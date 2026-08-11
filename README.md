@@ -26,7 +26,7 @@ This project fulfills joint academic requirements for **Software Project Managem
 
 - `main`: Stable, production-ready code for milestone releases.
 - `develop`: Primary integration branch for active sprint development.
-- `feature/*`: Dedicated branches for individual User Stories (e.g., `feature/US-01-elderly-ui`).
+- `feature/*`: Dedicated branches for individual User Stories (e.g., `feature/dev-id/US-01-elderly-ui`).
 
 ---
 
