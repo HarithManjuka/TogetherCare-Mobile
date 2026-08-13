@@ -1,0 +1,21 @@
+# .coderabbit.yaml
+version: "2"
+language: "en-US"
+reviews:
+  profile: "chill" # Options: chill, assertive
+  request_tools:
+    - "github-checks"
+  auto_review:
+    enabled: true
+    # Specify branches CodeRabbit should auto-review PRs for
+    target_branches:
+      - "dev"
+      - "main"
+  path_instructions:
+    - path: "src/screens/elderly/**"
+      instructions: "Enforce high contrast UI standards, readable font sizes, and accessible touch targets >= 48dp."
+    - path: "src/screens/volunteer/**"
+      instructions: "Verify NIC and Student ID validation handling and secure credential checks."
+
+chat:
+  auto_reply: true

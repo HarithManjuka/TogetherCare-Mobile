@@ -1,14 +1,23 @@
+// App.js
 import React, { useState } from 'react';
 import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { COLORS } from './src/constants/theme';
 
+// Import Screens
+import SplashScreen from './src/screens/SplashScreen';
 import ElderlyHomeScreen from './src/screens/elderly/ElderlyHomeScreen';
 import VolunteerHomeScreen from './src/screens/volunteer/VolunteerHomeScreen';
 import CaregiverDashboard from './src/screens/caregiver/CaregiverDashboard';
 import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
 
 export default function App() {
+  const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState('elderly');
+
+  // Show Launch Screen while initializing
+  if (isLoading) {
+    return <SplashScreen onFinish={() => setIsLoading(false)} />;
+  }
 
   return (
     <SafeAreaView style={styles.container}>
