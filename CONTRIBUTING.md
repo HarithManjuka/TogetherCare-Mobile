@@ -25,3 +25,18 @@ We follow a strict **Feature-Branch Workflow** off the `dev` integration branch.
 [ main ]  <────────────────────────────────────── [ dev ] (Sprint Release PR)
                                                      │
                                                      ├──► feature/IT238XXXXX/feature-name
+
+---
+
+# Git Contribution Guidelines
+**Branch Naming:**
+* `main`: Production-ready code for milestone releases.
+* `develop`: Integration branch.
+* `feature/user-id/US-XX-short-desc`: (e.g., `feature/sandeepa/US-01-auth`)
+
+**Commit Messages:**
+* `feat:` A new feature (e.g., `feat: add volunteer login screen`)
+* `fix:` A bug fix
+* `docs:` Documentation changes
+* `style:` Formatting, missing semi-colons, etc.
+* `refactor:` Code change that neither fixes a bug nor adds a feature
