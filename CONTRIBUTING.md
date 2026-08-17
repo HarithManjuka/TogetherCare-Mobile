@@ -2,7 +2,7 @@
 
 First off, thank you for contributing to **TogetherCare**! 
 
-This project fulfills joint academic requirements for **Software Project Management (SE3080)** and **User Experience Engineering (SE3050)** at SLIIT[cite: 1, 8]. Following these guidelines ensures smooth integration, high code quality, and verifiable evidence for our module evaluations[cite: 1, 6].
+This project fulfills joint academic requirements for **Software Project Management (SE3080)** and **User Experience Engineering (SE3050)** at SLIIT. Following these guidelines ensures smooth integration, high code quality, and verifiable evidence for our module evaluations.
 
 ---
 
@@ -19,9 +19,27 @@ This project fulfills joint academic requirements for **Software Project Managem
 
 ## 🌿 Git Branching Strategy
 
-We follow a strict **Feature-Branch Workflow** off the `dev` integration branch.
+We follow a strict **Feature-Branch Workflow** off the `develop` integration branch.
 
 ```text
-[ main ]  <────────────────────────────────────── [ dev ] (Sprint Release PR)
+[ main ]  <────────────────────────────────────── [ develop ] (Sprint Release PR)
                                                      │
                                                      ├──► feature/IT238XXXXX/feature-name
+```
+
+**Branch Naming:**
+* `main`: Production-ready code for milestone releases.
+* `develop`: Integration branch.
+* `feature/user-id/US-XX-short-desc`: (e.g., `feature/sandeepa/US-01-auth`)
+
+---
+
+## 📝 Commit Messages
+
+We use structured commit messages to make our Git history readable and to ensure commit history reflects each team member's contribution for our agile review.
+
+* `feat:` A new feature (e.g., `feat: add volunteer login screen`)
+* `fix:` A bug fix
+* `docs:` Documentation changes
+* `style:` Formatting, missing semi-colons, etc.
+* `refactor:` Code change that neither fixes a bug nor adds a feature
