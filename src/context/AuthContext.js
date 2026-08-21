@@ -10,25 +10,22 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Restore session on app start
+  // Phase 1 Development: Always start on Welcome page when app runs
   useEffect(() => {
-    const restoreSession = async () => {
+    const initSession = async () => {
       try {
-        const storedToken = await storage.getToken();
-        const storedUser = await storage.getUser();
-
-        if (storedToken && storedUser) {
-          setToken(storedToken);
-          setUser(storedUser);
-        }
+        // Clear stored tokens on launch for Phase 1 dev requirement
+        await storage.clearSession();
+        setToken(null);
+        setUser(null);
       } catch (e) {
-        console.error('Session Restoration Error:', e);
+        console.error('Session Initialization Error:', e);
       } finally {
         setIsLoading(false);
       }
     };
 
-    restoreSession();
+    initSession();
   }, []);
 
   // Register action
