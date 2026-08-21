@@ -1,7 +1,7 @@
-// App.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import { COLORS } from './src/constants/theme';
+import client from './src/api/client';
 
 // Import Screens
 import SplashScreen from './src/screens/SplashScreen';
@@ -13,6 +13,16 @@ import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [role, setRole] = useState('elderly');
+
+  useEffect(() => {
+    client.get('/health')
+      .then(res => {
+        console.log('✅ Express Backend Connected:', res.data);
+      })
+      .catch(err => {
+        console.error('❌ Express Backend Connection Failed:', err.message);
+      });
+  }, []);
 
   // Show Launch Screen while initializing
   if (isLoading) {
