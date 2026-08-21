@@ -1,78 +1,66 @@
-import React, { useState, useEffect } from 'react';
-import { SafeAreaView, View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
-import { COLORS } from './src/constants/theme';
-import client from './src/api/client';
-
-// Import Screens
+// App.js
+import React, { useState } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { AuthProvider, useAuth } from './src/context/AuthContext';
 import SplashScreen from './src/screens/SplashScreen';
+import WelcomeScreen from './src/screens/auth/WelcomeScreen';
+import LoginScreen from './src/screens/auth/LoginScreen';
+import RegisterScreen from './src/screens/auth/RegisterScreen';
+
+// Role Dashboard Screens
 import ElderlyHomeScreen from './src/screens/elderly/ElderlyHomeScreen';
 import VolunteerHomeScreen from './src/screens/volunteer/VolunteerHomeScreen';
 import CaregiverDashboard from './src/screens/caregiver/CaregiverDashboard';
 import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
 
-export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [role, setRole] = useState('elderly');
+function MainNavigator() {
+  const { user, isAuthenticated, isLoading } = useAuth();
+  const [showSplash, setShowSplash] = useState(true);
+  const [authScreen, setAuthScreen] = useState('Welcome'); // 'Welcome' | 'Login' | 'Register'
 
-  useEffect(() => {
-    client.get('/health')
-      .then(res => {
-        console.log('✅ Express Backend Connected:', res.data);
-      })
-      .catch(err => {
-        console.error('❌ Express Backend Connection Failed:', err.message);
-      });
-  }, []);
-
-  // Show Launch Screen while initializing
-  if (isLoading) {
-    return <SplashScreen onFinish={() => setIsLoading(false)} />;
+  // 1. Show Splash on initial startup
+  if (showSplash) {
+    return <SplashScreen onFinish={() => setShowSplash(false)} />;
   }
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
-      
-      {/* Dev Role Switcher */}
-      <View style={styles.roleBanner}>
-        <Text style={styles.bannerTitle}>ROLE PREVIEW: </Text>
-        {['elderly', 'volunteer', 'caregiver', 'admin'].map((r) => (
-          <TouchableOpacity
-            key={r}
-            onPress={() => setRole(r)}
-            style={[styles.roleBtn, role === r && styles.activeRoleBtn]}
-          >
-            <Text style={[styles.roleBtnText, role === r && styles.activeRoleBtnText]}>
-              {r.toUpperCase()}
-            </Text>
-          </TouchableOpacity>
-        ))}
+  // 2. Show spinner while verifying stored token
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0D9488" />
       </View>
+    );
+  }
 
-      {/* Screen Views */}
-      <View style={styles.screenContainer}>
-        {role === 'elderly' && <ElderlyHomeScreen />}
-        {role === 'volunteer' && <VolunteerHomeScreen />}
-        {role === 'caregiver' && <CaregiverDashboard />}
-        {role === 'admin' && <AdminDashboardScreen />}
-      </View>
-    </SafeAreaView>
-  );
+  // 3. Unauthenticated Stack
+  if (!isAuthenticated || !user) {
+    if (authScreen === 'Login') {
+      return <LoginScreen onNavigate={setAuthScreen} />;
+    }
+    if (authScreen === 'Register') {
+      return <RegisterScreen onNavigate={setAuthScreen} />;
+    }
+    return <WelcomeScreen onNavigate={setAuthScreen} />;
+  }
+
+  // 4. Role-Based Navigation Routing
+  switch (user.role) {
+    case 'volunteer':
+      return <VolunteerHomeScreen />;
+    case 'caregiver':
+      return <CaregiverDashboard />;
+    case 'admin':
+      return <AdminDashboardScreen />;
+    case 'elderly':
+    default:
+      return <ElderlyHomeScreen />;
+  }
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  roleBanner: { 
-    flexDirection: 'row', 
-    padding: 8, 
-    backgroundColor: '#E2E8F0', 
-    alignItems: 'center', 
-    justifyContent: 'space-around' 
-  },
-  bannerTitle: { fontSize: 10, fontWeight: 'bold', color: COLORS.textPrimary },
-  roleBtn: { paddingHorizontal: 6, paddingVertical: 4, borderRadius: 4, backgroundColor: '#CBD5E1' },
-  activeRoleBtn: { backgroundColor: COLORS.primary },
-  roleBtnText: { fontSize: 10, color: '#334155', fontWeight: 'bold' },
-  activeRoleBtnText: { color: '#FFFFFF' },
-  screenContainer: { flex: 1 },
-});
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainNavigator />
+    </AuthProvider>
+  );
+}
