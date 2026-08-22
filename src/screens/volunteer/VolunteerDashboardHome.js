@@ -7,15 +7,15 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  TextInput,
   Alert,
   SafeAreaView,
   StatusBar,
   Platform,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
+import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
   const { user } = useAuth();
@@ -24,15 +24,10 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const [isOnline, setIsOnline] = useState(true);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
-  const [addRequestModalVisible, setAddRequestModalVisible] = useState(false);
+  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  const [editingOffer, setEditingOffer] = useState(null);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
   const [acceptedRequests, setAcceptedRequests] = useState([]);
-
-  // Form states for Add Request
-  const [newElderName, setNewElderName] = useState('');
-  const [newRequestType, setNewRequestType] = useState('Grocery pickup');
-  const [newDescription, setNewDescription] = useState('');
-  const [newAddress, setNewAddress] = useState('');
 
   // Form states for Availability
   const [availHours, setAvailHours] = useState('Weekdays & Weekends (9 AM - 6 PM)');
@@ -50,6 +45,24 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const volunteerLocation = user?.address?.city
     ? `${user.address.city}, ${user.address.district || 'Colombo'}`
     : 'Colombo 03';
+
+  // Volunteer's active offers (CRUD state)
+  const [myOffers, setMyOffers] = useState([
+    {
+      id: 'offer-1',
+      volunteerName: `${volunteerName} ${user?.lastName || ''}`.trim(),
+      services: ['Grocery Pickup', 'Pharmacy Run'],
+      date: '2026-08-25',
+      startTime: '02:00 PM',
+      endTime: '04:00 PM',
+      serviceArea: 'Colombo 03',
+      radius: 'Within 5 km',
+      capacity: 2,
+      slotsLeft: 2,
+      specialSkills: 'I have a large SUV and can carry heavy grocery loads.',
+      status: 'pending',
+    },
+  ]);
 
   // Requests matching wireframe + rich data
   const [requestsList, setRequestsList] = useState([
@@ -97,6 +110,49 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     },
   ]);
 
+  // Offer CRUD Handlers
+  const handleSaveOffer = (offerData) => {
+    if (editingOffer) {
+      // Update existing offer (CRUD Update)
+      setMyOffers((prev) =>
+        prev.map((o) => (o.id === editingOffer.id ? { ...o, ...offerData } : o))
+      );
+      Alert.alert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
+    } else {
+      // Create new offer (CRUD Create)
+      setMyOffers((prev) => [offerData, ...prev]);
+      Alert.alert(
+        '🎉 Offer Posted Successfully!',
+        'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
+      );
+    }
+    setEditingOffer(null);
+    setOfferModalVisible(false);
+  };
+
+  const handleEditOffer = (offer) => {
+    setEditingOffer(offer);
+    setOfferModalVisible(true);
+  };
+
+  const handleDeleteOffer = (offerId) => {
+    Alert.alert(
+      'Cancel & Delete Offer',
+      'Are you sure you want to remove this availability offer from the community board?',
+      [
+        { text: 'Keep Offer', style: 'cancel' },
+        {
+          text: 'Delete Offer',
+          style: 'destructive',
+          onPress: () => {
+            setMyOffers((prev) => prev.filter((o) => o.id !== offerId));
+            Alert.alert('Offer Removed', 'Your offer has been removed.');
+          },
+        },
+      ]
+    );
+  };
+
   const handleAcceptRequest = (request) => {
     if (acceptedRequests.includes(request.id)) {
       Alert.alert('Already Accepted', 'You have already accepted this request.');
@@ -112,35 +168,6 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         { text: 'View in Schedule', onPress: () => onNavigateTab('schedule') },
       ]
     );
-  };
-
-  const handleCreateNewRequest = () => {
-    if (!newElderName.trim() || !newDescription.trim()) {
-      Alert.alert('Missing Fields', 'Please provide elder name and request details.');
-      return;
-    }
-
-    const newReq = {
-      id: `req-${Date.now()}`,
-      type: newRequestType,
-      category: newRequestType.toLowerCase().includes('grocery') ? 'grocery' : 'medical',
-      elderName: newElderName.trim(),
-      distance: '0.8 km',
-      duration: '30 min',
-      badge: 'Today',
-      badgeType: 'today',
-      address: newAddress.trim() || 'Colombo 03',
-      phone: '077 000 0000',
-      items: [newDescription.trim()],
-      notes: 'Submitted via Volunteer Quick Action.',
-    };
-
-    setRequestsList((prev) => [newReq, ...prev]);
-    setAddRequestModalVisible(false);
-    setNewElderName('');
-    setNewDescription('');
-    setNewAddress('');
-    Alert.alert('Success', 'New assistance request posted to community queue!');
   };
 
   return (
@@ -226,7 +253,135 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
           </View>
         </View>
 
-        {/* Section: Nearby requests */}
+        {/* --- SECTION: My Active Offers / Posted Availability (CRUD Display) --- */}
+        <View style={styles.sectionContainer}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.sectionTitle}>My Active Offers</Text>
+              <View style={styles.offerCountBadge}>
+                <Text style={styles.offerCountText}>{myOffers.length}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                setEditingOffer(null);
+                setOfferModalVisible(true);
+              }}
+              activeOpacity={0.7}
+              style={styles.postOfferLinkBtn}
+            >
+              <Ionicons name="add-circle" size={16} color="#1E40AF" />
+              <Text style={styles.postOfferLinkText}>+ Post New Offer</Text>
+            </TouchableOpacity>
+          </View>
+
+          {myOffers.length === 0 ? (
+            <View style={styles.emptyOffersBox}>
+              <Text style={styles.emptyOffersEmoji}>🤝</Text>
+              <Text style={styles.emptyOffersTitle}>No Active Offers Posted</Text>
+              <Text style={styles.emptyOffersSub}>
+                Post your available hours and services to let seniors in Colombo book help.
+              </Text>
+              <TouchableOpacity
+                style={styles.postFirstOfferBtn}
+                onPress={() => {
+                  setEditingOffer(null);
+                  setOfferModalVisible(true);
+                }}
+              >
+                <Text style={styles.postFirstOfferBtnText}>+ Offer Your Help Now</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.offersList}>
+              {myOffers.map((offer) => (
+                <View key={offer.id} style={styles.offerCard}>
+                  {/* Card Header */}
+                  <View style={styles.offerCardHeader}>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.offerVolunteerRow}>
+                        <Text style={styles.offerVolunteerName}>
+                          👤 {offer.volunteerName}
+                        </Text>
+                        <View style={styles.pendingBadge}>
+                          <Text style={styles.pendingBadgeText}>
+                            {offer.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.offerDateTime}>
+                        📅 Available on {offer.date} · 🕒 {offer.startTime} - {offer.endTime}
+                      </Text>
+                    </View>
+
+                    {/* Slots Left Badge */}
+                    <View style={styles.slotsLeftBadge}>
+                      <Text style={styles.slotsLeftNumber}>{offer.slotsLeft}</Text>
+                      <Text style={styles.slotsLeftLabel}>Slots Left</Text>
+                    </View>
+                  </View>
+
+                  {/* Services Badges */}
+                  <View style={styles.servicesPillsRow}>
+                    {offer.services.map((srv, idx) => (
+                      <View key={idx} style={styles.servicePill}>
+                        <Text style={styles.servicePillText}>
+                          {srv.includes('Grocery')
+                            ? '🛒 '
+                            : srv.includes('Pharmacy')
+                            ? '💊 '
+                            : srv.includes('Companionship')
+                            ? '🤝 '
+                            : srv.includes('Tech')
+                            ? '📱 '
+                            : '🐕 '}
+                          {srv}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Area & Radius */}
+                  <View style={styles.offerLocationRow}>
+                    <Ionicons name="navigate-outline" size={14} color="#64748B" />
+                    <Text style={styles.offerLocationText}>
+                      {offer.serviceArea} ({offer.radius})
+                    </Text>
+                  </View>
+
+                  {/* Special Skills / Extra Details */}
+                  {offer.specialSkills ? (
+                    <View style={styles.skillsBox}>
+                      <Text style={styles.skillsTag}>Special Skills / Notes:</Text>
+                      <Text style={styles.skillsContent}>"{offer.specialSkills}"</Text>
+                    </View>
+                  ) : null}
+
+                  {/* CRUD Action Buttons */}
+                  <View style={styles.offerActionsRow}>
+                    <TouchableOpacity
+                      style={styles.editOfferBtn}
+                      onPress={() => handleEditOffer(offer)}
+                    >
+                      <Ionicons name="create-outline" size={15} color="#1E40AF" />
+                      <Text style={styles.editOfferBtnText}>Edit Offer</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.deleteOfferBtn}
+                      onPress={() => handleDeleteOffer(offer.id)}
+                    >
+                      <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                      <Text style={styles.deleteOfferBtnText}>Cancel Offer</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Section: Nearby requests (Matches Wireframe) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Nearby requests</Text>
@@ -298,21 +453,25 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
           </View>
         </View>
 
-        {/* Section: Quick actions */}
+        {/* Section: Quick actions (Matches Wireframe) */}
         <View style={styles.sectionContainer}>
           <Text style={styles.sectionTitle}>Quick actions</Text>
 
           <View style={styles.quickActionsRow}>
-            {/* Quick Action 1: Add Request */}
+            {/* Quick Action 1: Add Request (Offer Help / Post Availability) */}
             <TouchableOpacity
               style={styles.quickActionCard}
-              onPress={() => setAddRequestModalVisible(true)}
+              onPress={() => {
+                setEditingOffer(null);
+                setOfferModalVisible(true);
+              }}
               activeOpacity={0.8}
             >
               <View style={styles.quickActionIconBox}>
                 <Text style={styles.quickActionEmoji}>📅</Text>
               </View>
               <Text style={styles.quickActionLabel}>Add Request</Text>
+              <Text style={styles.quickActionSub}>Offer Your Help</Text>
             </TouchableOpacity>
 
             {/* Quick Action 2: Availability */}
@@ -325,11 +484,12 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
                 <Text style={styles.quickActionEmoji}>🕒</Text>
               </View>
               <Text style={styles.quickActionLabel}>Availability</Text>
+              <Text style={styles.quickActionSub}>Set Hours</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Banner: Community Impact Message */}
+        {/* Banner: Community Impact */}
         <View style={styles.impactCard}>
           <View style={styles.impactIconCol}>
             <Ionicons name="heart-circle" size={36} color="#0D9488" />
@@ -343,7 +503,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </ScrollView>
 
-      {/* --- MODAL 1: Request Detail & Accept Modal --- */}
+      {/* --- OFFER HELP MODAL (CRUD Add & Edit Form) --- */}
+      <OfferHelpModal
+        visible={offerModalVisible}
+        onClose={() => {
+          setOfferModalVisible(false);
+          setEditingOffer(null);
+        }}
+        onSubmit={handleSaveOffer}
+        initialData={editingOffer}
+        currentUser={user}
+      />
+
+      {/* --- MODAL: Request Detail & Accept Modal --- */}
       <Modal
         visible={selectedRequest !== null}
         animationType="slide"
@@ -448,96 +620,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- MODAL 2: Add Request Modal --- */}
-      <Modal
-        visible={addRequestModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setAddRequestModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.formModalCard}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Add Assistance Request</Text>
-              <TouchableOpacity
-                onPress={() => setAddRequestModalVisible(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.inputLabel}>Elderly Person Name *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. Mr. Bandara"
-              placeholderTextColor="#94A3B8"
-              value={newElderName}
-              onChangeText={setNewElderName}
-            />
-
-            <Text style={styles.inputLabel}>Assistance Type</Text>
-            <View style={styles.typeSelectorRow}>
-              {['Grocery pickup', 'Pharmacy', 'Companionship'].map((t) => (
-                <TouchableOpacity
-                  key={t}
-                  style={[
-                    styles.typeChip,
-                    newRequestType === t && styles.typeChipActive,
-                  ]}
-                  onPress={() => setNewRequestType(t)}
-                >
-                  <Text
-                    style={[
-                      styles.typeChipText,
-                      newRequestType === t && styles.typeChipTextActive,
-                    ]}
-                  >
-                    {t}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Items / Details Needed *</Text>
-            <TextInput
-              style={[styles.modalInput, { height: 80, textAlignVertical: 'top' }]}
-              placeholder="List items or describe task needed..."
-              placeholderTextColor="#94A3B8"
-              multiline
-              value={newDescription}
-              onChangeText={setNewDescription}
-            />
-
-            <Text style={styles.inputLabel}>Location / Street Address</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="e.g. No. 12, Duplication Rd, Colombo 03"
-              placeholderTextColor="#94A3B8"
-              value={newAddress}
-              onChangeText={setNewAddress}
-            />
-
-            <View style={styles.modalActionsRow}>
-              <TouchableOpacity
-                style={styles.modalSecondaryBtn}
-                onPress={() => setAddRequestModalVisible(false)}
-              >
-                <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalPrimaryBtn}
-                onPress={handleCreateNewRequest}
-              >
-                <Text style={styles.modalPrimaryBtnText}>Submit Request</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* --- MODAL 3: Availability Modal --- */}
+      {/* --- MODAL: Availability Modal --- */}
       <Modal
         visible={availabilityModalVisible}
         animationType="slide"
@@ -644,7 +727,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- MODAL 4: Notifications Modal --- */}
+      {/* --- MODAL: Notifications Modal --- */}
       <Modal
         visible={notificationsVisible}
         animationType="fade"
@@ -862,7 +945,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: 12,
+  },
+  offerCountBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  offerCountText: {
+    color: '#1E40AF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  postOfferLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  postOfferLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E40AF',
   },
   seeAllBtn: {
     paddingVertical: 4,
@@ -872,6 +977,202 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#1E40AF',
+  },
+
+  // My Active Offers Styles
+  offersList: {
+    gap: 12,
+  },
+  offerCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  offerCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  offerVolunteerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
+  offerVolunteerName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  pendingBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  pendingBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  offerDateTime: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  slotsLeftBadge: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignItems: 'center',
+    minWidth: 65,
+  },
+  slotsLeftNumber: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#1E40AF',
+  },
+  slotsLeftLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#3B82F6',
+    textTransform: 'uppercase',
+  },
+  servicesPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: 8,
+  },
+  servicePill: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  servicePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  offerLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  offerLocationText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  skillsBox: {
+    backgroundColor: '#FFFFFF',
+    padding: 8,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#3B82F6',
+    marginBottom: 10,
+  },
+  skillsTag: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#1E40AF',
+    textTransform: 'uppercase',
+  },
+  skillsContent: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: '#334155',
+    marginTop: 2,
+  },
+  offerActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingTop: 10,
+  },
+  editOfferBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    height: 36,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 8,
+  },
+  editOfferBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  deleteOfferBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    height: 36,
+    backgroundColor: '#FEF2F2',
+    borderRadius: 8,
+  },
+  deleteOfferBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+
+  // Empty Offers
+  emptyOffersBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    padding: 20,
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  emptyOffersEmoji: {
+    fontSize: 32,
+    marginBottom: 6,
+  },
+  emptyOffersTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  emptyOffersSub: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+  postFirstOfferBtn: {
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  postFirstOfferBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
   },
 
   // Nearby Requests List
@@ -987,7 +1288,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    paddingVertical: 22,
+    paddingVertical: 18,
     paddingHorizontal: 12,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1008,6 +1309,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#334155',
+  },
+  quickActionSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 2,
   },
 
   // Impact Card
@@ -1185,17 +1491,6 @@ const styles = StyleSheet.create({
     color: '#334155',
     marginTop: 10,
     marginBottom: 6,
-  },
-  modalInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: '#0F172A',
-    marginBottom: 10,
   },
   typeSelectorRow: {
     flexDirection: 'row',
