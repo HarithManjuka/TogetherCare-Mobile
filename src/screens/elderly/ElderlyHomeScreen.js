@@ -19,9 +19,10 @@ import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-ico
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
 import { COLORS, SIZES } from '../../constants/theme';
+import ProfileScreen from '../auth/ProfileScreen';
 
 export default function ElderlyHomeScreen() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   // User profile loaded directly from MongoDB
   const [profile, setProfile] = useState(null);
@@ -31,9 +32,9 @@ export default function ElderlyHomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Visit details modal & Profile menu modal
+  // Visit details modal & Profile screen state
   const [selectedVisit, setSelectedVisit] = useState(null);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showProfileScreen, setShowProfileScreen] = useState(false);
 
   // Dynamic time greeting
   const getGreeting = () => {
@@ -139,6 +140,22 @@ export default function ElderlyHomeScreen() {
     );
   };
 
+  // If user opens their profile screen, render ProfileScreen
+  if (showProfileScreen) {
+    return (
+      <ProfileScreen
+        onBack={() => {
+          setShowProfileScreen(false);
+          fetchUserProfile();
+        }}
+        onClose={() => {
+          setShowProfileScreen(false);
+          fetchUserProfile();
+        }}
+      />
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -167,10 +184,17 @@ export default function ElderlyHomeScreen() {
           <TouchableOpacity
             style={styles.profileButton}
             activeOpacity={0.7}
-            onPress={() => setShowProfileMenu(true)}
+            onPress={() => setShowProfileScreen(true)}
             accessibilityLabel="User Profile Menu"
           >
-            <Ionicons name="person-circle" size={38} color={COLORS.primary} />
+            {currentUser?.profilePicture ? (
+              <Image
+                source={{ uri: currentUser.profilePicture }}
+                style={styles.headerAvatarImg}
+              />
+            ) : (
+              <Ionicons name="person-circle" size={38} color={COLORS.primary} />
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -416,47 +440,6 @@ export default function ElderlyHomeScreen() {
           </View>
         </View>
       </Modal>
-
-      {/* Profile / Account Settings Modal */}
-      <Modal
-        visible={showProfileMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowProfileMenu(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowProfileMenu(false)}
-        >
-          <View style={styles.profileMenuCard}>
-            <View style={styles.profileInfoBox}>
-              <Ionicons name="person-circle" size={64} color={COLORS.primary} />
-              <Text style={styles.profileName}>
-                {currentUser?.firstName ? `${currentUser.firstName}${currentUser.lastName ? ' ' + currentUser.lastName : ''}` : ''}
-              </Text>
-              <View style={styles.roleBadge}>
-                <Text style={styles.profileRole}>
-                  {currentUser?.role ? currentUser.role.toUpperCase() : 'MEMBER'}
-                </Text>
-              </View>
-              {currentUser?.email ? <Text style={styles.profileEmail}>{currentUser.email}</Text> : null}
-              {currentUser?.phone ? <Text style={styles.profileEmail}>📞 {currentUser.phone}</Text> : null}
-            </View>
-
-            <TouchableOpacity
-              style={styles.signOutBtn}
-              onPress={() => {
-                setShowProfileMenu(false);
-                logout();
-              }}
-            >
-              <Ionicons name="log-out-outline" size={20} color={COLORS.danger} />
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -511,6 +494,13 @@ const styles = StyleSheet.create({
     padding: 2,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  headerAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -865,60 +855,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
-  },
-  profileMenuCard: {
-    width: '90%',
-    maxWidth: 340,
-    backgroundColor: COLORS.background,
-    borderRadius: 20,
-    padding: 24,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  profileInfoBox: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  profileName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.primary,
-    marginTop: 8,
-  },
-  roleBadge: {
-    backgroundColor: '#CCFBF1',
-    paddingHorizontal: 12,
-    paddingVertical: 3,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  profileRole: {
-    fontSize: 13,
-    color: COLORS.secondary,
-    fontWeight: '700',
-  },
-  profileEmail: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 6,
-  },
-  signOutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    width: '100%',
-    paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    minHeight: 48,
-  },
-  signOutText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.danger,
   },
 });
