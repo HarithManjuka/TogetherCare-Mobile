@@ -6,6 +6,7 @@ import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
+import ForgotPasswordFlow from './src/screens/auth/ForgotPasswordFlow';
 
 // Role Dashboard Screens
 import ElderlyHomeScreen from './src/screens/elderly/ElderlyHomeScreen';
@@ -39,6 +40,9 @@ function MainNavigator() {
     }
     if (authScreen === 'Register') {
       return <RegisterScreen onNavigate={setAuthScreen} />;
+    }
+    if (authScreen === 'ForgotPassword') {
+      return <ForgotPasswordFlow onBackToLogin={() => setAuthScreen('Login')} />;
     }
     return <WelcomeScreen onNavigate={setAuthScreen} />;
   }
