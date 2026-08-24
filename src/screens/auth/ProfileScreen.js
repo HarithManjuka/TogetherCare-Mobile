@@ -1,5 +1,5 @@
 // src/screens/auth/ProfileScreen.js
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,9 @@ import {
 } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useProfile } from '../../hooks/useProfile';
+import { useTheme } from '../../context/ThemeContext';
 import { COLORS } from '../../constants/theme';
-import styles from '../../styles/ProfileScreen.styles';
+import { getProfileScreenStyles } from '../../styles/ProfileScreen.styles';
 
 export default function ProfileScreen({ onBack, onClose }) {
   const {
@@ -64,6 +65,9 @@ export default function ProfileScreen({ onBack, onClose }) {
     handleLogout,
   } = useProfile();
 
+  const { sizeMode, setSizeMode, scale, isLarge } = useTheme();
+  const styles = useMemo(() => getProfileScreenStyles(scale), [scale]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -76,7 +80,7 @@ export default function ProfileScreen({ onBack, onClose }) {
           onPress={onBack || onClose}
           accessibilityLabel="Go back"
         >
-          <Ionicons name="chevron-back" size={22} color="#000000" />
+          <Ionicons name="chevron-back" size={Math.round(22 * scale)} color="#000000" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -85,7 +89,7 @@ export default function ProfileScreen({ onBack, onClose }) {
           onPress={onClose || onBack}
           accessibilityLabel="Close"
         >
-          <Ionicons name="close" size={26} color="#000000" />
+          <Ionicons name="close" size={Math.round(26 * scale)} color="#000000" />
         </TouchableOpacity>
       </View>
 
@@ -115,13 +119,13 @@ export default function ProfileScreen({ onBack, onClose }) {
               />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={80} color="#000000" />
+                <Ionicons name="person" size={Math.round(80 * scale)} color="#000000" />
               </View>
             )}
 
             {/* Camera / Edit Badge */}
             <View style={styles.cameraBadge}>
-              <Ionicons name="camera" size={16} color="#FFFFFF" />
+              <Ionicons name="camera" size={Math.round(16 * scale)} color="#FFFFFF" />
             </View>
           </TouchableOpacity>
 
@@ -136,9 +140,17 @@ export default function ProfileScreen({ onBack, onClose }) {
           <View style={styles.badgeCol}>
             <View style={styles.badgeIconBox}>
               {isVerified ? (
-                <MaterialCommunityIcons name="shield-check" size={46} color="#16A34A" />
+                <MaterialCommunityIcons
+                  name="shield-check"
+                  size={Math.round(46 * scale)}
+                  color="#16A34A"
+                />
               ) : (
-                <MaterialCommunityIcons name="shield-alert-outline" size={46} color="#D97706" />
+                <MaterialCommunityIcons
+                  name="shield-alert-outline"
+                  size={Math.round(46 * scale)}
+                  color="#D97706"
+                />
               )}
             </View>
             <Text
@@ -154,7 +166,11 @@ export default function ProfileScreen({ onBack, onClose }) {
           {/* Rating Badge from Review Table in Database */}
           <View style={styles.badgeCol}>
             <View style={styles.badgeIconBox}>
-              <MaterialCommunityIcons name="star-circle-outline" size={48} color="#000000" />
+              <MaterialCommunityIcons
+                name="star-circle-outline"
+                size={Math.round(48 * scale)}
+                color="#000000"
+              />
             </View>
             <Text style={styles.badgeLabel}>
               {user?.totalReviews && user.totalReviews > 0
@@ -177,7 +193,11 @@ export default function ProfileScreen({ onBack, onClose }) {
               onPress={openEditModal}
               accessibilityLabel="Edit Personal Details"
             >
-              <MaterialCommunityIcons name="square-edit-outline" size={24} color="#000000" />
+              <MaterialCommunityIcons
+                name="square-edit-outline"
+                size={Math.round(24 * scale)}
+                color="#000000"
+              />
             </TouchableOpacity>
           </View>
 
@@ -222,7 +242,11 @@ export default function ProfileScreen({ onBack, onClose }) {
               onPress={() => setShowInterestsModal(true)}
               accessibilityLabel="Edit Interests"
             >
-              <MaterialCommunityIcons name="square-edit-outline" size={24} color="#000000" />
+              <MaterialCommunityIcons
+                name="square-edit-outline"
+                size={Math.round(24 * scale)}
+                color="#000000"
+              />
             </TouchableOpacity>
           </View>
 
@@ -234,7 +258,7 @@ export default function ProfileScreen({ onBack, onClose }) {
             ).map((interestName, idx) => (
               <View key={idx} style={styles.interestItem}>
                 <View style={styles.interestCircle}>
-                  {renderInterestIcon(interestName, false, 28, '#000000')}
+                  {renderInterestIcon(interestName, false, Math.round(28 * scale), '#000000')}
                 </View>
                 <Text style={styles.interestLabel}>{interestName}</Text>
               </View>
@@ -244,6 +268,38 @@ export default function ProfileScreen({ onBack, onClose }) {
 
         {/* Horizontal Divider 3 */}
         <View style={styles.dividerLine} />
+
+        {/* Display Size Setting for Elders */}
+        <View style={styles.sizeSelectorRow}>
+          <View>
+            <Text style={styles.sizeSelectorLabel}>Display Size</Text>
+            <Text style={{ fontSize: Math.round(12 * scale), color: COLORS.textSecondary, marginTop: 2 }}>
+              {isLarge ? 'Large (125% Senior-friendly)' : 'Standard (100%)'}
+            </Text>
+          </View>
+
+          <View style={styles.sizeButtonsGroup}>
+            <TouchableOpacity
+              style={[styles.sizePill, sizeMode === 'standard' && styles.sizePillActive]}
+              onPress={() => setSizeMode('standard')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sizePillText, sizeMode === 'standard' && styles.sizePillTextActive]}>
+                Standard
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.sizePill, sizeMode === 'large' && styles.sizePillActive]}
+              onPress={() => setSizeMode('large')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.sizePillText, sizeMode === 'large' && styles.sizePillTextActive]}>
+                Large
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {/* Verify Account Option (Menu Row) */}
         <View style={styles.menuBlock}>
@@ -255,7 +311,7 @@ export default function ProfileScreen({ onBack, onClose }) {
           >
             <Text style={styles.menuItemText}>Verify Account</Text>
             <View style={styles.menuItemIconBox}>
-              <Ionicons name="chevron-forward" size={22} color="#000000" />
+              <Ionicons name="chevron-forward" size={Math.round(22 * scale)} color="#000000" />
             </View>
           </TouchableOpacity>
         </View>
@@ -268,7 +324,7 @@ export default function ProfileScreen({ onBack, onClose }) {
           accessibilityRole="button"
           accessibilityLabel="Log Out"
         >
-          <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
+          <Ionicons name="log-out-outline" size={Math.round(22 * scale)} color={COLORS.danger} />
           <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -468,7 +524,7 @@ export default function ProfileScreen({ onBack, onClose }) {
                         onPress={() => toggleInterestSelection(item.name)}
                       >
                         <View style={styles.pillIconBox}>
-                          {renderInterestIcon(item.name, isSelected, 18)}
+                          {renderInterestIcon(item.name, isSelected, Math.round(18 * scale))}
                         </View>
                         <Text
                           style={[

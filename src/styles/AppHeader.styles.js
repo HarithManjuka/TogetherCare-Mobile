@@ -33,6 +33,29 @@ export default StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  sizeToggleButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1.5,
+    borderColor: '#C7D2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 46,
+  },
+  sizeToggleButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  sizeToggleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  sizeToggleTextActive: {
+    color: '#FFFFFF',
+  },
   iconButton: {
     width: 40,
     height: 40,

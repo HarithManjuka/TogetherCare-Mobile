@@ -1,5 +1,5 @@
 // src/screens/elderly/ElderlyHomeScreen.js
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useElderlyHome } from '../../hooks/useElderlyHome';
+import { useTheme } from '../../context/ThemeContext';
 import { COLORS } from '../../constants/theme';
 import AppHeader from '../../components/common/AppHeader';
 import ProfileScreen from '../auth/ProfileScreen';
-import styles from '../../styles/ElderlyHomeScreen.styles';
+import { getElderlyHomeScreenStyles } from '../../styles/ElderlyHomeScreen.styles';
 
 export default function ElderlyHomeScreen() {
   const {
@@ -36,6 +37,9 @@ export default function ElderlyHomeScreen() {
     handleActionPress,
     refreshProfile,
   } = useElderlyHome();
+
+  const { scale, isLarge } = useTheme();
+  const styles = useMemo(() => getElderlyHomeScreenStyles(scale), [scale]);
 
   // If user opens their profile screen, render ProfileScreen
   if (showProfileScreen) {
@@ -57,7 +61,7 @@ export default function ElderlyHomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* Reusable App Header Component */}
+      {/* Reusable App Header Component with Size Switcher */}
       <AppHeader
         onProfilePress={() => setShowProfileScreen(true)}
         onNotificationPress={() => handleActionPress('Notifications')}
@@ -90,7 +94,11 @@ export default function ElderlyHomeScreen() {
             accessibilityLabel="Request Help"
           >
             <View style={styles.heroIconContainer}>
-              <Ionicons name="search-outline" size={42} color={COLORS.primary} />
+              <Ionicons
+                name="search-outline"
+                size={isLarge ? 50 : 42}
+                color={COLORS.primary}
+              />
             </View>
             <Text style={styles.heroCardText}>Request Help</Text>
             <Text style={styles.heroSubtext}>Find a verified volunteer or caregiver</Text>
@@ -107,7 +115,11 @@ export default function ElderlyHomeScreen() {
               accessibilityLabel="My Schedules"
             >
               <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
-                <Ionicons name="calendar-outline" size={32} color={COLORS.primary} />
+                <Ionicons
+                  name="calendar-outline"
+                  size={isLarge ? 38 : 32}
+                  color={COLORS.primary}
+                />
               </View>
               <Text style={styles.gridCardText}>My Schedules</Text>
             </TouchableOpacity>
@@ -121,7 +133,11 @@ export default function ElderlyHomeScreen() {
               accessibilityLabel="Care Circle"
             >
               <View style={[styles.gridIconContainer, { backgroundColor: '#CCFBF1' }]}>
-                <Ionicons name="call-outline" size={30} color={COLORS.secondary} />
+                <Ionicons
+                  name="call-outline"
+                  size={isLarge ? 36 : 30}
+                  color={COLORS.secondary}
+                />
               </View>
               <Text style={styles.gridCardText}>Care Circle</Text>
             </TouchableOpacity>
@@ -152,7 +168,11 @@ export default function ElderlyHomeScreen() {
           </View>
         ) : upcomingVisits.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="calendar-clear-outline" size={48} color="#94A3B8" />
+            <Ionicons
+              name="calendar-clear-outline"
+              size={isLarge ? 56 : 48}
+              color="#94A3B8"
+            />
             <Text style={styles.emptyTitle}>No Upcoming Visits</Text>
             <Text style={styles.emptySubtitle}>
               You currently have no visits scheduled in the database. Tap "Request Help" to create a new companionship request.
