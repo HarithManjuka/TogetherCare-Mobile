@@ -50,12 +50,17 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
     },
 
     // WhatsApp-Style Tabs Bar
-    tabsBar: {
+    tabsBarWrapper: {
       backgroundColor: '#1A365D',
-      flexDirection: 'row',
-      justifyContent: 'space-around',
       borderBottomWidth: 1,
       borderBottomColor: '#2A4365',
+    },
+    tabsBarScrollContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 8,
+      minWidth: '100%',
     },
     tabItem: {
       flex: 1,
@@ -63,15 +68,17 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 14,
+      paddingHorizontal: 4,
       position: 'relative',
-      gap: 5,
+      gap: 4,
     },
     tabText: {
-      fontSize: Math.round(12 * scale),
+      fontSize: Math.round(11.5 * scale),
       fontWeight: '800',
       color: '#94A3B8',
-      letterSpacing: 0.4,
+      letterSpacing: 0.2,
       textTransform: 'uppercase',
+      textAlign: 'center',
     },
     tabTextActive: {
       color: '#FFFFFF',
@@ -79,10 +86,11 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
     },
     tabBadge: {
       backgroundColor: '#38BDF8',
-      borderRadius: 10,
-      paddingHorizontal: 6,
+      borderRadius: 9,
+      paddingHorizontal: 5,
       paddingVertical: 1,
       minWidth: 18,
+      height: 18,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -94,9 +102,9 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
     tabActiveIndicator: {
       position: 'absolute',
       bottom: 0,
-      left: 8,
-      right: 8,
-      height: 3.5,
+      left: 4,
+      right: 4,
+      height: 3,
       backgroundColor: '#FFFFFF',
       borderTopLeftRadius: 3,
       borderTopRightRadius: 3,

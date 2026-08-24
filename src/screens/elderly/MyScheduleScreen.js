@@ -139,48 +139,55 @@ export default function MyScheduleScreen({ onBack, onRequestNew }) {
       </View>
 
       {/* WhatsApp-Style Navigation Tabs Bar */}
-      <View style={styles.tabsBar}>
-        {TABS.map((tab) => {
-          const isActive = activeTab === tab.key;
-          const badgeCount = counts[tab.key] || 0;
+      <View style={styles.tabsBarWrapper}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabsBarScrollContent}
+        >
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            const badgeCount = counts[tab.key] || 0;
 
-          return (
-            <TouchableOpacity
-              key={tab.key}
-              style={styles.tabItem}
-              activeOpacity={0.8}
-              onPress={() => setActiveTab(tab.key)}
-            >
-              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
-                {tab.label}
-              </Text>
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.tabItem}
+                activeOpacity={0.8}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                  {tab.label}
+                </Text>
 
-              {badgeCount > 0 && (
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeText}>{badgeCount}</Text>
-                </View>
-              )}
+                {badgeCount > 0 && (
+                  <View style={styles.tabBadge}>
+                    <Text style={styles.tabBadgeText}>{badgeCount}</Text>
+                  </View>
+                )}
 
-              {/* Active Tab Underline Indicator */}
-              {isActive && <View style={styles.tabActiveIndicator} />}
-            </TouchableOpacity>
-          );
-        })}
+                {/* Active Tab Underline Indicator */}
+                {isActive && <View style={styles.tabActiveIndicator} />}
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Tab Body Content */}
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#1A365D']}
-            tintColor="#1A365D"
-          />
-        }
-      >
+      {/* Tab Body Content with clean light background */}
+      <View style={styles.container}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#1A365D']}
+              tintColor="#1A365D"
+            />
+          }
+        >
         {isLoading ? (
           <View style={{ paddingVertical: 50, alignItems: 'center' }}>
             <ActivityIndicator size="large" color="#1A365D" />
@@ -323,7 +330,8 @@ export default function MyScheduleScreen({ onBack, onRequestNew }) {
             );
           })
         )}
-      </ScrollView>
+        </ScrollView>
+      </View>
 
       {/* Schedule Detail Sheet Modal */}
       <Modal
