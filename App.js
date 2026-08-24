@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
@@ -63,8 +64,10 @@ function MainNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <MainNavigator />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <MainNavigator />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

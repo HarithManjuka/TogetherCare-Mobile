@@ -1,7 +1,8 @@
 // src/context/AuthContext.js
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import client from '../api/client';
 import { storage } from '../utils/storage';
+import * as userService from '../services/userService';
 
 const AuthContext = createContext({});
 
@@ -10,11 +11,10 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Phase 1 Development: Always start on Welcome page when app runs
+  // Phase 1 Development: Start session
   useEffect(() => {
     const initSession = async () => {
       try {
-        // Clear stored tokens on launch for Phase 1 dev requirement
         await storage.clearSession();
         setToken(null);
         setUser(null);
@@ -68,6 +68,60 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  // Refresh profile from MongoDB
+  const refreshProfile = useCallback(async () => {
+    try {
+      const data = await userService.getProfile();
+      if (data?.success && data?.user) {
+        setUser(data.user);
+        await storage.setUser(data.user);
+        return data.user;
+      }
+    } catch (error) {
+      console.error('Error refreshing profile in AuthContext:', error.message);
+    }
+    return null;
+  }, []);
+
+  // Update user profile details (Name, Phone, Age, Address, Interests)
+  const updateProfile = async (profileData) => {
+    const data = await userService.updateProfile(profileData);
+    if (data?.success && data?.user) {
+      setUser(data.user);
+      await storage.setUser(data.user);
+      return data.user;
+    }
+    throw new Error(data?.message || 'Failed to update profile');
+  };
+
+  // Upload or replace profile picture on Cloudinary
+  const uploadProfilePicture = async (imageAsset) => {
+    const data = await userService.uploadProfilePicture(imageAsset);
+    if (data?.success && data?.profilePicture) {
+      setUser((prev) => ({
+        ...(prev || {}),
+        profilePicture: data.profilePicture,
+      }));
+      await refreshProfile();
+      return data.profilePicture;
+    }
+    throw new Error(data?.message || 'Failed to upload image');
+  };
+
+  // Delete profile picture from Cloudinary & MongoDB
+  const deleteProfilePicture = async () => {
+    // Optimistically remove photo from UI state immediately
+    setUser((prev) => ({
+      ...(prev || {}),
+      profilePicture: '',
+      profilePicturePublicId: '',
+    }));
+
+    const data = await userService.deleteProfilePicture();
+    await refreshProfile();
+    return data;
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -78,6 +132,10 @@ export const AuthProvider = ({ children }) => {
         register,
         login,
         logout,
+        refreshProfile,
+        updateProfile,
+        uploadProfilePicture,
+        deleteProfilePicture,
       }}
     >
       {children}
