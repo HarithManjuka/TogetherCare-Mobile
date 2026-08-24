@@ -16,26 +16,37 @@ const FALLBACK_ACTIVITIES = [
   { name: 'Reading', icon: 'book-open-page-variant-outline', iconFamily: 'MaterialCommunityIcons' },
 ];
 
-export function useCreateCompanionship({ onClose, onSuccess }) {
+export function useCreateCompanionship({ onClose, onSuccess, editingRequest = null }) {
   const [activities, setActivities] = useState(FALLBACK_ACTIVITIES);
   const [loadingActivities, setLoadingActivities] = useState(false);
-  const [selectedActivity, setSelectedActivity] = useState('Grocery');
+  const [selectedActivity, setSelectedActivity] = useState(
+    editingRequest?.activityType || 'Grocery'
+  );
 
   // Date Selection: 'today' | 'tomorrow' | 'custom'
-  const [dateOption, setDateOption] = useState('today');
+  const [dateOption, setDateOption] = useState(editingRequest ? 'custom' : 'today');
   const [selectedDate, setSelectedDate] = useState(() => {
+    if (editingRequest?.scheduledDate) {
+      try {
+        return new Date(editingRequest.scheduledDate).toISOString().split('T')[0];
+      } catch (e) {
+        return new Date().toISOString().split('T')[0];
+      }
+    }
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   // Time Selection
-  const [fromTime, setFromTime] = useState('09 : 00 AM');
-  const [toTime, setToTime] = useState('11 : 00 AM');
+  const [fromTime, setFromTime] = useState(editingRequest?.startTime || '09 : 00 AM');
+  const [toTime, setToTime] = useState(editingRequest?.endTime || '11 : 00 AM');
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
 
   // Communication Method: Default to 'chat' (message)
-  const [communicationMethod, setCommunicationMethod] = useState('chat');
+  const [communicationMethod, setCommunicationMethod] = useState(
+    editingRequest?.communicationMethod || 'chat'
+  );
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -166,16 +177,23 @@ export function useCreateCompanionship({ onClose, onSuccess }) {
         endTime: activeToTime.replace(/\s+/g, ' '),
         timeSlot: `${activeFromTime} - ${activeToTime}`,
         communicationMethod: communicationMethod || 'chat',
-        notes: `Companionship for ${activeActivity} via ${communicationMethod || 'chat'}`,
+        notes: `Companionship for ${activeActivity}, communicate via ${communicationMethod || 'chat'}`,
       };
 
       console.log('Submitting companionship payload:', payload);
-      const res = await companionshipService.createRequest(payload);
+      let res;
+      if (editingRequest?._id) {
+        res = await companionshipService.updateRequest(editingRequest._id, payload);
+      } else {
+        res = await companionshipService.createRequest(payload);
+      }
 
       if (res?.success) {
         notifyUser(
-          'Request Sent Successfully',
-          `Your companionship request for ${activeActivity} on ${activeDate} (${activeFromTime} - ${activeToTime}) has been sent.`,
+          editingRequest ? 'Request Updated' : 'Request Sent Successfully',
+          editingRequest
+            ? `Your companionship request has been updated.`
+            : `Your companionship request for ${activeActivity} on ${activeDate} (${activeFromTime} - ${activeToTime}) has been sent.`,
           () => {
             if (onSuccess) onSuccess(res.data);
             if (onClose) onClose();
@@ -184,14 +202,14 @@ export function useCreateCompanionship({ onClose, onSuccess }) {
       } else {
         notifyUser(
           'Request Failed',
-          res?.message || 'Unable to create companionship request.',
+          res?.message || 'Unable to process companionship request.',
           () => {
             if (onClose) onClose();
           }
         );
       }
     } catch (err) {
-      console.error('Error creating companionship request:', err);
+      console.error('Error submitting companionship request:', err);
       notifyUser(
         'Request Failed',
         err.message || 'Failed to submit companionship request.',
@@ -227,6 +245,7 @@ export function useCreateCompanionship({ onClose, onSuccess }) {
     handleCustomTimeConfirm,
     renderActivityIcon,
     handleSubmit,
+    isEditing: !!editingRequest,
   };
 }
 

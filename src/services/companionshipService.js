@@ -27,10 +27,31 @@ export const createRequest = async (requestData) => {
 };
 
 /**
- * Fetch all open/pending companionship requests (for volunteer screens in the future)
+ * Update an existing companionship request
+ * @param {string} id
+ * @param {Object} requestData
  */
-export const getOpenRequests = async () => {
-  const response = await client.get('/companionship/open-requests');
+export const updateRequest = async (id, requestData) => {
+  const response = await client.put(`/companionship/${id}`, requestData);
   return response.data;
 };
+
+/**
+ * Delete a pending companionship request
+ * @param {string} id
+ */
+export const deleteRequest = async (id) => {
+  const response = await client.delete(`/companionship/${id}`);
+  return response.data;
+};
+
+/**
+ * Cancel a companionship request
+ * @param {string} id
+ */
+export const cancelRequest = async (id) => {
+  const response = await client.put(`/companionship/${id}/cancel`);
+  return response.data;
+};
+
 

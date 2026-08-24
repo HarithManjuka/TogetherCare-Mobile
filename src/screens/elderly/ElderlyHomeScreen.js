@@ -18,6 +18,7 @@ import { COLORS } from '../../constants/theme';
 import AppHeader from '../../components/common/AppHeader';
 import ProfileScreen from '../auth/ProfileScreen';
 import CreateCompanionshipScreen from './CreateCompanionshipScreen';
+import MyScheduleScreen from './MyScheduleScreen';
 import { getElderlyHomeScreenStyles } from '../../styles/ElderlyHomeScreen.styles';
 
 export default function ElderlyHomeScreen() {
@@ -35,6 +36,8 @@ export default function ElderlyHomeScreen() {
     setShowProfileScreen,
     showCreateScreen,
     setShowCreateScreen,
+    showScheduleScreen,
+    setShowScheduleScreen,
     handleRequestCreated,
     formatScheduleDate,
     renderActivityIcon,
@@ -70,6 +73,22 @@ export default function ElderlyHomeScreen() {
         onSuccess={() => {
           setShowCreateScreen(false);
           handleRequestCreated();
+        }}
+      />
+    );
+  }
+
+  // If user opens My Schedule, render MyScheduleScreen with WhatsApp-style tabbed view
+  if (showScheduleScreen) {
+    return (
+      <MyScheduleScreen
+        onBack={() => {
+          setShowScheduleScreen(false);
+          onRefresh();
+        }}
+        onRequestNew={() => {
+          setShowScheduleScreen(false);
+          setShowCreateScreen(true);
         }}
       />
     );
@@ -165,9 +184,19 @@ export default function ElderlyHomeScreen() {
         {/* Section: Upcoming visits */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming visits</Text>
-          {upcomingVisits.length > 0 && (
-            <Text style={styles.sectionBadge}>{upcomingVisits.length} Scheduled</Text>
-          )}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowScheduleScreen(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+          >
+            {upcomingVisits.length > 0 ? (
+              <Text style={styles.sectionBadge}>{upcomingVisits.length} Scheduled</Text>
+            ) : (
+              <Text style={[styles.sectionBadge, { backgroundColor: '#EEF2FF', color: COLORS.primary }]}>
+                View all ›
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Error Notice */}

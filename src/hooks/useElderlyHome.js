@@ -15,10 +15,11 @@ export function useElderlyHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Visit details modal, Profile screen & Create Companionship screen state
+  // Visit details modal, Profile screen, Create Companionship screen & Schedule screen state
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [showProfileScreen, setShowProfileScreen] = useState(false);
   const [showCreateScreen, setShowCreateScreen] = useState(false);
+  const [showScheduleScreen, setShowScheduleScreen] = useState(false);
 
   // Dynamic time greeting
   const getGreeting = () => {
@@ -116,6 +117,15 @@ export function useElderlyHome() {
       setShowCreateScreen(true);
       return;
     }
+    if (
+      featureName === 'Schedule' ||
+      featureName === 'My Schedule' ||
+      featureName === 'My Schedules' ||
+      featureName === 'View Schedule'
+    ) {
+      setShowScheduleScreen(true);
+      return;
+    }
 
     Alert.alert(
       featureName,
@@ -143,6 +153,8 @@ export function useElderlyHome() {
     setShowProfileScreen,
     showCreateScreen,
     setShowCreateScreen,
+    showScheduleScreen,
+    setShowScheduleScreen,
     handleRequestCreated,
     formatScheduleDate,
     renderActivityIcon,

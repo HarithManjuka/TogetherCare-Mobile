@@ -21,6 +21,7 @@ export default function CreateCompanionshipScreen({
   onBack,
   onClose,
   onSuccess,
+  editingRequest = null,
 }) {
   const { scale } = useTheme();
   const styles = useMemo(() => getCreateCompanionshipScreenStyles(scale), [scale]);
@@ -48,7 +49,12 @@ export default function CreateCompanionshipScreen({
     handleCustomTimeConfirm,
     renderActivityIcon,
     handleSubmit,
-  } = useCreateCompanionship({ onClose: onClose || onBack, onSuccess });
+    isEditing,
+  } = useCreateCompanionship({
+    onClose: onClose || onBack,
+    onSuccess,
+    editingRequest,
+  });
 
   // Time slot options (dynamically includes custom selected time)
   const baseFromOptions = ['09 : 00 AM', '02 : 00 PM'];
@@ -115,7 +121,7 @@ export default function CreateCompanionshipScreen({
         </TouchableOpacity>
 
         <View style={styles.topTitleWrap}>
-          <Text style={styles.topBarTitle}>STEP 1: Choose Activity</Text>
+          <Text style={styles.topBarTitle}>{isEditing ? 'Edit Request' : 'STEP 1: Choose Activity'}</Text>
         </View>
 
         <TouchableOpacity
@@ -431,7 +437,7 @@ export default function CreateCompanionshipScreen({
           {submitting ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.confirmBtnText}>Confirm Request</Text>
+            <Text style={styles.confirmBtnText}>{isEditing ? 'Save Changes' : 'Confirm Request'}</Text>
           )}
         </TouchableOpacity>
       </View>
