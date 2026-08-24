@@ -1,6 +1,6 @@
 // src/hooks/useProfile.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
@@ -228,6 +228,38 @@ export function useProfile() {
     }
   };
 
+  // --- Logout Action (Cross-Platform Guaranteed Execution) ---
+  const handleLogout = () => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' && window.confirm
+        ? window.confirm('Are you sure you want to log out of TogetherCare?')
+        : true;
+      if (confirmed) {
+        logout();
+      }
+    } else {
+      Alert.alert('Log Out', 'Are you sure you want to log out of TogetherCare?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Log Out',
+          style: 'destructive',
+          onPress: () => {
+            logout();
+          },
+        },
+      ]);
+    }
+  };
+
+  // --- Verify Account Placeholder Action ---
+  const handleVerifyAccountPress = () => {
+    Alert.alert(
+      'Verify Account',
+      'Account verification submission will be available in the upcoming release.',
+      [{ text: 'OK', style: 'default' }]
+    );
+  };
+
   // Render Interest Icon helper
   const renderInterestIcon = (interestName, isSelected = false, size = 28, customColor = null) => {
     const iconColor = customColor || (isSelected ? '#FFFFFF' : '#000000');
@@ -313,7 +345,8 @@ export function useProfile() {
     toggleInterestSelection,
     handleSaveInterests,
     renderInterestIcon,
-    // Auth actions
-    logout,
+    // Actions
+    handleVerifyAccountPress,
+    handleLogout,
   };
 }
