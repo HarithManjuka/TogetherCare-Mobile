@@ -1,5 +1,5 @@
 // src/screens/auth/ProfileScreen.js
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -65,8 +65,25 @@ export default function ProfileScreen({ onBack, onClose }) {
     handleLogout,
   } = useProfile();
 
-  const { sizeMode, setSizeMode, scale, isLarge } = useTheme();
+  const {
+    sizeMode,
+    setSizeMode,
+    scale,
+    isLarge,
+    availableDisplaySizes = [],
+  } = useTheme();
+
+  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
+
   const styles = useMemo(() => getProfileScreenStyles(scale), [scale]);
+
+  // Current size object
+  const currentSizeObj =
+    availableDisplaySizes.find((s) => s.code === sizeMode) || {
+      code: 'standard',
+      label: 'Standard',
+      sublabel: '100% Regular scale',
+    };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -132,6 +149,30 @@ export default function ProfileScreen({ onBack, onClose }) {
           <Text style={styles.userTitle}>
             {user?.firstName ? `Mr.${user.firstName}` : 'Mr.Austin'}
           </Text>
+
+          {/* User Role Display Tag under Name */}
+          <View style={styles.roleContainer}>
+            <View style={styles.roleBadge}>
+              <Ionicons
+                name={
+                  user?.role === 'volunteer'
+                    ? 'hand-left-outline'
+                    : user?.role === 'caregiver'
+                    ? 'medkit-outline'
+                    : user?.role === 'admin'
+                    ? 'shield-outline'
+                    : 'heart-circle-outline'
+                }
+                size={Math.round(14 * scale)}
+                color={COLORS.primary}
+              />
+              <Text style={styles.roleText}>
+                {user?.role
+                  ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                  : 'Elderly'}
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Badges Row: Verified / Pending Shield & Rating */}
@@ -269,37 +310,96 @@ export default function ProfileScreen({ onBack, onClose }) {
         {/* Horizontal Divider 3 */}
         <View style={styles.dividerLine} />
 
-        {/* Display Size Setting for Elders */}
-        <View style={styles.sizeSelectorRow}>
-          <View>
-            <Text style={styles.sizeSelectorLabel}>Display Size</Text>
-            <Text style={{ fontSize: Math.round(12 * scale), color: COLORS.textSecondary, marginTop: 2 }}>
-              {isLarge ? 'Large (125% Senior-friendly)' : 'Standard (100%)'}
-            </Text>
+        {/* Preferences & Accessibility Section */}
+        <View style={styles.sectionBlock}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Preferences</Text>
           </View>
 
-          <View style={styles.sizeButtonsGroup}>
-            <TouchableOpacity
-              style={[styles.sizePill, sizeMode === 'standard' && styles.sizePillActive]}
-              onPress={() => setSizeMode('standard')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.sizePillText, sizeMode === 'standard' && styles.sizePillTextActive]}>
-                Standard
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.preferencesContainer}>
+            {/* Display & Text Size Dropdown Selector */}
+            <View style={styles.dropdownCard}>
+              <TouchableOpacity
+                style={styles.dropdownTrigger}
+                activeOpacity={0.8}
+                onPress={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
+                accessibilityLabel="Select Display & Text Size"
+              >
+                <View style={styles.dropdownTriggerLeft}>
+                  <View style={styles.dropdownIconBox}>
+                    <Ionicons name="text-outline" size={Math.round(20 * scale)} color={COLORS.primary} />
+                  </View>
+                  <View style={styles.dropdownTextWrap}>
+                    <Text style={styles.dropdownTitleText}>Display & Text Size</Text>
+                    <Text style={styles.dropdownSubtitleText}>
+                      {currentSizeObj.label} — {currentSizeObj.sublabel}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.dropdownChevronBox}>
+                  <Ionicons
+                    name={isSizeDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                    size={Math.round(20 * scale)}
+                    color={COLORS.textSecondary}
+                  />
+                </View>
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.sizePill, sizeMode === 'large' && styles.sizePillActive]}
-              onPress={() => setSizeMode('large')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.sizePillText, sizeMode === 'large' && styles.sizePillTextActive]}>
-                Large
-              </Text>
-            </TouchableOpacity>
+              {/* Display Size Dropdown Menu Items */}
+              {isSizeDropdownOpen && (
+                <View style={styles.dropdownMenuContainer}>
+                  {availableDisplaySizes.map((sizeItem) => {
+                    const isSelected = sizeMode === sizeItem.code;
+                    return (
+                      <TouchableOpacity
+                        key={sizeItem.code}
+                        style={[
+                          styles.dropdownOptionItem,
+                          isSelected && styles.dropdownOptionItemActive,
+                        ]}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setSizeMode(sizeItem.code);
+                          setIsSizeDropdownOpen(false);
+                        }}
+                      >
+                        <View style={styles.dropdownOptionLeft}>
+                          <Ionicons
+                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
+                            size={Math.round(18 * scale)}
+                            color={isSelected ? COLORS.primary : '#94A3B8'}
+                          />
+                          <Text
+                            style={[
+                              styles.dropdownOptionText,
+                              isSelected && styles.dropdownOptionTextActive,
+                            ]}
+                          >
+                            {sizeItem.label}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.dropdownOptionSubtext,
+                              isSelected && styles.dropdownOptionSubtextActive,
+                            ]}
+                          >
+                            ({sizeItem.sublabel})
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={Math.round(18 * scale)} color={COLORS.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           </View>
         </View>
+
+        {/* Horizontal Divider 4 */}
+        <View style={styles.dividerLine} />
 
         {/* Verify Account Option (Menu Row) */}
         <View style={styles.menuBlock}>

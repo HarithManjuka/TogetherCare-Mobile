@@ -76,6 +76,27 @@ export const getProfileScreenStyles = (scale = 1.0) =>
       color: '#000000',
       marginTop: 14,
     },
+    roleContainer: {
+      marginTop: 6,
+      alignItems: 'center',
+    },
+    roleBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EFF6FF',
+      borderWidth: 1.5,
+      borderColor: '#BFDBFE',
+      paddingHorizontal: Math.round(12 * scale),
+      paddingVertical: Math.round(4 * scale),
+      borderRadius: 16,
+      gap: 5,
+    },
+    roleText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '800',
+      color: COLORS.primary,
+      letterSpacing: 0.2,
+    },
     badgesRow: {
       flexDirection: 'row',
       justifyContent: 'space-around',
@@ -153,46 +174,100 @@ export const getProfileScreenStyles = (scale = 1.0) =>
       fontWeight: '700',
       color: '#000000',
     },
-    // Display / Size selector row
-    sizeSelectorRow: {
+    // Preferences Section & Dropdowns
+    preferencesContainer: {
+      gap: Math.round(12 * scale),
+      marginTop: 4,
+    },
+    dropdownCard: {
+      backgroundColor: '#F8FAFC',
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: '#E2E8F0',
+      overflow: 'hidden',
+    },
+    dropdownTrigger: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: '#F8FAFC',
-      padding: Math.round(12 * scale),
-      borderRadius: 14,
-      borderWidth: 1.5,
-      borderColor: '#E2E8F0',
-      marginTop: 8,
+      paddingHorizontal: Math.round(16 * scale),
+      paddingVertical: Math.round(14 * scale),
     },
-    sizeSelectorLabel: {
-      fontSize: Math.round(16 * scale),
-      fontWeight: '700',
-      color: COLORS.textPrimary,
-    },
-    sizeButtonsGroup: {
+    dropdownTriggerLeft: {
       flexDirection: 'row',
-      gap: 8,
+      alignItems: 'center',
+      gap: Math.round(12 * scale),
+      flex: 1,
     },
-    sizePill: {
-      paddingVertical: Math.round(6 * scale),
-      paddingHorizontal: Math.round(14 * scale),
-      borderRadius: 10,
-      backgroundColor: '#E2E8F0',
-      borderWidth: 1,
-      borderColor: '#CBD5E1',
+    dropdownIconBox: {
+      width: Math.round(38 * scale),
+      height: Math.round(38 * scale),
+      borderRadius: Math.round(10 * scale),
+      backgroundColor: '#EFF6FF',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    sizePillActive: {
-      backgroundColor: COLORS.primary,
-      borderColor: COLORS.primary,
+    dropdownTextWrap: {
+      flex: 1,
     },
-    sizePillText: {
-      fontSize: Math.round(14 * scale),
+    dropdownTitleText: {
+      fontSize: Math.round(15 * scale),
       fontWeight: '700',
       color: COLORS.textPrimary,
     },
-    sizePillTextActive: {
-      color: '#FFFFFF',
+    dropdownSubtitleText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '600',
+      color: COLORS.primary,
+      marginTop: 2,
+    },
+    dropdownChevronBox: {
+      paddingLeft: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dropdownMenuContainer: {
+      backgroundColor: '#FFFFFF',
+      borderTopWidth: 1,
+      borderTopColor: '#E2E8F0',
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+    },
+    dropdownOptionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: Math.round(12 * scale),
+      paddingHorizontal: Math.round(12 * scale),
+      borderRadius: 10,
+      marginVertical: 2,
+    },
+    dropdownOptionItemActive: {
+      backgroundColor: '#EFF6FF',
+    },
+    dropdownOptionLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    dropdownOptionText: {
+      fontSize: Math.round(15 * scale),
+      fontWeight: '600',
+      color: '#334155',
+    },
+    dropdownOptionTextActive: {
+      fontWeight: '800',
+      color: COLORS.primary,
+    },
+    dropdownOptionSubtext: {
+      fontSize: Math.round(12 * scale),
+      color: '#64748B',
+      marginLeft: 4,
+    },
+    dropdownOptionSubtextActive: {
+      color: COLORS.primary,
+      fontWeight: '600',
     },
     menuBlock: {
       marginVertical: 4,
