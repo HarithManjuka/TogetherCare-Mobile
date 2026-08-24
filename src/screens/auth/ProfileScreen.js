@@ -59,8 +59,9 @@ export default function ProfileScreen({ onBack, onClose }) {
     toggleInterestSelection,
     handleSaveInterests,
     renderInterestIcon,
-    // Auth actions
-    logout,
+    // Navigation & Session actions
+    handleVerifyAccountPress,
+    handleLogout,
   } = useProfile();
 
   return (
@@ -244,31 +245,32 @@ export default function ProfileScreen({ onBack, onClose }) {
         {/* Horizontal Divider 3 */}
         <View style={styles.dividerLine} />
 
-        {/* Account & Preferences Menu */}
+        {/* Verify Account Option (Menu Row) */}
         <View style={styles.menuBlock}>
           <TouchableOpacity
             style={styles.menuItem}
             activeOpacity={0.7}
-            onPress={() => {
-              Alert.alert('Account', 'Sign out of your account?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Sign Out', style: 'destructive', onPress: logout },
-              ]);
-            }}
+            onPress={handleVerifyAccountPress}
+            accessibilityLabel="Verify Account"
           >
-            <Text style={styles.menuItemText}>Account</Text>
-            <Ionicons name="chevron-forward" size={20} color="#000000" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.menuItem}
-            activeOpacity={0.7}
-            onPress={() => Alert.alert('Preferences', 'Notification & App preferences will be available in the next release.')}
-          >
-            <Text style={styles.menuItemText}>Preferences</Text>
-            <Ionicons name="chevron-forward" size={20} color="#000000" />
+            <Text style={styles.menuItemText}>Verify Account</Text>
+            <View style={styles.menuItemIconBox}>
+              <Ionicons name="chevron-forward" size={22} color="#000000" />
+            </View>
           </TouchableOpacity>
         </View>
+
+        {/* Log Out Button */}
+        <TouchableOpacity
+          style={styles.logoutButton}
+          activeOpacity={0.85}
+          onPress={handleLogout}
+          accessibilityRole="button"
+          accessibilityLabel="Log Out"
+        >
+          <Ionicons name="log-out-outline" size={22} color={COLORS.danger} />
+          <Text style={styles.logoutButtonText}>Log Out</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* 1. Modal: Image Actions */}

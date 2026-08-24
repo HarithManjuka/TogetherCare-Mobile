@@ -3,7 +3,6 @@ import React from 'react';
 import {
   View,
   Text,
-  Image,
   TouchableOpacity,
   ScrollView,
   RefreshControl,
@@ -15,12 +14,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useElderlyHome } from '../../hooks/useElderlyHome';
 import { COLORS } from '../../constants/theme';
+import AppHeader from '../../components/common/AppHeader';
 import ProfileScreen from '../auth/ProfileScreen';
 import styles from '../../styles/ElderlyHomeScreen.styles';
 
 export default function ElderlyHomeScreen() {
   const {
-    user,
     firstName,
     greeting,
     upcomingVisits,
@@ -58,45 +57,11 @@ export default function ElderlyHomeScreen() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
 
-      {/* Top App Header */}
-      <View style={styles.topHeader}>
-        <View style={styles.brandContainer}>
-          <Image
-            source={require('../../../assets/logo.png')}
-            style={styles.brandLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.brandTitle}>TogetherCare</Text>
-        </View>
-
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.7}
-            onPress={() => handleActionPress('Notifications')}
-            accessibilityLabel="Notifications"
-          >
-            <Ionicons name="notifications-outline" size={24} color={COLORS.textPrimary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.profileButton}
-            activeOpacity={0.7}
-            onPress={() => setShowProfileScreen(true)}
-            accessibilityLabel="User Profile Menu"
-          >
-            {user?.profilePicture ? (
-              <Image
-                source={{ uri: user.profilePicture }}
-                style={styles.headerAvatarImg}
-                key={user.profilePicture}
-              />
-            ) : (
-              <Ionicons name="person-circle" size={38} color={COLORS.primary} />
-            )}
-          </TouchableOpacity>
-        </View>
-      </View>
+      {/* Reusable App Header Component */}
+      <AppHeader
+        onProfilePress={() => setShowProfileScreen(true)}
+        onNotificationPress={() => handleActionPress('Notifications')}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
