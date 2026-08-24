@@ -25,3 +25,12 @@ export const createRequest = async (requestData) => {
   const response = await client.post('/companionship/create', requestData);
   return response.data;
 };
+
+/**
+ * Fetch all open/pending companionship requests (for volunteer screens in the future)
+ */
+export const getOpenRequests = async () => {
+  const response = await client.get('/companionship/open-requests');
+  return response.data;
+};
+

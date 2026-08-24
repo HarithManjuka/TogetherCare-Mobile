@@ -17,6 +17,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { COLORS } from '../../constants/theme';
 import AppHeader from '../../components/common/AppHeader';
 import ProfileScreen from '../auth/ProfileScreen';
+import CreateCompanionshipScreen from './CreateCompanionshipScreen';
 import { getElderlyHomeScreenStyles } from '../../styles/ElderlyHomeScreen.styles';
 
 export default function ElderlyHomeScreen() {
@@ -32,6 +33,9 @@ export default function ElderlyHomeScreen() {
     setSelectedVisit,
     showProfileScreen,
     setShowProfileScreen,
+    showCreateScreen,
+    setShowCreateScreen,
+    handleRequestCreated,
     formatScheduleDate,
     renderActivityIcon,
     handleActionPress,
@@ -52,6 +56,20 @@ export default function ElderlyHomeScreen() {
         onClose={() => {
           setShowProfileScreen(false);
           refreshProfile();
+        }}
+      />
+    );
+  }
+
+  // If user opens Create Companionship Request, render CreateCompanionshipScreen as separate full page
+  if (showCreateScreen) {
+    return (
+      <CreateCompanionshipScreen
+        onBack={() => setShowCreateScreen(false)}
+        onClose={() => setShowCreateScreen(false)}
+        onSuccess={() => {
+          setShowCreateScreen(false);
+          handleRequestCreated();
         }}
       />
     );

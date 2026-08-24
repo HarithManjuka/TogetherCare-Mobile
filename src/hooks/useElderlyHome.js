@@ -15,9 +15,10 @@ export function useElderlyHome() {
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState(null);
 
-  // Visit details modal & Profile screen state
+  // Visit details modal, Profile screen & Create Companionship screen state
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [showProfileScreen, setShowProfileScreen] = useState(false);
+  const [showCreateScreen, setShowCreateScreen] = useState(false);
 
   // Dynamic time greeting
   const getGreeting = () => {
@@ -88,26 +89,43 @@ export function useElderlyHome() {
       case 'chat':
         return <FontAwesome5 name="coffee" size={22} color={COLORS.primary} />;
       case 'groceries':
+      case 'grocery':
       case 'shopping':
         return <MaterialCommunityIcons name="cart-outline" size={26} color={COLORS.secondary} />;
       case 'medical':
+      case 'medicine':
       case 'doctor':
         return <MaterialCommunityIcons name="medical-bag" size={26} color={COLORS.danger} />;
       case 'reading':
       case 'book':
         return <Ionicons name="book-outline" size={24} color={COLORS.secondary} />;
+      case 'tech':
+        return <MaterialCommunityIcons name="laptop" size={26} color={COLORS.primary} />;
+      case 'work':
+        return <MaterialCommunityIcons name="wrench" size={26} color={COLORS.secondary} />;
+      case 'game':
+        return <FontAwesome5 name="chess-pawn" size={24} color={COLORS.primary} />;
       default:
         return <MaterialCommunityIcons name="account-heart-outline" size={26} color={COLORS.secondary} />;
     }
   };
 
-  // Generic handler for future form pages
+  // Handler for action cards
   const handleActionPress = (featureName) => {
+    if (featureName === 'Request Help' || featureName === 'Companionship') {
+      setShowCreateScreen(true);
+      return;
+    }
+
     Alert.alert(
       featureName,
-      `You selected ${featureName}. This feature form will open in the next phase.`,
+      `You selected ${featureName}.`,
       [{ text: 'OK', style: 'default' }]
     );
+  };
+
+  const handleRequestCreated = () => {
+    fetchUpcomingVisits();
   };
 
   return {
@@ -123,9 +141,13 @@ export function useElderlyHome() {
     setSelectedVisit,
     showProfileScreen,
     setShowProfileScreen,
+    showCreateScreen,
+    setShowCreateScreen,
+    handleRequestCreated,
     formatScheduleDate,
     renderActivityIcon,
     handleActionPress,
     refreshProfile,
   };
 }
+
