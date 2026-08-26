@@ -71,12 +71,16 @@ function MainNavigator() {
   }
 }
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <MainNavigator />
-      </AuthProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainNavigator />
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

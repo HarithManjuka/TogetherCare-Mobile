@@ -1,10 +1,13 @@
-// src/components/volunteer/VolunteerBottomNav.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../constants/theme';
 
 export default function VolunteerBottomNav({ activeTab, onSelectTab, requestBadgeCount = 2 }) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
+
   const tabs = [
     {
       id: 'home',
@@ -40,7 +43,7 @@ export default function VolunteerBottomNav({ activeTab, onSelectTab, requestBadg
   ];
 
   return (
-    <View style={styles.navContainer}>
+    <View style={[styles.navContainer, { paddingBottom: bottomPadding }]}>
       <View style={styles.navInner}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

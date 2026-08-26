@@ -15,12 +15,17 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import client from '../../api/client';
 import LogoutModal from '../../components/common/LogoutModal';
 import AvatarActionModal from '../../components/common/AvatarActionModal';
+import EditProfileModal from '../../components/common/EditProfileModal';
+import AppHeader from '../../components/common/AppHeader';
 
-export default function ProfileScreen({ onNavigateVerifyEmail }) {
-  const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
+export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }) {
+  const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile, updateProfile } = useAuth();
+  const { scale } = useTheme();
+  const styles = React.useMemo(() => getProfileScreenStyles(scale), [scale]);
   const [uploading, setUploading] = useState(false);
 
   // Refresh latest database profile on mount
@@ -29,6 +34,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
   }, [refreshProfile]);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Volunteer specific preferences state
@@ -122,7 +128,30 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
       
-      {/* 0. Impressive & Professional Birthday Celebration Banner */}
+      {/* 0. Top Header Bar & Back Navigation to Home for Elderly Role */}
+      {user?.role === 'elderly' && (
+        <View style={styles.elderlyTopBarCard}>
+          <AppHeader onProfilePress={() => {}} />
+          <View style={styles.elderlyBackNavRow}>
+            <TouchableOpacity
+              style={styles.elderlyBackBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                if (onBack) onBack();
+                else if (onClose) onClose();
+              }}
+            >
+              <Ionicons name="arrow-back" size={18} color="#1E40AF" style={{ marginRight: 6 }} />
+              <Text style={styles.elderlyBackBtnText}>Back to Home Dashboard</Text>
+            </TouchableOpacity>
+            <View style={styles.elderlyPillTag}>
+              <Text style={styles.elderlyPillTagText}>ELDERLY PROFILE</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* 0.1. Impressive & Professional Birthday Celebration Banner */}
       {isBirthdayToday(user?.dateOfBirth) && (
         <View style={styles.birthdayBannerContainer}>
           <View style={styles.birthdayHeaderRow}>
@@ -182,6 +211,16 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
           <Ionicons name="finger-print-outline" size={14} color="#1E40AF" style={{ marginRight: 4 }} />
           <Text style={styles.customIdText}>{user?.customId || 'USER-ID'}</Text>
         </View>
+
+        {/* Role-adaptive Edit Profile Details Action Button */}
+        <TouchableOpacity
+          style={styles.editProfileBtn}
+          activeOpacity={0.8}
+          onPress={() => setShowEditModal(true)}
+        >
+          <Ionicons name="create-outline" size={16} color="#1E40AF" style={{ marginRight: 6 }} />
+          <Text style={styles.editProfileBtnText}>Edit Profile Details</Text>
+        </TouchableOpacity>
       </View>
 
       {/* 2. Verification Status Card */}
@@ -281,23 +320,25 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>Personal Information</Text>
 
-        <InfoRow icon="call-outline" label="Phone Number" value={user?.phone || 'Not provided'} />
+        <InfoRow icon="call-outline" label="Phone Number" value={user?.phone || 'Not provided'} styles={styles} scale={scale} />
         <InfoRow
           icon="calendar-outline"
           label="Date of Birth"
           value={user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('en-GB') : 'Not provided'}
+          styles={styles}
+          scale={scale}
         />
-        <InfoRow icon="time-outline" label="Age" value={user?.age ? `${user.age} years old` : 'Not provided'} />
-        <InfoRow icon="briefcase-outline" label="Account Role" value={user?.role ? user.role.toUpperCase() : 'USER'} isLast />
+        <InfoRow icon="time-outline" label="Age" value={user?.age ? `${user.age} years old` : 'Not provided'} styles={styles} scale={scale} />
+        <InfoRow icon="briefcase-outline" label="Account Role" value={user?.role ? user.role.toUpperCase() : 'USER'} isLast styles={styles} scale={scale} />
       </View>
 
       {/* 4. Location & Address Details */}
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>Residential Location</Text>
 
-        <InfoRow icon="location-outline" label="District" value={user?.address?.district || 'Not provided'} />
-        <InfoRow icon="map-outline" label="Province" value={user?.address?.province || 'Not provided'} />
-        <InfoRow icon="home-outline" label="Street Address" value={user?.address?.streetAddress || 'Not provided'} />
+        <InfoRow icon="location-outline" label="District" value={user?.address?.district || 'Not provided'} styles={styles} scale={scale} />
+        <InfoRow icon="map-outline" label="Province" value={user?.address?.province || 'Not provided'} styles={styles} scale={scale} />
+        <InfoRow icon="home-outline" label="Street Address" value={user?.address?.streetAddress || 'Not provided'} styles={styles} scale={scale} />
         <InfoRow
           icon="navigate-outline"
           label="City & Postal Code"
@@ -307,6 +348,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
               : 'Not provided'
           }
           isLast
+          styles={styles}
+          scale={scale}
         />
       </View>
 
@@ -337,9 +380,9 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
       {isVolunteer && (
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Volunteer Credentials</Text>
-          <InfoRow icon="card-outline" label="ID Document Type" value={user?.volunteerIdType || 'NIC / Passport'} />
-          <InfoRow icon="document-text-outline" label="ID Document Number" value={user?.volunteerIdNumber || 'Not submitted'} />
-          <InfoRow icon="school-outline" label="Educational Institution" value={user?.educationalInstitution || 'Not provided'} isLast />
+          <InfoRow icon="card-outline" label="ID Document Type" value={user?.volunteerIdType || 'NIC / Passport'} styles={styles} scale={scale} />
+          <InfoRow icon="document-text-outline" label="ID Document Number" value={user?.volunteerIdNumber || 'Not submitted'} styles={styles} scale={scale} />
+          <InfoRow icon="school-outline" label="Educational Institution" value={user?.educationalInstitution || 'Not provided'} isLast styles={styles} scale={scale} />
         </View>
       )}
 
@@ -413,9 +456,9 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
       {user?.role === 'elderly' && (
         <View style={styles.card}>
           <Text style={styles.cardSectionTitle}>Emergency Contact Information</Text>
-          <InfoRow icon="person-outline" label="Contact Name" value={user?.emergencyContact?.name || 'Not provided'} />
-          <InfoRow icon="git-network-outline" label="Relationship" value={user?.emergencyContact?.relation || 'Not provided'} />
-          <InfoRow icon="call-outline" label="Emergency Phone" value={user?.emergencyContact?.phone || 'Not provided'} isLast />
+          <InfoRow icon="person-outline" label="Contact Name" value={user?.emergencyContact?.name || 'Not provided'} styles={styles} scale={scale} />
+          <InfoRow icon="git-network-outline" label="Relationship" value={user?.emergencyContact?.relation || 'Not provided'} styles={styles} scale={scale} />
+          <InfoRow icon="call-outline" label="Emergency Phone" value={user?.emergencyContact?.phone || 'Not provided'} isLast styles={styles} scale={scale} />
         </View>
       )}
 
@@ -458,7 +501,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
 
       <Text style={styles.versionFooter}>TogetherCare v1.0.0 • Sri Lanka</Text>
 
-      {/* Reusable Designable Logout Modal */}
+      {/* Modals */}
       <LogoutModal
         visible={showLogoutModal}
         onClose={() => setShowLogoutModal(false)}
@@ -466,332 +509,414 @@ export default function ProfileScreen({ onNavigateVerifyEmail }) {
         isLoggingOut={isLoggingOut}
       />
 
-      {/* Cross-Platform Avatar Options Modal */}
       <AvatarActionModal
         visible={showAvatarModal}
         onClose={() => setShowAvatarModal(false)}
         onPickPhoto={handlePickAvatar}
         onRemovePhoto={handleRemoveAvatar}
+        onSelectPick={handlePickAvatar}
+        onSelectRemove={handleRemoveAvatar}
+        hasExistingPhoto={hasProfilePic}
+      />
+
+      <EditProfileModal
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        user={user}
+        onSaveSuccess={updateProfile}
       />
     </ScrollView>
   );
 }
 
 // Reusable Sub-Row Component
-function InfoRow({ icon, label, value, isLast }) {
+function InfoRow({ icon, label, value, isLast, styles, scale = 1.0 }) {
   return (
-    <View style={[styles.infoRow, !isLast && styles.infoRowBorder]}>
-      <View style={styles.infoIconBox}>
-        <Ionicons name={icon} size={18} color="#4B5563" />
+    <View style={[styles?.infoRow, !isLast && styles?.infoRowBorder]}>
+      <View style={styles?.infoIconBox}>
+        <Ionicons name={icon} size={Math.round(18 * scale)} color="#4B5563" />
       </View>
-      <View style={styles.infoTextBox}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value}</Text>
+      <View style={styles?.infoTextBox}>
+        <Text style={styles?.infoLabel}>{label}</Text>
+        <Text style={styles?.infoValue}>{value}</Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 40,
-  },
-  profileHeaderCard: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingVertical: 24,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 14,
-  },
-  avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    borderWidth: 3,
-    borderColor: '#1E40AF',
-  },
-  avatarPlaceholder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: '#EFF6FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#DBEAFE',
-  },
-  avatarInitials: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1E40AF',
-  },
-  cameraBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#1E40AF',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 6,
-    zIndex: 10,
-  },
-  editBadge: {
-    backgroundColor: '#0284C7',
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 2,
-  },
-  userEmail: {
-    fontSize: 13,
-    color: '#64748B',
-    marginBottom: 10,
-  },
-  customIdPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  customIdText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#1E40AF',
-    letterSpacing: 0.5,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 16,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  cardSectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 14,
-  },
-  verificationRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  verificationIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#F8FAFC',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  verificationDetails: {
-    flex: 1,
-  },
-  verificationLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  verificationSub: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 8,
-    gap: 4,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  infoRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  infoIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  infoTextBox: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-    marginTop: 2,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FEE2E2',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  logoutButtonText: {
-    color: '#DC2626',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  versionFooter: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  switchTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  switchSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    paddingRight: 10,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  menuItemText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#334155',
-    marginLeft: 12,
-  },
-  birthdayBannerContainer: {
-    backgroundColor: '#FEF3C7',
-    borderRadius: 20,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#F59E0B',
-    marginBottom: 16,
-    shadowColor: '#D97706',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  birthdayHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  birthdayIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 2,
-    borderColor: '#F59E0B',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-    shadowColor: '#B45309',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  birthdayTitleBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  birthdayBannerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#78350F',
-  },
-  birthdayPill: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  birthdayPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  birthdayBannerSubtitle: {
-    fontSize: 12.5,
-    color: '#92400E',
-    marginTop: 4,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-});
+export const getProfileScreenStyles = (scale = 1.0) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: '#F8FAFC',
+    },
+    scrollContent: {
+      paddingHorizontal: Math.round(20 * scale),
+      paddingTop: 16,
+      paddingBottom: 40,
+    },
+    profileHeaderCard: {
+      alignItems: 'center',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 20,
+      paddingVertical: Math.round(24 * scale),
+      paddingHorizontal: Math.round(16 * scale),
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      marginBottom: 16,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    avatarContainer: {
+      position: 'relative',
+      marginBottom: Math.round(14 * scale),
+    },
+    avatarImage: {
+      width: Math.round(96 * scale),
+      height: Math.round(96 * scale),
+      borderRadius: Math.round(48 * scale),
+      borderWidth: 3,
+      borderColor: '#1E40AF',
+    },
+    avatarPlaceholder: {
+      width: Math.round(96 * scale),
+      height: Math.round(96 * scale),
+      borderRadius: Math.round(48 * scale),
+      backgroundColor: '#EFF6FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: '#DBEAFE',
+    },
+    avatarInitials: {
+      fontSize: Math.round(32 * scale),
+      fontWeight: '800',
+      color: '#1E40AF',
+    },
+    cameraBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: '#1E40AF',
+      width: Math.round(36 * scale),
+      height: Math.round(36 * scale),
+      borderRadius: Math.round(18 * scale),
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2.5,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+      elevation: 6,
+      zIndex: 10,
+    },
+    editBadge: {
+      backgroundColor: '#0284C7',
+    },
+    userName: {
+      fontSize: Math.round(20 * scale),
+      fontWeight: '800',
+      color: '#0F172A',
+      marginBottom: 2,
+    },
+    userEmail: {
+      fontSize: Math.round(13 * scale),
+      color: '#64748B',
+      marginBottom: 10,
+    },
+    customIdPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EFF6FF',
+      paddingHorizontal: Math.round(12 * scale),
+      paddingVertical: Math.round(5 * scale),
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#BFDBFE',
+    },
+    customIdText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '700',
+      color: '#1E40AF',
+      letterSpacing: 0.5,
+    },
+    card: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      padding: Math.round(18 * scale),
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      marginBottom: 16,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.03,
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    cardSectionTitle: {
+      fontSize: Math.round(15 * scale),
+      fontWeight: '700',
+      color: '#0F172A',
+      marginBottom: 14,
+    },
+    verificationRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    verificationIconWrap: {
+      width: Math.round(38 * scale),
+      height: Math.round(38 * scale),
+      borderRadius: Math.round(19 * scale),
+      backgroundColor: '#F8FAFC',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    verificationDetails: {
+      flex: 1,
+    },
+    verificationLabel: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '700',
+      color: '#1E293B',
+    },
+    verificationSub: {
+      fontSize: Math.round(11 * scale),
+      color: '#64748B',
+      marginTop: 1,
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: Math.round(9 * scale),
+      paddingVertical: Math.round(5 * scale),
+      borderRadius: 8,
+      gap: 4,
+    },
+    statusBadgeText: {
+      fontSize: Math.round(11 * scale),
+      fontWeight: '700',
+    },
+    infoRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: Math.round(10 * scale),
+    },
+    infoRowBorder: {
+      borderBottomWidth: 1,
+      borderBottomColor: '#F1F5F9',
+    },
+    infoIconBox: {
+      width: Math.round(32 * scale),
+      height: Math.round(32 * scale),
+      borderRadius: 8,
+      backgroundColor: '#F1F5F9',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    infoTextBox: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: Math.round(11 * scale),
+      color: '#64748B',
+      fontWeight: '500',
+    },
+    infoValue: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '600',
+      color: '#0F172A',
+      marginTop: 2,
+    },
+    logoutButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#FEE2E2',
+      paddingVertical: Math.round(14 * scale),
+      borderRadius: 12,
+      marginTop: 4,
+      marginBottom: 16,
+    },
+    logoutButtonText: {
+      color: '#DC2626',
+      fontSize: Math.round(14 * scale),
+      fontWeight: '700',
+    },
+    versionFooter: {
+      textAlign: 'center',
+      fontSize: Math.round(11 * scale),
+      color: '#94A3B8',
+    },
+    switchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    switchTitle: {
+      fontSize: Math.round(14 * scale),
+      fontWeight: '700',
+      color: '#0F172A',
+    },
+    switchSubtitle: {
+      fontSize: Math.round(12 * scale),
+      color: '#64748B',
+      marginTop: 2,
+      paddingRight: 10,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: Math.round(12 * scale),
+      borderBottomWidth: 1,
+      borderBottomColor: '#F1F5F9',
+    },
+    menuItemText: {
+      flex: 1,
+      fontSize: Math.round(14 * scale),
+      fontWeight: '700',
+      color: '#334155',
+      marginLeft: 12,
+    },
+    birthdayBannerContainer: {
+      backgroundColor: '#FEF3C7',
+      borderRadius: 20,
+      padding: Math.round(16 * scale),
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      marginBottom: 16,
+      shadowColor: '#D97706',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    birthdayHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    birthdayIconBox: {
+      width: Math.round(52 * scale),
+      height: Math.round(52 * scale),
+      borderRadius: Math.round(26 * scale),
+      backgroundColor: '#FEF3C7',
+      borderWidth: 2,
+      borderColor: '#F59E0B',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 14,
+      shadowColor: '#B45309',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    birthdayTitleBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 6,
+    },
+    birthdayBannerTitle: {
+      fontSize: Math.round(17 * scale),
+      fontWeight: '800',
+      color: '#78350F',
+    },
+    birthdayPill: {
+      backgroundColor: '#F59E0B',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 12,
+    },
+    birthdayPillText: {
+      fontSize: Math.round(10 * scale),
+      fontWeight: '800',
+      color: '#FFFFFF',
+      letterSpacing: 0.5,
+    },
+    birthdayBannerSubtitle: {
+      fontSize: Math.round(12.5 * scale),
+      color: '#92400E',
+      marginTop: 4,
+      lineHeight: Math.round(18 * scale),
+      fontWeight: '600',
+    },
+    editProfileBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: '#EFF6FF',
+      borderWidth: 1,
+      borderColor: '#BFDBFE',
+      paddingHorizontal: Math.round(16 * scale),
+      paddingVertical: Math.round(9 * scale),
+      borderRadius: 20,
+      marginTop: 12,
+      shadowColor: '#1E40AF',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    editProfileBtnText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '700',
+      color: '#1E40AF',
+    },
+    elderlyTopBarCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      marginBottom: 16,
+      overflow: 'hidden',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    elderlyBackNavRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: Math.round(16 * scale),
+      paddingVertical: Math.round(10 * scale),
+      backgroundColor: '#F8FAFC',
+      borderTopWidth: 1,
+      borderTopColor: '#F1F5F9',
+    },
+    elderlyBackBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#EFF6FF',
+      paddingHorizontal: Math.round(12 * scale),
+      paddingVertical: Math.round(6 * scale),
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#BFDBFE',
+    },
+    elderlyBackBtnText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '800',
+      color: '#1E40AF',
+    },
+    elderlyPillTag: {
+      backgroundColor: '#DBEAFE',
+      paddingHorizontal: Math.round(10 * scale),
+      paddingVertical: Math.round(4 * scale),
+      borderRadius: 12,
+    },
+    elderlyPillTagText: {
+      fontSize: Math.round(10 * scale),
+      fontWeight: '800',
+      color: '#1E40AF',
+      letterSpacing: 0.5,
+    },
+  });

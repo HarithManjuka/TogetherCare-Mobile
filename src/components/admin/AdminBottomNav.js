@@ -1,21 +1,27 @@
-// src/components/admin/AdminBottomNav.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TABS = [
-  { key: 'dashboard', label: 'Dashboard', icon: 'grid', iconOutline: 'grid' },
-  { key: 'users', label: 'Users', icon: 'person', iconOutline: 'person' },
-  { key: 'alerts', label: 'Safety Alert', icon: 'notifications', iconOutline: 'notifications' },
-  { key: 'settings', label: 'Settings', icon: 'settings', iconOutline: 'settings' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
+  { key: 'users', label: 'Users', icon: 'people', iconOutline: 'people-outline' },
+  { key: 'alerts', label: 'Alerts', icon: 'shield-checkmark', iconOutline: 'shield-checkmark-outline' },
+  { key: 'settings', label: 'Settings', icon: 'settings', iconOutline: 'settings-outline' },
 ];
 
+/**
+ * Mobile Responsive Admin Bottom Navigation Component
+ */
 export default function AdminBottomNav({ activeTab, onTabPress }) {
-  const ACTIVE_COLOR = '#2563EB'; // Primary Blue
-  const INACTIVE_COLOR = '#9CA3AF'; // Slate Gray
+  const insets = useSafeAreaInsets();
+  const ACTIVE_COLOR = '#1E40AF';
+  const INACTIVE_COLOR = '#64748B';
+
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 14 : 10);
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.navContainer, { paddingBottom: bottomPadding }]}>
       <View style={styles.navBar}>
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
@@ -29,7 +35,6 @@ export default function AdminBottomNav({ activeTab, onTabPress }) {
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={tab.label}
             >
-              {/* Active Pill Capsule Background Indicator */}
               <View style={[styles.iconPill, isActive && styles.iconPillActive]}>
                 <Ionicons
                   name={isActive ? tab.icon : tab.iconOutline}
@@ -37,8 +42,6 @@ export default function AdminBottomNav({ activeTab, onTabPress }) {
                   color={isActive ? ACTIVE_COLOR : INACTIVE_COLOR}
                 />
               </View>
-
-              {/* Bottom Label */}
               <Text
                 style={[
                   styles.tabLabel,
@@ -58,46 +61,48 @@ export default function AdminBottomNav({ activeTab, onTabPress }) {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  navContainer: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingBottom: Platform.OS === 'ios' ? 24 : 10,
+    borderTopColor: '#E2E8F0',
+    paddingBottom: Platform.OS === 'ios' ? 20 : 10,
     paddingTop: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 12,
+    zIndex: 999,
   },
   navBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
   },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
   },
   iconPill: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
+    width: 44,
+    height: 26,
+    borderRadius: 13,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   iconPillActive: {
-    backgroundColor: '#E8EDFB', // Soft light-blue pill highlight
+    backgroundColor: '#DBEAFE',
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   activeTabLabel: {
-    fontWeight: '700',
+    fontWeight: '800',
+    color: '#1E40AF',
   },
 });

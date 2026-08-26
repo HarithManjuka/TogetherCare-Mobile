@@ -14,8 +14,27 @@ import { Ionicons } from '@expo/vector-icons';
  * Custom Avatar Options Modal (Upload / Remove / Cancel)
  * Works cross-platform on Mobile (iOS/Android) and React Native Web
  */
-export default function AvatarActionModal({ visible, onClose, onPickPhoto, onRemovePhoto }) {
+export default function AvatarActionModal({
+  visible,
+  onClose,
+  onPickPhoto,
+  onRemovePhoto,
+  onSelectPick,
+  onSelectRemove,
+}) {
   if (!visible) return null;
+
+  const handlePick = () => {
+    onClose();
+    const fn = onPickPhoto || onSelectPick;
+    if (typeof fn === 'function') fn();
+  };
+
+  const handleRemove = () => {
+    onClose();
+    const fn = onRemovePhoto || onSelectRemove;
+    if (typeof fn === 'function') fn();
+  };
 
   return (
     <Modal
@@ -38,10 +57,7 @@ export default function AvatarActionModal({ visible, onClose, onPickPhoto, onRem
               <TouchableOpacity
                 style={styles.actionButton}
                 activeOpacity={0.75}
-                onPress={() => {
-                  onClose();
-                  onPickPhoto();
-                }}
+                onPress={handlePick}
               >
                 <Ionicons name="image-outline" size={20} color="#1E40AF" style={{ marginRight: 10 }} />
                 <Text style={styles.actionButtonText}>Choose New Photo</Text>
@@ -51,10 +67,7 @@ export default function AvatarActionModal({ visible, onClose, onPickPhoto, onRem
               <TouchableOpacity
                 style={styles.removeButton}
                 activeOpacity={0.75}
-                onPress={() => {
-                  onClose();
-                  onRemovePhoto();
-                }}
+                onPress={handleRemove}
               >
                 <Ionicons name="trash-outline" size={20} color="#DC2626" style={{ marginRight: 10 }} />
                 <Text style={styles.removeButtonText}>Remove Current Photo</Text>

@@ -38,6 +38,10 @@ export default function LoginScreen({ onNavigate }) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
+
   const { login } = useAuth();
 
   // --- Entrance animation ---
@@ -116,9 +120,10 @@ export default function LoginScreen({ onNavigate }) {
         <ScrollView
           contentContainerStyle={[
             styles.container,
-            { paddingHorizontal: hPad, minHeight: height - (Platform.OS === 'ios' ? 90 : 60) },
+            { paddingHorizontal: hPad, paddingBottom: 40 },
           ]}
-          keyboardShouldPersistTaps="handled"
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
         >
           <Animated.View
             style={[
@@ -136,11 +141,13 @@ export default function LoginScreen({ onNavigate }) {
           <Animated.View
             style={[styles.form, { opacity: fadeForm, transform: [{ translateY: slideForm }] }]}
           >
-            <View
+            <TouchableOpacity
               style={[
                 styles.inputWrapper,
                 emailFocused && styles.inputWrapperFocused,
               ]}
+              activeOpacity={1}
+              onPress={() => emailInputRef.current?.focus()}
             >
               <Icon
                 name="mail-outline"
@@ -149,6 +156,7 @@ export default function LoginScreen({ onNavigate }) {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={emailInputRef}
                 style={styles.input}
                 placeholder="Email"
                 placeholderTextColor="#9CA3AF"
@@ -159,13 +167,15 @@ export default function LoginScreen({ onNavigate }) {
                 onFocus={() => setEmailFocused(true)}
                 onBlur={() => setEmailFocused(false)}
               />
-            </View>
+            </TouchableOpacity>
 
-            <View
+            <TouchableOpacity
               style={[
                 styles.inputWrapper,
                 passwordFocused && styles.inputWrapperFocused,
               ]}
+              activeOpacity={1}
+              onPress={() => passwordInputRef.current?.focus()}
             >
               <Icon
                 name="lock-closed-outline"
@@ -174,6 +184,7 @@ export default function LoginScreen({ onNavigate }) {
                 style={styles.inputIcon}
               />
               <TextInput
+                ref={passwordInputRef}
                 style={styles.input}
                 placeholder="Password"
                 placeholderTextColor="#9CA3AF"
@@ -193,7 +204,7 @@ export default function LoginScreen({ onNavigate }) {
                   color="#6B7280"
                 />
               </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
 
             <TouchableOpacity style={styles.forgotBtn} activeOpacity={0.7} onPress={() => onNavigate('ForgotPassword')}>
               <Text style={styles.forgotText}>Forgot your password?</Text>
@@ -314,6 +325,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1.5,
     borderColor: '#E5E7EB',
+    zIndex: 10,
+    elevation: 3,
   },
   inputWrapperFocused: {
     borderColor: PRIMARY,
