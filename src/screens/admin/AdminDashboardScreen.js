@@ -1,18 +1,38 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
+// src/screens/admin/AdminDashboardScreen.js
+import React, { useState } from 'react';
+import { View, StyleSheet, SafeAreaView, Platform } from 'react-native';
+import AdminBottomNav from '../../components/admin/AdminBottomNav';
+import ProfileScreen from '../auth/ProfileScreen';
 
 export default function AdminDashboardScreen() {
+  const [activeTab, setActiveTab] = useState('dashboard');
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Admin Verification Portal</Text>
-      <Text style={styles.subtitle}>Pending Volunteer Approvals: 0</Text>
-    </View>
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        {/* Render Tab Views */}
+        {activeTab === 'dashboard' && <View style={styles.contentView}>{/* Dashboard Screen Content */}</View>}
+        {activeTab === 'users' && <View style={styles.contentView}>{/* Users Screen Content */}</View>}
+        {activeTab === 'alerts' && <View style={styles.contentView}>{/* Safety Alert Screen Content */}</View>}
+        {activeTab === 'settings' && <ProfileScreen />}
+      </View>
+
+      {/* Fixed Bottom Navigation */}
+      <AdminBottomNav activeTab={activeTab} onTabPress={setActiveTab} />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 20, backgroundColor: COLORS.background },
-  title: { fontSize: SIZES.standardTitle, fontWeight: 'bold', color: COLORS.textPrimary },
-  subtitle: { fontSize: SIZES.standardBody, color: COLORS.textSecondary, marginTop: 5 },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  container: {
+    flex: 1,
+    paddingBottom: Platform.OS === 'ios' ? 84 : 70, // Prevent content overlap
+  },
+  contentView: {
+    flex: 1,
+  },
 });
