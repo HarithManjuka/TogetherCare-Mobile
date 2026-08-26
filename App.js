@@ -19,6 +19,15 @@ function MainNavigator() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [authScreen, setAuthScreen] = useState('Welcome'); // 'Welcome' | 'Login' | 'Register'
+  const wasAuthenticated = React.useRef(isAuthenticated);
+
+  // Automatically redirect to Login screen ASAP when user logs out
+  React.useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated) {
+      setAuthScreen('Login');
+    }
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   // 1. Show Splash on initial startup
   if (showSplash) {
