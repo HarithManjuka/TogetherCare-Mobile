@@ -54,6 +54,13 @@ export default function ElderlyHomeScreen() {
             onRequestNew={() => setShowCreateScreen(true)}
           />
         );
+      case 'settings':
+        return (
+          <ProfileScreen
+            onBack={() => setCurrentTab('home')}
+            onClose={() => setCurrentTab('home')}
+          />
+        );
       case 'home':
       default:
         return (

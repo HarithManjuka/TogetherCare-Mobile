@@ -1,7 +1,7 @@
-// src/components/elderly/ElderlyBottomNav.js
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function ElderlyBottomNav({
@@ -11,6 +11,8 @@ export default function ElderlyBottomNav({
   msgBadgeCount = 0,
 }) {
   const { scale } = useTheme();
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
 
   const tabs = [
     {
@@ -53,7 +55,7 @@ export default function ElderlyBottomNav({
   ];
 
   return (
-    <View style={styles.navContainer}>
+    <View style={[styles.navContainer, { paddingBottom: bottomPadding }]}>
       <View style={styles.navInner}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
