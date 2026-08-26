@@ -1,672 +1,797 @@
 // src/screens/auth/ProfileScreen.js
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  StyleSheet,
+  ScrollView,
   Image,
   TouchableOpacity,
-  ScrollView,
-  RefreshControl,
+  Alert,
   ActivityIndicator,
-  Modal,
-  TextInput,
-  SafeAreaView,
-  StatusBar,
+  Platform,
+  Switch,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useProfile } from '../../hooks/useProfile';
-import { useTheme } from '../../context/ThemeContext';
-import { COLORS } from '../../constants/theme';
-import { getProfileScreenStyles } from '../../styles/ProfileScreen.styles';
+import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
+import { useAuth } from '../../context/AuthContext';
+import client from '../../api/client';
+import LogoutModal from '../../components/common/LogoutModal';
+import AvatarActionModal from '../../components/common/AvatarActionModal';
 
-export default function ProfileScreen({ onBack, onClose }) {
-  const {
-    user,
-    userDisplayName,
-    userCity,
-    userAgeDisplay,
-    isVerified,
-    refreshing,
-    uploadingImage,
-    onRefresh,
-    // Profile photo modal & actions
-    showImageActionsModal,
-    setShowImageActionsModal,
-    handlePickImage,
-    handleDeleteImage,
-    // Personal Details modal & actions
-    showEditModal,
-    setShowEditModal,
-    editFirstName,
-    setEditFirstName,
-    editLastName,
-    setEditLastName,
-    editPhone,
-    setEditPhone,
-    editAge,
-    setEditAge,
-    editAddress,
-    setEditAddress,
-    updatingDetails,
-    openEditModal,
-    handleSavePersonalDetails,
-    // Interests modal & actions
-    showInterestsModal,
-    setShowInterestsModal,
-    selectedInterests,
-    dbInterests,
-    loadingInterests,
-    updatingInterests,
-    toggleInterestSelection,
-    handleSaveInterests,
-    renderInterestIcon,
-    // Navigation & Session actions
-    handleVerifyAccountPress,
-    handleLogout,
-  } = useProfile();
+export default function ProfileScreen({ onNavigateVerifyEmail }) {
+  const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
+  const [uploading, setUploading] = useState(false);
 
-  const {
-    sizeMode,
-    setSizeMode,
-    scale,
-    isLarge,
-    availableDisplaySizes = [],
-  } = useTheme();
+  // Refresh latest database profile on mount
+  useEffect(() => {
+    refreshProfile();
+  }, [refreshProfile]);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  const [isSizeDropdownOpen, setIsSizeDropdownOpen] = useState(false);
+  // Volunteer specific preferences state
+  const [isAvailable, setIsAvailable] = useState(true);
+  const [receiveEmergencyAlerts, setReceiveEmergencyAlerts] = useState(true);
+  const [soundAlerts, setSoundAlerts] = useState(true);
 
-  const styles = useMemo(() => getProfileScreenStyles(scale), [scale]);
+  const hasProfilePic = !!(user?.profilePicture || user?.avatar);
 
-  // Current size object
-  const currentSizeObj =
-    availableDisplaySizes.find((s) => s.code === sizeMode) || {
-      code: 'standard',
-      label: 'Standard',
-      sublabel: '100% Regular scale',
-    };
+  // Avatar Press Handler
+  const handleAvatarPress = () => {
+    if (hasProfilePic) {
+      setShowAvatarModal(true);
+    } else {
+      handlePickAvatar();
+    }
+  };
+
+  // Remove Photo Handler
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploading(true);
+      await deleteProfilePicture();
+      Alert.alert('Success', 'Profile picture removed successfully');
+    } catch (err) {
+      console.error('Remove avatar error:', err);
+      Alert.alert('Error', err.message || 'Could not remove profile picture');
+    } finally {
+      setUploading(false);
+    }
+  };
+  const handlePickAvatar = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required to change profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploading(true);
+        const imageAsset = result.assets[0];
+        await uploadProfilePicture(imageAsset);
+        Alert.alert('Success', 'Profile picture updated successfully');
+      }
+    } catch (err) {
+      console.error('Avatar pick/upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleConfirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutModal(false);
+    }
+  };
+
+  const isVolunteer = user?.role === 'volunteer';
+  const isEmailVerified = user?.isEmailVerified || user?.accountStatus === 'active';
+  const volunteerBadgeStatus = user?.verificationBadgeStatus || 'unverified';
+
+  const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase() || 'TC';
+
+  // Check if today matches user's birth date (Month & Day)
+  const isBirthdayToday = (dob) => {
+    if (!dob) return false;
+    const today = new Date();
+    const birthDate = new Date(dob);
+    return (
+      today.getMonth() === birthDate.getMonth() &&
+      today.getDate() === birthDate.getDate()
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-
-      {/* Top Header with Circular Back & Close buttons */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.circleButton}
-          activeOpacity={0.7}
-          onPress={onBack || onClose}
-          accessibilityLabel="Go back"
-        >
-          <Ionicons name="chevron-back" size={Math.round(22 * scale)} color="#000000" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.closeButton}
-          activeOpacity={0.7}
-          onPress={onClose || onBack}
-          accessibilityLabel="Close"
-        >
-          <Ionicons name="close" size={Math.round(26 * scale)} color="#000000" />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
-        }
-      >
-        {/* Avatar & Display Name */}
-        <View style={styles.avatarSection}>
-          <TouchableOpacity
-            style={styles.avatarWrapper}
-            activeOpacity={0.85}
-            onPress={() => setShowImageActionsModal(true)}
-          >
-            {uploadingImage ? (
-              <View style={styles.avatarPlaceholder}>
-                <ActivityIndicator size="large" color={COLORS.primary} />
-              </View>
-            ) : user?.profilePicture ? (
-              <Image
-                source={{ uri: user.profilePicture }}
-                style={styles.avatarImage}
-                key={user.profilePicture}
-              />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={Math.round(80 * scale)} color="#000000" />
-              </View>
-            )}
-
-            {/* Camera / Edit Badge */}
-            <View style={styles.cameraBadge}>
-              <Ionicons name="camera" size={Math.round(16 * scale)} color="#FFFFFF" />
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      
+      {/* 0. Impressive & Professional Birthday Celebration Banner */}
+      {isBirthdayToday(user?.dateOfBirth) && (
+        <View style={styles.birthdayBannerContainer}>
+          <View style={styles.birthdayHeaderRow}>
+            <View style={styles.birthdayIconBox}>
+              <Text style={{ fontSize: 26 }}>🎂</Text>
             </View>
-          </TouchableOpacity>
-
-          <Text style={styles.userTitle}>
-            {user?.firstName ? `Mr.${user.firstName}` : 'Mr.Austin'}
-          </Text>
-
-          {/* User Role Display Tag under Name */}
-          <View style={styles.roleContainer}>
-            <View style={styles.roleBadge}>
-              <Ionicons
-                name={
-                  user?.role === 'volunteer'
-                    ? 'hand-left-outline'
-                    : user?.role === 'caregiver'
-                    ? 'medkit-outline'
-                    : user?.role === 'admin'
-                    ? 'shield-outline'
-                    : 'heart-circle-outline'
-                }
-                size={Math.round(14 * scale)}
-                color={COLORS.primary}
-              />
-              <Text style={styles.roleText}>
-                {user?.role
-                  ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                  : 'Elderly'}
+            <View style={{ flex: 1 }}>
+              <View style={styles.birthdayTitleBadgeRow}>
+                <Text style={styles.birthdayBannerTitle}>
+                  Happy Birthday, {user?.firstName}! 🎉
+                </Text>
+                <View style={styles.birthdayPill}>
+                  <Text style={styles.birthdayPillText}>SPECIAL DAY ✨</Text>
+                </View>
+              </View>
+              <Text style={styles.birthdayBannerSubtitle}>
+                TogetherCare wishes you a wonderful birthday filled with warmth, happiness, and good health! Turning {user?.age || ''} years young today.
               </Text>
             </View>
           </View>
         </View>
+      )}
 
-        {/* Badges Row: Verified / Pending Shield & Rating */}
-        <View style={styles.badgesRow}>
-          {/* Verified / Pending Badge */}
-          <View style={styles.badgeCol}>
-            <View style={styles.badgeIconBox}>
-              {isVerified ? (
-                <MaterialCommunityIcons
-                  name="shield-check"
-                  size={Math.round(46 * scale)}
-                  color="#16A34A"
-                />
-              ) : (
-                <MaterialCommunityIcons
-                  name="shield-alert-outline"
-                  size={Math.round(46 * scale)}
-                  color="#D97706"
-                />
-              )}
-            </View>
-            <Text
-              style={[
-                styles.badgeLabel,
-                isVerified ? { color: '#16A34A' } : { color: '#D97706' },
-              ]}
-            >
-              {isVerified ? 'Verified' : 'Pending'}
-            </Text>
-          </View>
-
-          {/* Rating Badge from Review Table in Database */}
-          <View style={styles.badgeCol}>
-            <View style={styles.badgeIconBox}>
-              <MaterialCommunityIcons
-                name="star-circle-outline"
-                size={Math.round(48 * scale)}
-                color="#000000"
-              />
-            </View>
-            <Text style={styles.badgeLabel}>
-              {user?.totalReviews && user.totalReviews > 0
-                ? `${user.averageRating}★`
-                : '0.0★'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Horizontal Divider 1 */}
-        <View style={styles.dividerLine} />
-
-        {/* Personal Details Section */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Personal Details</Text>
-            <TouchableOpacity
-              style={styles.editIconBtn}
-              activeOpacity={0.7}
-              onPress={openEditModal}
-              accessibilityLabel="Edit Personal Details"
-            >
-              <MaterialCommunityIcons
-                name="square-edit-outline"
-                size={Math.round(24 * scale)}
-                color="#000000"
-              />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.detailsContent}>
-            <Text style={styles.detailLine}>
-              <Text style={styles.detailBold}>Name - </Text>
-              {userDisplayName}
-            </Text>
-
-            <Text style={styles.detailLine}>
-              <Text style={styles.detailBold}>Mobile - </Text>
-              {user?.phone || '07XXXXXXXX'}
-            </Text>
-
-            <Text style={styles.detailLine}>
-              <Text style={styles.detailBold}>Email - </Text>
-              {user?.email || 'user@togethercare.com'}
-            </Text>
-
-            <Text style={styles.detailLine}>
-              <Text style={styles.detailBold}>Age- </Text>
-              {userAgeDisplay}
-            </Text>
-
-            <Text style={styles.detailLine}>
-              <Text style={styles.detailBold}>Address- </Text>
-              {userCity}
-            </Text>
-          </View>
-        </View>
-
-        {/* Horizontal Divider 2 */}
-        <View style={styles.dividerLine} />
-
-        {/* Interests Section */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Interests</Text>
-            <TouchableOpacity
-              style={styles.editIconBtn}
-              activeOpacity={0.7}
-              onPress={() => setShowInterestsModal(true)}
-              accessibilityLabel="Edit Interests"
-            >
-              <MaterialCommunityIcons
-                name="square-edit-outline"
-                size={Math.round(24 * scale)}
-                color="#000000"
-              />
-            </TouchableOpacity>
-          </View>
-
-          {/* Interests Circles Row */}
-          <View style={styles.interestsRow}>
-            {(user?.interests && user.interests.length > 0
-              ? user.interests
-              : ['Play', 'Walk', 'Chat']
-            ).map((interestName, idx) => (
-              <View key={idx} style={styles.interestItem}>
-                <View style={styles.interestCircle}>
-                  {renderInterestIcon(interestName, false, Math.round(28 * scale), '#000000')}
-                </View>
-                <Text style={styles.interestLabel}>{interestName}</Text>
+      {/* 1. Profile Header Card */}
+      <View style={styles.profileHeaderCard}>
+        <View style={styles.avatarContainer}>
+          <TouchableOpacity activeOpacity={0.85} onPress={handleAvatarPress} disabled={uploading}>
+            {(user?.profilePicture || user?.avatar) ? (
+              <Image source={{ uri: user.profilePicture || user.avatar }} style={styles.avatarImage} />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarInitials}>{initials}</Text>
               </View>
-            ))}
-          </View>
-        </View>
+            )}
+          </TouchableOpacity>
 
-        {/* Horizontal Divider 3 */}
-        <View style={styles.dividerLine} />
-
-        {/* Preferences & Accessibility Section */}
-        <View style={styles.sectionBlock}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Preferences</Text>
-          </View>
-
-          <View style={styles.preferencesContainer}>
-            {/* Display & Text Size Dropdown Selector */}
-            <View style={styles.dropdownCard}>
-              <TouchableOpacity
-                style={styles.dropdownTrigger}
-                activeOpacity={0.8}
-                onPress={() => setIsSizeDropdownOpen(!isSizeDropdownOpen)}
-                accessibilityLabel="Select Display & Text Size"
-              >
-                <View style={styles.dropdownTriggerLeft}>
-                  <View style={styles.dropdownIconBox}>
-                    <Ionicons name="text-outline" size={Math.round(20 * scale)} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.dropdownTextWrap}>
-                    <Text style={styles.dropdownTitleText}>Display & Text Size</Text>
-                    <Text style={styles.dropdownSubtitleText}>
-                      {currentSizeObj.label} — {currentSizeObj.sublabel}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.dropdownChevronBox}>
-                  <Ionicons
-                    name={isSizeDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                    size={Math.round(20 * scale)}
-                    color={COLORS.textSecondary}
-                  />
-                </View>
-              </TouchableOpacity>
-
-              {/* Display Size Dropdown Menu Items */}
-              {isSizeDropdownOpen && (
-                <View style={styles.dropdownMenuContainer}>
-                  {availableDisplaySizes.map((sizeItem) => {
-                    const isSelected = sizeMode === sizeItem.code;
-                    return (
-                      <TouchableOpacity
-                        key={sizeItem.code}
-                        style={[
-                          styles.dropdownOptionItem,
-                          isSelected && styles.dropdownOptionItemActive,
-                        ]}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setSizeMode(sizeItem.code);
-                          setIsSizeDropdownOpen(false);
-                        }}
-                      >
-                        <View style={styles.dropdownOptionLeft}>
-                          <Ionicons
-                            name={isSelected ? 'radio-button-on' : 'radio-button-off'}
-                            size={Math.round(18 * scale)}
-                            color={isSelected ? COLORS.primary : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.dropdownOptionText,
-                              isSelected && styles.dropdownOptionTextActive,
-                            ]}
-                          >
-                            {sizeItem.label}
-                          </Text>
-                          <Text
-                            style={[
-                              styles.dropdownOptionSubtext,
-                              isSelected && styles.dropdownOptionSubtextActive,
-                            ]}
-                          >
-                            ({sizeItem.sublabel})
-                          </Text>
-                        </View>
-                        {isSelected && (
-                          <Ionicons name="checkmark-circle" size={Math.round(18 * scale)} color={COLORS.primary} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-
-        {/* Horizontal Divider 4 */}
-        <View style={styles.dividerLine} />
-
-        {/* Verify Account Option (Menu Row) */}
-        <View style={styles.menuBlock}>
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[styles.cameraBadge, hasProfilePic && styles.editBadge]}
             activeOpacity={0.7}
-            onPress={handleVerifyAccountPress}
-            accessibilityLabel="Verify Account"
+            onPress={handleAvatarPress}
+            disabled={uploading}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Text style={styles.menuItemText}>Verify Account</Text>
-            <View style={styles.menuItemIconBox}>
-              <Ionicons name="chevron-forward" size={Math.round(22 * scale)} color="#000000" />
-            </View>
+            {uploading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Ionicons name={hasProfilePic ? "pencil" : "camera"} size={16} color="#FFFFFF" />
+            )}
           </TouchableOpacity>
         </View>
 
-        {/* Log Out Button */}
-        <TouchableOpacity
-          style={styles.logoutButton}
-          activeOpacity={0.85}
-          onPress={handleLogout}
-          accessibilityRole="button"
-          accessibilityLabel="Log Out"
-        >
-          <Ionicons name="log-out-outline" size={Math.round(22 * scale)} color={COLORS.danger} />
-          <Text style={styles.logoutButtonText}>Log Out</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        <Text style={styles.userName}>{user?.firstName} {user?.lastName}</Text>
+        <Text style={styles.userEmail}>{user?.email}</Text>
 
-      {/* 1. Modal: Image Actions */}
-      <Modal
-        visible={showImageActionsModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowImageActionsModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowImageActionsModal(false)}
-        >
-          <View style={styles.modalSheet}>
-            <Text style={styles.sheetTitle}>Profile Photo</Text>
-
-            <TouchableOpacity style={styles.sheetBtn} onPress={() => handlePickImage(true)}>
-              <Ionicons name="camera-outline" size={22} color={COLORS.primary} />
-              <Text style={styles.sheetBtnText}>Take Photo</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.sheetBtn} onPress={() => handlePickImage(false)}>
-              <Ionicons name="images-outline" size={22} color={COLORS.primary} />
-              <Text style={styles.sheetBtnText}>Choose from Gallery</Text>
-            </TouchableOpacity>
-
-            {Boolean(user?.profilePicture) && (
-              <TouchableOpacity
-                style={[styles.sheetBtn, { borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}
-                onPress={handleDeleteImage}
-              >
-                <Ionicons name="trash-outline" size={22} color={COLORS.danger} />
-                <Text style={[styles.sheetBtnText, { color: COLORS.danger }]}>
-                  Remove Current Photo
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.sheetCancelBtn}
-              onPress={() => setShowImageActionsModal(false)}
-            >
-              <Text style={styles.sheetCancelBtnText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* 2. Modal: Edit Personal Details */}
-      <Modal
-        visible={showEditModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowEditModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Personal Details</Text>
-              <TouchableOpacity onPress={() => setShowEditModal(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={false}>
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>First Name</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editFirstName}
-                  onChangeText={setEditFirstName}
-                  placeholder="First Name"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Last Name</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editLastName}
-                  onChangeText={setEditLastName}
-                  placeholder="Last Name"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Mobile Phone</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editPhone}
-                  onChangeText={setEditPhone}
-                  placeholder="07XXXXXXXX"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="phone-pad"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Age (Years)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editAge}
-                  onChangeText={setEditAge}
-                  placeholder="70"
-                  placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Address / City</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editAddress}
-                  onChangeText={setEditAddress}
-                  placeholder="City or Address"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Email Address (Cannot be changed)</Text>
-                <View style={[styles.textInput, styles.readOnlyInput]}>
-                  <Text style={styles.readOnlyText}>{user?.email || ''}</Text>
-                  <Ionicons name="lock-closed" size={16} color="#94A3B8" />
-                </View>
-              </View>
-            </ScrollView>
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowEditModal(false)}
-              >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSavePersonalDetails}
-                disabled={updatingDetails}
-              >
-                {updatingDetails ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save Changes</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
+        {/* Custom 8-char Unique ID */}
+        <View style={styles.customIdPill}>
+          <Ionicons name="finger-print-outline" size={14} color="#1E40AF" style={{ marginRight: 4 }} />
+          <Text style={styles.customIdText}>{user?.customId || 'USER-ID'}</Text>
         </View>
-      </Modal>
+      </View>
 
-      {/* 3. Modal: Edit Interests */}
-      <Modal
-        visible={showInterestsModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowInterestsModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Choose Interests</Text>
-              <TouchableOpacity onPress={() => setShowInterestsModal(false)}>
-                <Ionicons name="close" size={24} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
+      {/* 2. Verification Status Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardSectionTitle}>Account Verification</Text>
 
-            <Text style={styles.interestsHint}>
-              Select the activities you enjoy to receive tailored companionship requests.
+        {/* Email Verification Status Row */}
+        <View style={styles.verificationRow}>
+          <View style={styles.verificationIconWrap}>
+            <Ionicons
+              name={isEmailVerified ? 'mail-open' : 'mail-unread-outline'}
+              size={20}
+              color={isEmailVerified ? '#16A34A' : '#DC2626'}
+            />
+          </View>
+          <View style={styles.verificationDetails}>
+            <Text style={styles.verificationLabel}>Email Verification</Text>
+            <Text style={styles.verificationSub}>
+              {isEmailVerified ? 'Email address verified and secured' : 'Email address not verified yet'}
             </Text>
+          </View>
+          {isEmailVerified ? (
+            <View style={[styles.statusBadge, { backgroundColor: '#DCFCE7' }]}>
+              <Ionicons name="checkmark-circle" size={13} color="#16A34A" />
+              <Text style={[styles.statusBadgeText, { color: '#16A34A' }]}>Verified</Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}
+              onPress={() => onNavigateVerifyEmail && onNavigateVerifyEmail()}
+            >
+              <Text style={[styles.statusBadgeText, { color: '#DC2626' }]}>Verify Now</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-            {loadingInterests ? (
-              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
-                <ActivityIndicator color={COLORS.primary} />
-                <Text style={{ marginTop: 8, color: COLORS.textSecondary }}>Loading available interests...</Text>
-              </View>
-            ) : (
-              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
-                <View style={styles.interestsGrid}>
-                  {dbInterests.map((item) => {
-                    const isSelected = selectedInterests.includes(item.name);
-                    return (
-                      <TouchableOpacity
-                        key={item._id || item.name}
-                        style={[
-                          styles.interestChoicePill,
-                          isSelected && styles.interestChoicePillSelected,
-                        ]}
-                        activeOpacity={0.8}
-                        onPress={() => toggleInterestSelection(item.name)}
-                      >
-                        <View style={styles.pillIconBox}>
-                          {renderInterestIcon(item.name, isSelected, Math.round(18 * scale))}
-                        </View>
-                        <Text
-                          style={[
-                            styles.interestChoiceText,
-                            isSelected && styles.interestChoiceTextSelected,
-                          ]}
-                        >
-                          {item.name}
-                        </Text>
-                        {isSelected ? (
-                          <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                        ) : null}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            )}
-
-            <View style={styles.modalBtnRow}>
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={() => setShowInterestsModal(false)}
+        {/* Volunteer Identity Verification (Only for Volunteers) */}
+        {isVolunteer && (
+          <View style={[styles.verificationRow, { marginTop: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 14 }]}>
+            <View style={styles.verificationIconWrap}>
+              <Ionicons
+                name="shield-checkmark"
+                size={20}
+                color={
+                  volunteerBadgeStatus === 'verified'
+                    ? '#16A34A'
+                    : volunteerBadgeStatus === 'pending'
+                    ? '#D97706'
+                    : '#6B7280'
+                }
+              />
+            </View>
+            <View style={styles.verificationDetails}>
+              <Text style={styles.verificationLabel}>Volunteer ID Verification</Text>
+              <Text style={styles.verificationSub}>
+                {volunteerBadgeStatus === 'verified'
+                  ? 'Government / Student ID verified'
+                  : volunteerBadgeStatus === 'pending'
+                  ? 'Documents currently under Admin review'
+                  : 'NIC / Passport / Student ID not verified'}
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    volunteerBadgeStatus === 'verified'
+                      ? '#DCFCE7'
+                      : volunteerBadgeStatus === 'pending'
+                      ? '#FEF3C7'
+                      : '#F3F4F6',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  {
+                    color:
+                      volunteerBadgeStatus === 'verified'
+                        ? '#16A34A'
+                        : volunteerBadgeStatus === 'pending'
+                        ? '#D97706'
+                        : '#4B5563',
+                  },
+                ]}
               >
-                <Text style={styles.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSaveInterests}
-                disabled={updatingInterests}
-              >
-                {updatingInterests ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save Interests</Text>
-                )}
-              </TouchableOpacity>
+                {volunteerBadgeStatus.toUpperCase()}
+              </Text>
             </View>
           </View>
+        )}
+      </View>
+
+      {/* 3. Personal & Contact Information */}
+      <View style={styles.card}>
+        <Text style={styles.cardSectionTitle}>Personal Information</Text>
+
+        <InfoRow icon="call-outline" label="Phone Number" value={user?.phone || 'Not provided'} />
+        <InfoRow
+          icon="calendar-outline"
+          label="Date of Birth"
+          value={user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('en-GB') : 'Not provided'}
+        />
+        <InfoRow icon="time-outline" label="Age" value={user?.age ? `${user.age} years old` : 'Not provided'} />
+        <InfoRow icon="briefcase-outline" label="Account Role" value={user?.role ? user.role.toUpperCase() : 'USER'} isLast />
+      </View>
+
+      {/* 4. Location & Address Details */}
+      <View style={styles.card}>
+        <Text style={styles.cardSectionTitle}>Residential Location</Text>
+
+        <InfoRow icon="location-outline" label="District" value={user?.address?.district || 'Not provided'} />
+        <InfoRow icon="map-outline" label="Province" value={user?.address?.province || 'Not provided'} />
+        <InfoRow icon="home-outline" label="Street Address" value={user?.address?.streetAddress || 'Not provided'} />
+        <InfoRow
+          icon="navigate-outline"
+          label="City & Postal Code"
+          value={
+            user?.address?.city
+              ? `${user.address.city} ${user.address.postalCode ? `(${user.address.postalCode})` : ''}`
+              : 'Not provided'
+          }
+          isLast
+        />
+      </View>
+
+      {/* 5. Role-Specific Information */}
+      {/* Volunteer Availability Status Switch */}
+      {isVolunteer && (
+        <View style={styles.card}>
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Availability Status</Text>
+              <Text style={styles.switchSubtitle}>
+                {isAvailable
+                  ? 'Active · Ready to accept nearby tasks'
+                  : 'Inactive · Not taking new tasks right now'}
+              </Text>
+            </View>
+            <Switch
+              value={isAvailable}
+              onValueChange={setIsAvailable}
+              trackColor={{ false: '#CBD5E1', true: '#86EFAC' }}
+              thumbColor={isAvailable ? '#16A34A' : '#F1F5F9'}
+            />
+          </View>
         </View>
-      </Modal>
-    </SafeAreaView>
+      )}
+
+      {/* Volunteer Credentials */}
+      {isVolunteer && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Volunteer Credentials</Text>
+          <InfoRow icon="card-outline" label="ID Document Type" value={user?.volunteerIdType || 'NIC / Passport'} />
+          <InfoRow icon="document-text-outline" label="ID Document Number" value={user?.volunteerIdNumber || 'Not submitted'} />
+          <InfoRow icon="school-outline" label="Educational Institution" value={user?.educationalInstitution || 'Not provided'} isLast />
+        </View>
+      )}
+
+      {/* Volunteer Alert & Notification Settings */}
+      {isVolunteer && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Alert & Notification Settings</Text>
+
+          <View style={styles.switchRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Emergency SOS Push Alerts</Text>
+              <Text style={styles.switchSubtitle}>
+                Get high-priority alerts when seniors in your area press SOS
+              </Text>
+            </View>
+            <Switch
+              value={receiveEmergencyAlerts}
+              onValueChange={setReceiveEmergencyAlerts}
+              trackColor={{ false: '#CBD5E1', true: '#BFDBFE' }}
+              thumbColor={receiveEmergencyAlerts ? '#1E40AF' : '#F1F5F9'}
+            />
+          </View>
+
+          <View style={[styles.switchRow, { marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Task Reminder Sounds</Text>
+              <Text style={styles.switchSubtitle}>
+                Play audio chime 15 minutes before scheduled visits
+              </Text>
+            </View>
+            <Switch
+              value={soundAlerts}
+              onValueChange={setSoundAlerts}
+              trackColor={{ false: '#CBD5E1', true: '#BFDBFE' }}
+              thumbColor={soundAlerts ? '#1E40AF' : '#F1F5F9'}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Volunteer Safety Guidelines & Community Support Helpline */}
+      {isVolunteer && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Help & Support</Text>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() =>
+              Alert.alert('Volunteer Guidelines', 'TogetherCare volunteer handbook and safety guidelines.')
+            }
+          >
+            <Ionicons name="book-outline" size={20} color="#1E40AF" />
+            <Text style={styles.menuItemText}>Volunteer Safety Guidelines</Text>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.menuItem, { borderBottomWidth: 0 }]}
+            onPress={() =>
+              Alert.alert('Helpline Support', 'Contact TogetherCare Support:\n📞 +94 11 234 5678\n✉️ support@togethercare.lk')
+            }
+          >
+            <Ionicons name="help-buoy-outline" size={20} color="#1E40AF" />
+            <Text style={styles.menuItemText}>Community Support Helpline</Text>
+            <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Elderly Details */}
+      {user?.role === 'elderly' && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>Emergency Contact Information</Text>
+          <InfoRow icon="person-outline" label="Contact Name" value={user?.emergencyContact?.name || 'Not provided'} />
+          <InfoRow icon="git-network-outline" label="Relationship" value={user?.emergencyContact?.relation || 'Not provided'} />
+          <InfoRow icon="call-outline" label="Emergency Phone" value={user?.emergencyContact?.phone || 'Not provided'} isLast />
+        </View>
+      )}
+
+      {/* Caregiver & Family Member Details */}
+      {user?.role === 'caregiver' && (
+        <View style={styles.card}>
+          <Text style={styles.cardSectionTitle}>
+            {user?.caregiverType === 'family_member' ? 'Family Member Details' : 'Caregiver Details'}
+          </Text>
+          <InfoRow
+            icon="people-outline"
+            label="Account Category"
+            value={user?.caregiverType === 'family_member' ? 'Family Relative / Caretaker' : 'Formal Caregiver'}
+          />
+          <InfoRow
+            icon="heart-outline"
+            label="Relationship to Elderly"
+            value={
+              user?.relationshipToElderly ||
+              (user?.caregiverType === 'family_member' ? 'Family Caretaker' : 'Care Provider')
+            }
+            isLast={user?.caregiverType !== 'formal_caregiver'}
+          />
+          {user?.caregiverType === 'formal_caregiver' && (
+            <InfoRow
+              icon="business-outline"
+              label="Organization / Agency"
+              value={user?.organizationName || 'Independent'}
+              isLast
+            />
+          )}
+        </View>
+      )}
+
+      {/* Logout Action Button */}
+      <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={() => setShowLogoutModal(true)}>
+        <Ionicons name="log-out-outline" size={20} color="#DC2626" style={{ marginRight: 8 }} />
+        <Text style={styles.logoutButtonText}>Log Out Account</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.versionFooter}>TogetherCare v1.0.0 • Sri Lanka</Text>
+
+      {/* Reusable Designable Logout Modal */}
+      <LogoutModal
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
+        onConfirm={handleConfirmLogout}
+        isLoggingOut={isLoggingOut}
+      />
+
+      {/* Cross-Platform Avatar Options Modal */}
+      <AvatarActionModal
+        visible={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onPickPhoto={handlePickAvatar}
+        onRemovePhoto={handleRemoveAvatar}
+      />
+    </ScrollView>
   );
 }
+
+// Reusable Sub-Row Component
+function InfoRow({ icon, label, value, isLast }) {
+  return (
+    <View style={[styles.infoRow, !isLast && styles.infoRowBorder]}>
+      <View style={styles.infoIconBox}>
+        <Ionicons name={icon} size={18} color="#4B5563" />
+      </View>
+      <View style={styles.infoTextBox}>
+        <Text style={styles.infoLabel}>{label}</Text>
+        <Text style={styles.infoValue}>{value}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 40,
+  },
+  profileHeaderCard: {
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 14,
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    borderWidth: 3,
+    borderColor: '#1E40AF',
+  },
+  avatarPlaceholder: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: '#EFF6FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#DBEAFE',
+  },
+  avatarInitials: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#1E40AF',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 6,
+    zIndex: 10,
+  },
+  editBadge: {
+    backgroundColor: '#0284C7',
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 10,
+  },
+  customIdPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  customIdText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E40AF',
+    letterSpacing: 0.5,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  cardSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 14,
+  },
+  verificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  verificationIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F8FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  verificationDetails: {
+    flex: 1,
+  },
+  verificationLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  verificationSub: {
+    fontSize: 11,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    gap: 4,
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  infoRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  infoIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  infoTextBox: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  infoValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingVertical: 14,
+    borderRadius: 12,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  logoutButtonText: {
+    color: '#DC2626',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  versionFooter: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  switchTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  switchSubtitle: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+    paddingRight: 10,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  menuItemText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#334155',
+    marginLeft: 12,
+  },
+  birthdayBannerContainer: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 20,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: '#F59E0B',
+    marginBottom: 16,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  birthdayHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  birthdayIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 14,
+    shadowColor: '#B45309',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  birthdayTitleBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  birthdayBannerTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#78350F',
+  },
+  birthdayPill: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  birthdayPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
+  },
+  birthdayBannerSubtitle: {
+    fontSize: 12.5,
+    color: '#92400E',
+    marginTop: 4,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+});

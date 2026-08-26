@@ -19,6 +19,7 @@ export default function CaregiverDashboardHome({
   onAddDependent,
   onRequestHelp,
   onViewRequest,
+  onViewProfile,
   refreshTrigger,
 }) {
   const { user, logout } = useAuth();
@@ -100,13 +101,19 @@ export default function CaregiverDashboardHome({
     <View style={styles.container}>
       {/* Top Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeText}>Welcome back,</Text>
-          <Text style={styles.userName}>{user?.firstName || 'Caregiver'}</Text>
-        </View>
-        <TouchableOpacity style={styles.logoutBtn} onPress={logout}>
-          <Icon name="log-out-outline" size={20} color={COLORS.danger} />
-          <Text style={styles.logoutText}>Logout</Text>
+        <TouchableOpacity style={styles.profileHeaderTouch} activeOpacity={0.8} onPress={onViewProfile}>
+          <Icon name="person-circle-outline" size={38} color={COLORS.primary} style={{ marginRight: 8 }} />
+          <View>
+            <Text style={styles.welcomeText}>
+              {user?.caregiverType === 'family_member' ? 'Family Member Profile' : 'Welcome back,'}
+            </Text>
+            <Text style={styles.userName}>{user?.firstName} {user?.lastName || ''}</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.profileBadgeBtn} onPress={onViewProfile} activeOpacity={0.8}>
+          <Icon name="person-outline" size={16} color={COLORS.primary} />
+          <Text style={styles.profileBadgeBtnText}>My Profile</Text>
         </TouchableOpacity>
       </View>
 
@@ -276,8 +283,29 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
-  welcomeText: { fontSize: 14, color: COLORS.textSecondary },
-  userName: { fontSize: 22, fontWeight: 'bold', color: COLORS.primary },
+  profileHeaderTouch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  profileBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  profileBadgeBtnText: {
+    color: COLORS.primary,
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  welcomeText: { fontSize: 13, color: COLORS.textSecondary },
+  userName: { fontSize: 18, fontWeight: 'bold', color: COLORS.primary },
   logoutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6 },
   logoutText: { color: COLORS.danger, fontWeight: '600', fontSize: 12 },
   scrollContainer: { paddingHorizontal: 20, paddingBottom: 100 },

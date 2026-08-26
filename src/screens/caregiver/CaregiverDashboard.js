@@ -1,6 +1,7 @@
 // src/screens/caregiver/CaregiverDashboard.js
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, SafeAreaView, Platform } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../../constants/theme';
 import CaregiverDashboardHome from './CaregiverDashboardHome';
 import AddDependentScreen from './AddDependentScreen';
@@ -9,6 +10,7 @@ import VolunteerSelectionScreen from './VolunteerSelectionScreen';
 import VolunteerProfileReviewScreen from './VolunteerProfileReviewScreen';
 import LiveTrackingScreen from './LiveTrackingScreen';
 import FeedbackScreen from './FeedbackScreen';
+import ProfileScreen from '../auth/ProfileScreen';
 import client from '../../api/client';
 
 export default function CaregiverDashboard() {
@@ -123,6 +125,20 @@ export default function CaregiverDashboard() {
             }}
           />
         );
+      case 'profile':
+        return (
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+            <View style={styles.profileNavHeader}>
+              <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentScreen('home')}>
+                <Icon name="arrow-back" size={20} color="#0F172A" />
+                <Text style={styles.backBtnText}>Dashboard</Text>
+              </TouchableOpacity>
+              <Text style={styles.profileHeaderTitle}>User Profile</Text>
+              <View style={{ width: 90 }} />
+            </View>
+            <ProfileScreen />
+          </SafeAreaView>
+        );
       case 'home':
       default:
         return (
@@ -130,6 +146,7 @@ export default function CaregiverDashboard() {
             onAddDependent={() => setCurrentScreen('add-dependent')}
             onRequestHelp={() => setCurrentScreen('request-help')}
             onViewRequest={handleViewRequest}
+            onViewProfile={() => setCurrentScreen('profile')}
             refreshTrigger={refreshTrigger}
           />
         );
@@ -143,5 +160,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  profileNavHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 14 : 8,
+    paddingBottom: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  backBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  profileHeaderTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
   },
 });
