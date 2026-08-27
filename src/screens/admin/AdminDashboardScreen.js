@@ -12,6 +12,7 @@ import {
   RefreshControl,
   Platform,
   StatusBar,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -184,9 +185,16 @@ export default function AdminDashboardScreen() {
                   filteredUsers.map((u) => (
                     <View key={u._id || u.customId} style={styles.userCard}>
                       <View style={styles.userAvatar}>
-                        <Text style={styles.userAvatarText}>
-                          {u.firstName?.[0]}{u.lastName?.[0]}
-                        </Text>
+                        {u.profilePicture || u.avatar ? (
+                          <Image
+                            source={{ uri: u.profilePicture || u.avatar }}
+                            style={styles.userAvatarImage}
+                          />
+                        ) : (
+                          <Text style={styles.userAvatarText}>
+                            {u.firstName?.[0]}{u.lastName?.[0]}
+                          </Text>
+                        )}
                       </View>
                       <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -430,6 +438,12 @@ const styles = StyleSheet.create({
     marginRight: 12,
     borderWidth: 1,
     borderColor: '#BFDBFE',
+    overflow: 'hidden',
+  },
+  userAvatarImage: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
   },
   userAvatarText: {
     fontSize: 14,

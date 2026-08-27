@@ -14,8 +14,10 @@ import {
   ScrollView,
   Animated,
   useWindowDimensions,
+  StatusBar,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { SRI_LANKA_PROVINCES, SRI_LANKA_DISTRICTS } from '../../constants/locations';
 import CalendarDatePickerModal from '../../components/common/CalendarDatePickerModal';
@@ -58,6 +60,7 @@ function FormInput({
 }) {
   const [hidden, setHidden] = useState(!!secureToggle);
   const focusAnim = useRef(new Animated.Value(0)).current;
+  const inputRef = useRef(null);
 
   const handleFocus = () => {
     Animated.timing(focusAnim, { toValue: 1, duration: 160, useNativeDriver: false }).start();
@@ -75,42 +78,48 @@ function FormInput({
       {label ? (
         <FieldLabel label={label} required={required} optional={optional} elderly={elderly} />
       ) : null}
-      <Animated.View
-        style={[
-          styles.inputWrapper,
-          elderly && styles.inputWrapperElderly,
-          error && styles.inputWrapperError,
-          { borderColor },
-        ]}
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={() => inputRef.current?.focus()}
       >
-        {icon && (
-          <Icon
-            name={icon}
-            size={elderly ? 20 : 17}
-            color={error ? '#DC2626' : '#94A3B8'}
-            style={styles.inputIcon}
+        <Animated.View
+          style={[
+            styles.inputWrapper,
+            elderly && styles.inputWrapperElderly,
+            error && styles.inputWrapperError,
+            { borderColor },
+          ]}
+        >
+          {icon && (
+            <Icon
+              name={icon}
+              size={elderly ? 20 : 17}
+              color={error ? '#DC2626' : '#94A3B8'}
+              style={styles.inputIcon}
+            />
+          )}
+          <TextInput
+            ref={inputRef}
+            style={[styles.input, elderly && styles.inputTextElderly]}
+            placeholderTextColor="#9CA3AF"
+            value={value}
+            onChangeText={onChangeText}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
+            selectionColor={PRIMARY}
+            secureTextEntry={secureToggle ? hidden : undefined}
+            {...rest}
           />
-        )}
-        <TextInput
-          style={[styles.input, elderly && styles.inputTextElderly]}
-          placeholderTextColor="#9CA3AF"
-          value={value}
-          onChangeText={onChangeText}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
-          selectionColor={PRIMARY}
-          secureTextEntry={secureToggle ? hidden : undefined}
-          {...rest}
-        />
-        {secureToggle && (
-          <TouchableOpacity
-            onPress={() => setHidden((v) => !v)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Icon name={hidden ? 'eye-outline' : 'eye-off-outline'} size={18} color="#94A3B8" />
-          </TouchableOpacity>
-        )}
-      </Animated.View>
+          {secureToggle && (
+            <TouchableOpacity
+              onPress={() => setHidden((v) => !v)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name={hidden ? 'eye-outline' : 'eye-off-outline'} size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -503,11 +512,15 @@ export default function RegisterScreen({ onNavigate }) {
   const stepOpacity = stepAnim;
   const stepTranslate = stepAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
 
+  const insets = useSafeAreaInsets();
+  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0);
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 12);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         {/* Top bar: back + progress */}
-        <View style={[styles.topBar, { paddingHorizontal: hPad }]}>
+        <View style={[styles.topBar, { paddingHorizontal: hPad, paddingTop: topPadding + 6 }]}>
           <TouchableOpacity onPress={goBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
             <Icon name={stepIndex === 0 ? 'close-outline' : 'chevron-back'} size={22} color="#334155" />
           </TouchableOpacity>
@@ -536,8 +549,15 @@ export default function RegisterScreen({ onNavigate }) {
         )}
 
         <ScrollView
-          contentContainerStyle={[styles.container, { paddingHorizontal: hPad }, isElderly && styles.containerElderly]}
-          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            styles.container,
+            { paddingHorizontal: hPad, paddingBottom: insets.bottom + 130, flexGrow: 1 },
+            isElderly && styles.containerElderly,
+          ]}
+          keyboardShouldPersistTaps="always"
+          showsVerticalScrollIndicator={false}
+          bounces={true}
+          overScrollMode="always"
         >
           <Animated.View style={{ opacity: stepOpacity, transform: [{ translateY: stepTranslate }] }}>
             {/* Step header */}
@@ -882,8 +902,16 @@ export default function RegisterScreen({ onNavigate }) {
           <View style={{ height: 100 }} />
         </ScrollView>
 
-        {/* Sticky bottom action bar */}
-        <View style={[styles.bottomBar, { paddingHorizontal: hPad }]}>
+        {/* Fixed elevated bottom action bar */}
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              paddingHorizontal: hPad,
+              paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 16 : 10) + 12,
+            },
+          ]}
+        >
           <Animated.View style={{ flex: 1, transform: [{ scale: btnScale }] }}>
             <TouchableOpacity
               style={[styles.primaryBtn, isElderly && styles.primaryBtnElderly]}
@@ -1112,11 +1140,20 @@ const styles = StyleSheet.create({
   roleSectionTitleElderly: { fontSize: 19, fontWeight: '700', color: PRIMARY },
 
   bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: '#E2E8F0',
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     backgroundColor: '#FFFFFF',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 20,
+    zIndex: 1000,
   },
   primaryBtn: {
     height: 56,

@@ -21,12 +21,14 @@ import LogoutModal from '../../components/common/LogoutModal';
 import AvatarActionModal from '../../components/common/AvatarActionModal';
 import EditProfileModal from '../../components/common/EditProfileModal';
 import AppHeader from '../../components/common/AppHeader';
+import VerifyEmailModal from '../../components/common/VerifyEmailModal';
 
 export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }) {
   const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile, updateProfile } = useAuth();
   const { scale } = useTheme();
   const styles = React.useMemo(() => getProfileScreenStyles(scale), [scale]);
   const [uploading, setUploading] = useState(false);
+  const [verifyEmailModalVisible, setVerifyEmailModalVisible] = useState(false);
 
   // Refresh latest database profile on mount
   useEffect(() => {
@@ -250,7 +252,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
           ) : (
             <TouchableOpacity
               style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}
-              onPress={() => onNavigateVerifyEmail && onNavigateVerifyEmail()}
+              activeOpacity={0.7}
+              onPress={() => setVerifyEmailModalVisible(true)}
             >
               <Text style={[styles.statusBadgeText, { color: '#DC2626' }]}>Verify Now</Text>
             </TouchableOpacity>
@@ -524,6 +527,16 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         onClose={() => setShowEditModal(false)}
         user={user}
         onSaveSuccess={updateProfile}
+      />
+
+      <VerifyEmailModal
+        visible={verifyEmailModalVisible}
+        email={user?.email}
+        onClose={() => setVerifyEmailModalVisible(false)}
+        onVerifiedSuccess={(updatedUser) => {
+          refreshProfile();
+          setVerifyEmailModalVisible(false);
+        }}
       />
     </ScrollView>
   );
