@@ -2,10 +2,12 @@
 import React, { useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/auth/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import RegisterScreen from './src/screens/auth/RegisterScreen';
+import ForgotPasswordFlow from './src/screens/auth/ForgotPasswordFlow';
 
 // Role Dashboard Screens
 import ElderlyHomeScreen from './src/screens/elderly/ElderlyHomeScreen';
@@ -17,6 +19,15 @@ function MainNavigator() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
   const [authScreen, setAuthScreen] = useState('Welcome'); // 'Welcome' | 'Login' | 'Register'
+  const wasAuthenticated = React.useRef(isAuthenticated);
+
+  // Automatically redirect to Login screen ASAP when user logs out
+  React.useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated) {
+      setAuthScreen('Login');
+    }
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   // 1. Show Splash on initial startup
   if (showSplash) {
@@ -40,6 +51,9 @@ function MainNavigator() {
     if (authScreen === 'Register') {
       return <RegisterScreen onNavigate={setAuthScreen} />;
     }
+    if (authScreen === 'ForgotPassword') {
+      return <ForgotPasswordFlow onBackToLogin={() => setAuthScreen('Login')} />;
+    }
     return <WelcomeScreen onNavigate={setAuthScreen} />;
   }
 
@@ -57,10 +71,16 @@ function MainNavigator() {
   }
 }
 
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+
 export default function App() {
   return (
-    <AuthProvider>
-      <MainNavigator />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MainNavigator />
+        </AuthProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

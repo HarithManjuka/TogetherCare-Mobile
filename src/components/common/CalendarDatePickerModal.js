@@ -8,6 +8,8 @@ import {
   StyleSheet,
   ScrollView,
   TouchableWithoutFeedback,
+  Alert,
+  Platform,
 } from 'react-native';
 
 const MONTH_NAMES = [
@@ -15,7 +17,16 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
 
-export default function CalendarDatePickerModal({ visible, initialDate, onConfirm, onClose, isElderlyMode = false }) {
+export default function CalendarDatePickerModal({
+  visible,
+  initialDate,
+  onConfirm,
+  onClose,
+  isElderlyMode = false,
+  title,
+  minDate,
+  maxDate,
+}) {
   const currentYear = new Date().getFullYear();
   
   // Default date state
@@ -25,13 +36,21 @@ export default function CalendarDatePickerModal({ visible, initialDate, onConfir
   const [viewMode, setViewMode] = useState('calendar'); // 'calendar' | 'year'
 
   useEffect(() => {
-    if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate)) {
-      const [y, m, d] = initialDate.split('-').map(Number);
-      if (y) setSelectedYear(y);
-      if (m) setSelectedMonth(m - 1);
-      if (d) setSelectedDay(d);
+    if (visible) {
+      if (initialDate && /^\d{4}-\d{2}-\d{2}$/.test(initialDate)) {
+        const [y, m, d] = initialDate.split('-').map(Number);
+        if (y) setSelectedYear(y);
+        if (m) setSelectedMonth(m - 1);
+        if (d) setSelectedDay(d);
+      } else {
+        const today = new Date();
+        const isBirth = isElderlyMode || (title && title.toLowerCase().includes('birth'));
+        setSelectedYear(isBirth ? 1975 : today.getFullYear());
+        setSelectedMonth(isBirth ? 0 : today.getMonth());
+        setSelectedDay(isBirth ? 15 : today.getDate());
+      }
     }
-  }, [initialDate, visible]);
+  }, [initialDate, visible, isElderlyMode, title]);
 
   // Compute total days in month
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
@@ -51,6 +70,38 @@ export default function CalendarDatePickerModal({ visible, initialDate, onConfir
     const mStr = String(selectedMonth + 1).padStart(2, '0');
     const dStr = String(selectedDay).padStart(2, '0');
     const dateString = `${selectedYear}-${mStr}-${dStr}`;
+    const selectedDateObj = new Date(selectedYear, selectedMonth, selectedDay);
+
+    if (minDate) {
+      const minDateObj = new Date(minDate);
+      minDateObj.setHours(0, 0, 0, 0);
+      selectedDateObj.setHours(0, 0, 0, 0);
+      if (selectedDateObj < minDateObj) {
+        const msg = `Selected date cannot be before ${minDate.toISOString().split('T')[0]}`;
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Invalid Date', msg);
+        }
+        return;
+      }
+    }
+
+    if (maxDate) {
+      const maxDateObj = new Date(maxDate);
+      maxDateObj.setHours(23, 59, 59, 999);
+      selectedDateObj.setHours(0, 0, 0, 0);
+      if (selectedDateObj > maxDateObj) {
+        const msg = `Selected date cannot be after ${maxDate.toISOString().split('T')[0]}`;
+        if (Platform.OS === 'web') {
+          window.alert(msg);
+        } else {
+          Alert.alert('Invalid Date', msg);
+        }
+        return;
+      }
+    }
+
     onConfirm(dateString);
   };
 
@@ -78,10 +129,18 @@ export default function CalendarDatePickerModal({ visible, initialDate, onConfir
             <View style={[styles.modalCard, isElderlyMode && styles.modalCardElderly]}>
               {/* Header */}
               <View style={styles.header}>
-                <Text style={[styles.title, { fontSize: titleSize }]}>📅 Select Birth Date</Text>
-                <Text style={styles.subtext}>
-                  {selectedYear}-{String(selectedMonth + 1).padStart(2, '0')}-{String(selectedDay).padStart(2, '0')} (Age: {currentAge} yrs)
+                <Text style={[styles.title, { fontSize: titleSize }]}>
+                  {title || '📅 Select Birth Date'}
                 </Text>
+                {(!title || title.toLowerCase().includes('birth')) ? (
+                  <Text style={styles.subtext}>
+                    {selectedYear}-{String(selectedMonth + 1).padStart(2, '0')}-{String(selectedDay).padStart(2, '0')} (Age: {currentAge} yrs)
+                  </Text>
+                ) : (
+                  <Text style={styles.subtext}>
+                    Selected: {selectedYear}-{String(selectedMonth + 1).padStart(2, '0')}-{String(selectedDay).padStart(2, '0')}
+                  </Text>
+                )}
               </View>
 
               {/* View Switcher Bar */}
