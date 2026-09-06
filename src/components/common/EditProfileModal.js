@@ -33,6 +33,7 @@ export default function EditProfileModal({ visible, onClose, user, onSaveSuccess
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
+  const [gender, setGender] = useState('male');
   const [streetAddress, setStreetAddress] = useState('');
   const [city, setCity] = useState('');
   const [postalCode, setPostalCode] = useState('');
@@ -60,6 +61,7 @@ export default function EditProfileModal({ visible, onClose, user, onSaveSuccess
       setLastName(user.lastName || '');
       setPhone(user.phone || '');
       setDateOfBirth(user.dateOfBirth ? new Date(user.dateOfBirth).toISOString().split('T')[0] : '');
+      setGender(user.gender || 'male');
       setStreetAddress(user.address?.streetAddress || '');
       setCity(user.address?.city || '');
       setPostalCode(user.address?.postalCode || '');
@@ -129,6 +131,7 @@ export default function EditProfileModal({ visible, onClose, user, onSaveSuccess
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         phone: phone.trim(),
+        gender: gender || 'male',
         address: {
           streetAddress: streetAddress.trim() || user.address?.streetAddress || '',
           city: city.trim() || user.address?.city || '',
@@ -265,6 +268,40 @@ export default function EditProfileModal({ visible, onClose, user, onSaveSuccess
               keyboardType="phone-pad"
               placeholder="07XXXXXXXX"
             />
+
+            <Text style={styles.label}>Gender</Text>
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 4, marginBottom: 8 }}>
+              {[
+                { label: 'Male', value: 'male' },
+                { label: 'Female', value: 'female' },
+              ].map((g) => (
+                <TouchableOpacity
+                  key={g.value}
+                  style={[
+                    styles.selectorBtn,
+                    { flex: 1, justifyContent: 'center', marginVertical: 0 },
+                    gender === g.value && { backgroundColor: '#EFF6FF', borderColor: '#1E40AF' },
+                  ]}
+                  onPress={() => setGender(g.value)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons
+                    name={gender === g.value ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={18}
+                    color={gender === g.value ? '#1E40AF' : '#64748B'}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={[
+                      styles.selectorBtnText,
+                      gender === g.value && { color: '#1E40AF', fontWeight: '800' },
+                    ]}
+                  >
+                    {g.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
             <Text style={styles.label}>Date of Birth (Calendar Selection)</Text>
             <TouchableOpacity
