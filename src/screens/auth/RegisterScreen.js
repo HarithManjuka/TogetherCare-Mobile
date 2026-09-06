@@ -249,6 +249,7 @@ export default function RegisterScreen({ onNavigate }) {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState(''); // Format: YYYY-MM-DD
+  const [gender, setGender] = useState('male'); // male | female
   const [role, setRole] = useState('elderly'); // elderly | volunteer | caregiver
 
   // Address fields
@@ -456,6 +457,7 @@ export default function RegisterScreen({ onNavigate }) {
       phone: phone.trim(),
       role,
       dateOfBirth: dob.trim(),
+      gender: gender || 'male',
       address: {
         streetAddress: streetAddress.trim(),
         city: city.trim(),
@@ -660,6 +662,32 @@ export default function RegisterScreen({ onNavigate }) {
                   onChangeText={(val) => { setPhone(val); clearFieldError('phone'); }}
                   keyboardType="phone-pad"
                 />
+
+                <FieldLabel label="Gender" required elderly={isElderly} />
+                <View style={[styles.row, { marginBottom: 12 }]}>
+                  {[
+                    { label: 'Male', value: 'male' },
+                    { label: 'Female', value: 'female' },
+                  ].map((g) => (
+                    <TouchableOpacity
+                      key={g.value}
+                      style={[
+                        styles.gridChip,
+                        { flex: 1, marginRight: 8, paddingVertical: 10 },
+                        gender === g.value && styles.gridChipActive,
+                      ]}
+                      onPress={() => setGender(g.value)}
+                      activeOpacity={0.8}
+                    >
+                      {gender === g.value && (
+                        <Icon name="checkmark-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      )}
+                      <Text style={[styles.gridChipText, gender === g.value && styles.gridChipTextActive]}>
+                        {g.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
 
                 <FieldLabel label="Date of Birth" required elderly={isElderly} />
                 <TouchableOpacity

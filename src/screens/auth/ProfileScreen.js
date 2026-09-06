@@ -21,14 +21,12 @@ import LogoutModal from '../../components/common/LogoutModal';
 import AvatarActionModal from '../../components/common/AvatarActionModal';
 import EditProfileModal from '../../components/common/EditProfileModal';
 import AppHeader from '../../components/common/AppHeader';
-import VerifyEmailModal from '../../components/common/VerifyEmailModal';
 
 export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }) {
   const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile, updateProfile } = useAuth();
   const { scale } = useTheme();
   const styles = React.useMemo(() => getProfileScreenStyles(scale), [scale]);
   const [uploading, setUploading] = useState(false);
-  const [verifyEmailModalVisible, setVerifyEmailModalVisible] = useState(false);
 
   // Refresh latest database profile on mount
   useEffect(() => {
@@ -129,11 +127,11 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      
-      {/* 0. Top Header Bar & Back Navigation to Home for Elderly Role */}
+
+      {/* Top Header Bar & Back Navigation to Home for Elderly Role */}
       {user?.role === 'elderly' && (
         <View style={styles.elderlyTopBarCard}>
-          <AppHeader onProfilePress={() => {}} />
+          <AppHeader onProfilePress={() => { }} />
           <View style={styles.elderlyBackNavRow}>
             <TouchableOpacity
               style={styles.elderlyBackBtn}
@@ -252,8 +250,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
           ) : (
             <TouchableOpacity
               style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}
-              activeOpacity={0.7}
-              onPress={() => setVerifyEmailModalVisible(true)}
+              onPress={() => onNavigateVerifyEmail && onNavigateVerifyEmail()}
             >
               <Text style={[styles.statusBadgeText, { color: '#DC2626' }]}>Verify Now</Text>
             </TouchableOpacity>
@@ -271,8 +268,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                   volunteerBadgeStatus === 'verified'
                     ? '#16A34A'
                     : volunteerBadgeStatus === 'pending'
-                    ? '#D97706'
-                    : '#6B7280'
+                      ? '#D97706'
+                      : '#6B7280'
                 }
               />
             </View>
@@ -282,8 +279,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                 {volunteerBadgeStatus === 'verified'
                   ? 'Government / Student ID verified'
                   : volunteerBadgeStatus === 'pending'
-                  ? 'Documents currently under Admin review'
-                  : 'NIC / Passport / Student ID not verified'}
+                    ? 'Documents currently under Admin review'
+                    : 'NIC / Passport / Student ID not verified'}
               </Text>
             </View>
             <View
@@ -294,8 +291,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                     volunteerBadgeStatus === 'verified'
                       ? '#DCFCE7'
                       : volunteerBadgeStatus === 'pending'
-                      ? '#FEF3C7'
-                      : '#F3F4F6',
+                        ? '#FEF3C7'
+                        : '#F3F4F6',
                 },
               ]}
             >
@@ -307,8 +304,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                       volunteerBadgeStatus === 'verified'
                         ? '#16A34A'
                         : volunteerBadgeStatus === 'pending'
-                        ? '#D97706'
-                        : '#4B5563',
+                          ? '#D97706'
+                          : '#4B5563',
                   },
                 ]}
               >
@@ -527,16 +524,6 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         onClose={() => setShowEditModal(false)}
         user={user}
         onSaveSuccess={updateProfile}
-      />
-
-      <VerifyEmailModal
-        visible={verifyEmailModalVisible}
-        email={user?.email}
-        onClose={() => setVerifyEmailModalVisible(false)}
-        onVerifiedSuccess={(updatedUser) => {
-          refreshProfile();
-          setVerifyEmailModalVisible(false);
-        }}
       />
     </ScrollView>
   );
