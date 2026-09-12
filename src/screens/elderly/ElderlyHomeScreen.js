@@ -1,6 +1,6 @@
 // src/screens/elderly/ElderlyHomeScreen.js
-import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, BackHandler } from 'react-native';
 import ElderlyBottomNav from '../../components/elderly/ElderlyBottomNav';
 import ElderlyDashboardHome from './ElderlyDashboardHome';
 import MyScheduleScreen from './MyScheduleScreen';
@@ -14,6 +14,29 @@ export default function ElderlyHomeScreen() {
   const [showProfileScreen, setShowProfileScreen] = useState(false);
 
   const { refreshProfile, onRefresh } = useElderlyHome();
+
+  // Handle mobile hardware/system Back button navigation
+  useEffect(() => {
+    const onBackPress = () => {
+      if (showCreateScreen) {
+        setShowCreateScreen(false);
+        return true;
+      }
+      if (showProfileScreen) {
+        setShowProfileScreen(false);
+        refreshProfile();
+        return true;
+      }
+      if (currentTab !== 'home') {
+        setCurrentTab('home');
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [showCreateScreen, showProfileScreen, currentTab]);
 
   // Full-page Modal / Screen: Create Companionship Request
   if (showCreateScreen) {

@@ -51,12 +51,14 @@ export default function AppBottomNav({
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${tab.label} tab`}
             >
-              <View style={[styles.iconPill, isActive && { backgroundColor: activePillColor }]}>
-                <Ionicons
-                  name={iconName}
-                  size={Math.round(20 * scale)}
-                  color={isActive ? activeColor : inactiveColor}
-                />
+              <View style={styles.iconPillWrapper}>
+                <View style={[styles.iconPill, isActive && { backgroundColor: activePillColor }]}>
+                  <Ionicons
+                    name={iconName}
+                    size={Math.round(20 * scale)}
+                    color={isActive ? activeColor : inactiveColor}
+                  />
+                </View>
                 {badgeCount && badgeCount > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
@@ -107,20 +109,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconPillWrapper: {
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 3,
+  },
   iconPill: {
-    width: 44,
-    height: 26,
-    borderRadius: 13,
+    width: 50,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'transparent',
-    marginBottom: 3,
-    position: 'relative',
+    overflow: 'hidden',
   },
   badge: {
     position: 'absolute',
     top: -4,
-    right: -4,
+    right: -2,
     backgroundColor: '#EF4444',
     borderRadius: 9,
     minWidth: 16,
@@ -130,6 +137,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
+    zIndex: 10,
   },
   badgeText: {
     color: '#FFFFFF',
