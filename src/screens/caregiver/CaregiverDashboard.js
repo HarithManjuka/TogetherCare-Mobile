@@ -1,6 +1,6 @@
 // src/screens/caregiver/CaregiverDashboard.js
-import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, SafeAreaView, Platform } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, SafeAreaView, Platform, BackHandler } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../../constants/theme';
 import CaregiverDashboardHome from './CaregiverDashboardHome';
@@ -18,6 +18,20 @@ export default function CaregiverDashboard() {
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Handle mobile hardware/system Back button navigation
+  useEffect(() => {
+    const onBackPress = () => {
+      if (currentScreen !== 'home') {
+        setCurrentScreen('home');
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [currentScreen]);
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 

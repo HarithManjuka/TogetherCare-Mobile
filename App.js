@@ -1,6 +1,6 @@
 // App.js
 import React, { useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, BackHandler } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -32,6 +32,26 @@ function MainNavigator() {
     }
     wasAuthenticated.current = isAuthenticated;
   }, [isAuthenticated]);
+
+  // Handle mobile hardware/system Back button in Unauthenticated stack
+  React.useEffect(() => {
+    if (isAuthenticated && user) return;
+
+    const onBackPress = () => {
+      if (authScreen === 'Register' || authScreen === 'ForgotPassword') {
+        setAuthScreen('Login');
+        return true;
+      }
+      if (authScreen === 'Login') {
+        setAuthScreen('Welcome');
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [authScreen, isAuthenticated, user]);
 
   // 1. Show Splash on initial startup
   if (showSplash) {
