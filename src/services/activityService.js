@@ -8,3 +8,5 @@ export const getActivities = async () => {
   const response = await client.get('/activities');
   return response.data;
 };
+
+export const getAllActivities = getActivities;

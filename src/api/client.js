@@ -43,7 +43,7 @@ const client = axios.create({
   },
 });
 
-// Request interceptor: Attach JWT token if present in AsyncStorage
+// Request interceptor: Attach JWT token securely
 client.interceptors.request.use(
   async (config) => {
     const token = await storage.getToken();
@@ -53,6 +53,17 @@ client.interceptors.request.use(
     return config;
   },
   (error) => Promise.reject(error)
+);
+
+// Response interceptor: automatically wipe storage credentials on 401 Unauthorized
+client.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response && error.response.status === 401) {
+      await storage.clearSession();
+    }
+    return Promise.reject(error);
+  }
 );
 
 export default client;

@@ -1,6 +1,10 @@
 // App.js
 import React, { useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './src/api/queryClient';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider } from './src/context/ThemeContext';
 import SplashScreen from './src/screens/SplashScreen';
@@ -71,16 +75,17 @@ function MainNavigator() {
   }
 }
 
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-
 export default function App() {
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <AuthProvider>
-          <MainNavigator />
-        </AuthProvider>
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <StatusBar style="auto" />
+            <MainNavigator />
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </SafeAreaProvider>
   );
 }
