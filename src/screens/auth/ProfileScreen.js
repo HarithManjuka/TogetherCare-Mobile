@@ -20,6 +20,7 @@ import client from '../../api/client';
 import LogoutModal from '../../components/common/LogoutModal';
 import AvatarActionModal from '../../components/common/AvatarActionModal';
 import EditProfileModal from '../../components/common/EditProfileModal';
+import VerifyEmailModal from '../../components/common/VerifyEmailModal';
 import AppHeader from '../../components/common/AppHeader';
 
 export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }) {
@@ -35,6 +36,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showVerifyEmailModal, setShowVerifyEmailModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Volunteer specific preferences state
@@ -128,28 +130,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-      {/* Top Header Bar & Back Navigation to Home for Elderly Role */}
-      {user?.role === 'elderly' && (
-        <View style={styles.elderlyTopBarCard}>
-          <AppHeader onProfilePress={() => { }} />
-          <View style={styles.elderlyBackNavRow}>
-            <TouchableOpacity
-              style={styles.elderlyBackBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                if (onBack) onBack();
-                else if (onClose) onClose();
-              }}
-            >
-              <Ionicons name="arrow-back" size={18} color="#1E40AF" style={{ marginRight: 6 }} />
-              <Text style={styles.elderlyBackBtnText}>Back to Home Dashboard</Text>
-            </TouchableOpacity>
-            <View style={styles.elderlyPillTag}>
-              <Text style={styles.elderlyPillTagText}>ELDERLY PROFILE</Text>
-            </View>
-          </View>
-        </View>
-      )}
+
 
       {/* 0.1. Impressive & Professional Birthday Celebration Banner */}
       {isBirthdayToday(user?.dateOfBirth) && (
@@ -250,7 +231,10 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
           ) : (
             <TouchableOpacity
               style={[styles.statusBadge, { backgroundColor: '#FEE2E2' }]}
-              onPress={() => onNavigateVerifyEmail && onNavigateVerifyEmail()}
+              onPress={() => {
+                setShowVerifyEmailModal(true);
+                if (onNavigateVerifyEmail) onNavigateVerifyEmail();
+              }}
             >
               <Text style={[styles.statusBadgeText, { color: '#DC2626' }]}>Verify Now</Text>
             </TouchableOpacity>
@@ -524,6 +508,16 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         onClose={() => setShowEditModal(false)}
         user={user}
         onSaveSuccess={updateProfile}
+      />
+
+      <VerifyEmailModal
+        visible={showVerifyEmailModal}
+        onClose={() => setShowVerifyEmailModal(false)}
+        email={user?.email}
+        onVerifiedSuccess={async () => {
+          await refreshProfile();
+          setShowVerifyEmailModal(false);
+        }}
       />
     </ScrollView>
   );

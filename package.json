@@ -7,7 +7,11 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "jest --watchAll=false"
+    "test": "jest --watchAll=false",
+    "test:it23831254": "jest src/__tests__/IT23831254 --watchAll=false",
+    "test:it23819092": "jest src/__tests__/IT23819092 --watchAll=false",
+    "test:it23818620": "jest src/__tests__/IT23818620 --watchAll=false",
+    "test:it23839106": "jest src/__tests__/IT23839106 --watchAll=false"
   },
   "jest": {
     "preset": "jest-expo",
