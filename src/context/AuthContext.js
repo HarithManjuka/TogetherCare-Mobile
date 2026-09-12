@@ -3,6 +3,7 @@ import React, { createContext, useState, useEffect, useContext, useCallback } fr
 import client from '../api/client';
 import { storage } from '../utils/storage';
 import * as userService from '../services/userService';
+import { queryClient } from '../api/queryClient';
 
 const AuthContext = createContext({});
 
@@ -11,13 +12,33 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Phase 1 Development: Start session
+  // Restore authenticated session from SecureStore & AsyncStorage on app boot
   useEffect(() => {
-    const initSession = async () => {
+    const restoreSession = async () => {
       try {
-        await storage.clearSession();
-        setToken(null);
-        setUser(null);
+        const storedToken = await storage.getToken();
+        const storedUser = await storage.getUser();
+
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(storedUser);
+
+          // Background sync to verify token validity and update stale local data
+          try {
+            const data = await userService.getProfile();
+            if (data?.success && data?.user) {
+              setUser(data.user);
+              await storage.setUser(data.user);
+            }
+          } catch (verifyError) {
+            if (verifyError.response?.status === 401) {
+              await storage.clearSession();
+              queryClient.clear();
+              setToken(null);
+              setUser(null);
+            }
+          }
+        }
       } catch (e) {
         console.error('Session Initialization Error:', e);
       } finally {
@@ -25,7 +46,7 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    initSession();
+    restoreSession();
   }, []);
 
   // Register action
@@ -64,6 +85,7 @@ export const AuthProvider = ({ children }) => {
   // Logout action
   const logout = async () => {
     await storage.clearSession();
+    queryClient.clear(); // Clears all cached queries from memory
     setToken(null);
     setUser(null);
   };
@@ -110,7 +132,6 @@ export const AuthProvider = ({ children }) => {
 
   // Delete profile picture from Cloudinary & MongoDB
   const deleteProfilePicture = async () => {
-    // Optimistically remove photo from UI state immediately
     setUser((prev) => ({
       ...(prev || {}),
       profilePicture: '',
@@ -127,8 +148,8 @@ export const AuthProvider = ({ children }) => {
       value={{
         user,
         token,
+        isAuthenticated: !!token && !!user,
         isLoading,
-        isAuthenticated: !!token,
         register,
         login,
         logout,

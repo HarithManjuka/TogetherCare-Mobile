@@ -54,6 +54,7 @@ export default function ElderlyHomeScreen() {
             onRequestNew={() => setShowCreateScreen(true)}
           />
         );
+      case 'profile':
       case 'settings':
         return (
           <ProfileScreen
@@ -67,7 +68,7 @@ export default function ElderlyHomeScreen() {
           <ElderlyDashboardHome
             onNavigateTab={setCurrentTab}
             onRequestHelp={() => setShowCreateScreen(true)}
-            onOpenProfile={() => setShowProfileScreen(true)}
+            onOpenProfile={() => setCurrentTab('profile')}
           />
         );
     }
