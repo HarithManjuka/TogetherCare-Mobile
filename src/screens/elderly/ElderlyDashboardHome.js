@@ -79,7 +79,7 @@ export default function ElderlyDashboardHome({
 
       {/* App Header Component with Profile & Size Switcher */}
       <AppHeader
-        onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('settings'))}
+        onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
         onNotificationPress={() => handleActionPress('Notifications')}
       />
 
