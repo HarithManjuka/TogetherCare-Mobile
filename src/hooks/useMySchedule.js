@@ -1,46 +1,49 @@
 // src/hooks/useMySchedule.js
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Alert, Platform } from 'react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
 import * as companionshipService from '../services/companionshipService';
 
-export function useMySchedule({ initialTab = 'upcoming' } = {}) {
-  const [activeTab, setActiveTab] = useState(initialTab); // 'requested' | 'upcoming' | 'ongoing' | 'completed'
-  const [schedules, setSchedules] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
+export const SCHEDULE_QUERY_KEY = ['mySchedule'];
+
+export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
+  const queryClient = useQueryClient();
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [editingRequest, setEditingRequest] = useState(null);
 
-  // Fetch all user schedules & requests
-  const fetchSchedules = useCallback(async () => {
-    try {
-      setFetchError(null);
-      const res = await companionshipService.getMyRequests();
-      if (res?.success && Array.isArray(res.data)) {
-        setSchedules(res.data);
-      } else {
-        setSchedules([]);
-      }
-    } catch (err) {
-      console.log('Error fetching schedules:', err.message);
-      setFetchError('Unable to load schedule from database. Pull down to refresh.');
-      setSchedules([]);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
+  // Query cached schedule data (with deduplication & background stale refresh)
+  const {
+    data: schedule = [],
+    isLoading,
+    isRefetching,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: SCHEDULE_QUERY_KEY,
+    queryFn: async () => {
+      const response = await companionshipService.getMyRequests();
+      return response?.data || response?.requests || (Array.isArray(response) ? response : []);
+    },
+  });
 
-  useEffect(() => {
-    fetchSchedules();
-  }, [fetchSchedules]);
+  // Mutation to cancel a request and immediately invalidate/refresh the cache
+  const cancelMutation = useMutation({
+    mutationFn: (requestId) => companionshipService.cancelRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
+    },
+  });
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchSchedules();
-  };
+  // Mutation to delete a request and immediately invalidate/refresh the cache
+  const deleteMutation = useMutation({
+    mutationFn: (requestId) => companionshipService.deleteRequest(requestId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
+    },
+  });
 
   // Helper to categorize schedules
   const categorized = useMemo(() => {
@@ -52,7 +55,9 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
 
-    schedules.forEach((item) => {
+    const schedulesList = Array.isArray(schedule) ? schedule : [];
+
+    schedulesList.forEach((item) => {
       const status = (item.status || 'pending').toLowerCase();
       const schedDate = item.scheduledDate
         ? new Date(item.scheduledDate).toISOString().split('T')[0]
@@ -65,7 +70,6 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
       } else if (status === 'ongoing' || status === 'in_progress') {
         ongoing.push(item);
       } else if (status === 'accepted' || status === 'scheduled') {
-        // If scheduled for today, can be ongoing or upcoming
         if (schedDate === todayStr) {
           upcoming.push(item);
         } else {
@@ -77,7 +81,7 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
     });
 
     return { requested, upcoming, ongoing, completed };
-  }, [schedules]);
+  }, [schedule]);
 
   // Current list based on active tab
   const currentList = useMemo(() => {
@@ -158,22 +162,18 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
     }
   };
 
-  const [editingRequest, setEditingRequest] = useState(null);
-
   // Delete Request Handler
   const handleDeleteRequest = (scheduleItem) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
     const performDelete = async () => {
       try {
-        const res = await companionshipService.deleteRequest(scheduleItem._id);
-        if (res?.success) {
-          if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
-            window.alert('Request Deleted\n\nYour companionship request has been deleted.');
-          } else {
-            Alert.alert('Request Deleted', 'Your companionship request has been deleted.');
-          }
-          fetchSchedules();
-          setSelectedSchedule(null);
+        await deleteMutation.mutateAsync(requestId);
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+          window.alert('Request Deleted\n\nYour companionship request has been deleted.');
+        } else {
+          Alert.alert('Request Deleted', 'Your companionship request has been deleted.');
         }
+        setSelectedSchedule(null);
       } catch (err) {
         if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
           window.alert(`Error\n\n${err.message || 'Failed to delete request.'}`);
@@ -201,18 +201,16 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
 
   // Cancel Request Handler
   const handleCancelRequest = (scheduleItem) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
     const performCancel = async () => {
       try {
-        const res = await companionshipService.cancelRequest(scheduleItem._id);
-        if (res?.success) {
-          if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
-            window.alert('Request Cancelled\n\nYour request has been cancelled.');
-          } else {
-            Alert.alert('Request Cancelled', 'Your request has been cancelled.');
-          }
-          fetchSchedules();
-          setSelectedSchedule(null);
+        await cancelMutation.mutateAsync(requestId);
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+          window.alert('Request Cancelled\n\nYour request has been cancelled.');
+        } else {
+          Alert.alert('Request Cancelled', 'Your request has been cancelled.');
         }
+        setSelectedSchedule(null);
       } catch (err) {
         Alert.alert('Error', err.message || 'Failed to cancel request.');
       }
@@ -235,15 +233,21 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
   };
 
   return {
+    schedule,
+    schedules: schedule,
+    isLoading,
+    isRefreshing: isRefetching,
+    refreshing: isRefetching,
+    error: error ? error.message : null,
+    fetchError: error ? error.message : null,
+    refreshSchedule: refetch,
+    onRefresh: refetch,
+    cancelRequest: cancelMutation.mutateAsync,
+    isCancelling: cancelMutation.isPending,
     activeTab,
     setActiveTab,
-    schedules,
     currentList,
     categorized,
-    isLoading,
-    refreshing,
-    fetchError,
-    onRefresh,
     selectedSchedule,
     setSelectedSchedule,
     editingRequest,
@@ -260,4 +264,5 @@ export function useMySchedule({ initialTab = 'upcoming' } = {}) {
       completed: categorized.completed.length,
     },
   };
-}
+};
+

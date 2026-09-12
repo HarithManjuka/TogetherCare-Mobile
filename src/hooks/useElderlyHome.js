@@ -1,25 +1,63 @@
 // src/hooks/useElderlyHome.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Alert } from 'react-native';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
+import * as activityService from '../services/activityService';
 import * as companionshipService from '../services/companionshipService';
 import { COLORS } from '../constants/theme';
 
-export function useElderlyHome() {
-  const { user, refreshProfile } = useAuth();
+export const ELDERLY_HOME_KEYS = {
+  activities: ['elderly', 'activities'],
+  requests: ['elderly', 'activeRequests'],
+  upcomingVisits: ['elderly', 'upcomingVisits'],
+};
 
-  // Schedules / Upcoming visits loaded from companionshipService
-  const [upcomingVisits, setUpcomingVisits] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [fetchError, setFetchError] = useState(null);
+export const useElderlyHome = () => {
+  const queryClient = useQueryClient();
+  const { user, refreshProfile } = useAuth();
 
   // Visit details modal, Profile screen, Create Companionship screen & Schedule screen state
   const [selectedVisit, setSelectedVisit] = useState(null);
   const [showProfileScreen, setShowProfileScreen] = useState(false);
   const [showCreateScreen, setShowCreateScreen] = useState(false);
   const [showScheduleScreen, setShowScheduleScreen] = useState(false);
+
+  // Parallel, deduplicated query for activities
+  const activitiesQuery = useQuery({
+    queryKey: ELDERLY_HOME_KEYS.activities,
+    queryFn: async () => {
+      const res = await activityService.getAllActivities();
+      return res?.data || res?.activities || (Array.isArray(res) ? res : []);
+    },
+  });
+
+  // Parallel, deduplicated query for active requests
+  const requestsQuery = useQuery({
+    queryKey: ELDERLY_HOME_KEYS.requests,
+    queryFn: async () => {
+      const res = await companionshipService.getMyRequests();
+      return res?.data || res?.requests || (Array.isArray(res) ? res : []);
+    },
+  });
+
+  // Parallel, deduplicated query for upcoming visits
+  const upcomingVisitsQuery = useQuery({
+    queryKey: ELDERLY_HOME_KEYS.upcomingVisits,
+    queryFn: async () => {
+      const res = await companionshipService.getUpcomingVisits();
+      return res?.data || res?.visits || (Array.isArray(res) ? res : []);
+    },
+  });
+
+  const refreshAll = async () => {
+    await Promise.all([
+      activitiesQuery.refetch(),
+      requestsQuery.refetch(),
+      upcomingVisitsQuery.refetch(),
+    ]);
+  };
 
   // Dynamic time greeting
   const getGreeting = () => {
@@ -45,37 +83,6 @@ export function useElderlyHome() {
       date: `${month} ${day}`,
       time: timeSlot || d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     };
-  };
-
-  // Fetch upcoming visits
-  const fetchUpcomingVisits = useCallback(async () => {
-    setFetchError(null);
-    try {
-      const response = await companionshipService.getUpcomingVisits();
-      if (response?.success && Array.isArray(response.data)) {
-        setUpcomingVisits(response.data);
-      } else {
-        setUpcomingVisits([]);
-      }
-    } catch (error) {
-      console.log('Error fetching upcoming visits:', error.message);
-      setFetchError('Unable to load visits from database. Pull down to refresh.');
-      setUpcomingVisits([]);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refreshProfile();
-    fetchUpcomingVisits();
-  }, [refreshProfile, fetchUpcomingVisits]);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    refreshProfile();
-    fetchUpcomingVisits();
   };
 
   // Activity Icon mapping based on database activityType field
@@ -135,18 +142,31 @@ export function useElderlyHome() {
   };
 
   const handleRequestCreated = () => {
-    fetchUpcomingVisits();
+    queryClient.invalidateQueries({ queryKey: ELDERLY_HOME_KEYS.requests });
+    queryClient.invalidateQueries({ queryKey: ELDERLY_HOME_KEYS.upcomingVisits });
+  };
+
+  const onRefresh = async () => {
+    if (refreshProfile) {
+      await refreshProfile();
+    }
+    await refreshAll();
   };
 
   return {
+    activities: activitiesQuery.data || [],
+    activeRequests: requestsQuery.data || [],
+    upcomingVisits: upcomingVisitsQuery.data || [],
+    isLoading: activitiesQuery.isLoading || requestsQuery.isLoading || upcomingVisitsQuery.isLoading,
+    isRefreshing: activitiesQuery.isRefetching || requestsQuery.isRefetching || upcomingVisitsQuery.isRefetching,
+    refreshing: activitiesQuery.isRefetching || requestsQuery.isRefetching || upcomingVisitsQuery.isRefetching,
+    error: activitiesQuery.error?.message || requestsQuery.error?.message || upcomingVisitsQuery.error?.message || null,
+    fetchError: activitiesQuery.error?.message || requestsQuery.error?.message || upcomingVisitsQuery.error?.message || null,
+    refreshAll,
+    onRefresh,
     user,
     firstName,
     greeting: getGreeting(),
-    upcomingVisits,
-    isLoading,
-    refreshing,
-    fetchError,
-    onRefresh,
     selectedVisit,
     setSelectedVisit,
     showProfileScreen,
@@ -161,5 +181,6 @@ export function useElderlyHome() {
     handleActionPress,
     refreshProfile,
   };
-}
+};
+
 
