@@ -13,6 +13,7 @@ import {
   Platform,
   StatusBar,
   Image,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -49,6 +50,20 @@ export default function AdminDashboardScreen() {
     fetchUsers();
   }, []);
 
+  // Handle mobile hardware/system Back button navigation
+  useEffect(() => {
+    const onBackPress = () => {
+      if (activeTab !== 'dashboard') {
+        setActiveTab('dashboard');
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [activeTab]);
+
   const handleRefresh = () => {
     setRefreshing(true);
     fetchUsers();
@@ -68,6 +83,7 @@ export default function AdminDashboardScreen() {
   const elderlyCount = users.filter((u) => u.role === 'elderly').length;
   const volunteerCount = users.filter((u) => u.role === 'volunteer').length;
   const caregiverCount = users.filter((u) => u.role === 'caregiver').length;
+  const adminCount = users.filter((u) => u.role === 'admin').length;
 
   const insets = useSafeAreaInsets();
   const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0) + (Platform.OS === 'android' ? 6 : 0);
@@ -156,8 +172,13 @@ export default function AdminDashboardScreen() {
             </View>
 
             {/* Role Filters */}
-            <View style={styles.filterChipsRow}>
-              {['all', 'elderly', 'volunteer', 'caregiver'].map((role) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterChipsRow}
+              style={styles.filterChipsScrollView}
+            >
+              {['all', 'elderly', 'volunteer', 'caregiver', 'admin'].map((role) => (
                 <TouchableOpacity
                   key={role}
                   style={[styles.filterChip, roleFilter === role && styles.filterChipActive]}
@@ -168,14 +189,14 @@ export default function AdminDashboardScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
 
             {loading ? (
               <View style={styles.loadingCenter}>
                 <ActivityIndicator size="large" color="#1E40AF" />
               </View>
             ) : (
-              <ScrollView contentContainerStyle={styles.scrollPadding} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollPadding} showsVerticalScrollIndicator={false}>
                 {filteredUsers.length === 0 ? (
                   <View style={styles.emptyCard}>
                     <Ionicons name="people-outline" size={32} color="#94A3B8" />
@@ -372,6 +393,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   searchBarContainer: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
@@ -388,11 +410,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0F172A',
   },
+  filterChipsScrollView: {
+    flexGrow: 0,
+    flexShrink: 0,
+    marginBottom: 12,
+  },
   filterChipsRow: {
     flexDirection: 'row',
     paddingHorizontal: 16,
     gap: 8,
-    marginBottom: 12,
+    alignItems: 'center',
   },
   filterChip: {
     paddingHorizontal: 12,
