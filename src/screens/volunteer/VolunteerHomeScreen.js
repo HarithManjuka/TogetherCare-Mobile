@@ -57,11 +57,7 @@ export default function VolunteerHomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  screenArea: {
-    flex: 1,
-  },
+  container: { flex: 1, padding: 20, backgroundColor: COLORS.background },
+  title: { fontSize: SIZES.standardTitle, fontWeight: 'bold', color: COLORS.textPrimary },
+  subtitle: { fontSize: SIZES.standardBody, color: COLORS.textSecondary, marginTop: 5 },
 });
