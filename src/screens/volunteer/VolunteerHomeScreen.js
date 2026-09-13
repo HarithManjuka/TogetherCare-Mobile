@@ -1,7 +1,7 @@
 // src/screens/volunteer/VolunteerHomeScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import VolunteerBottomNav from '../../components/volunteer/VolunteerBottomNav';
+import AppBottomNav from '../../components/common/AppBottomNav';
 import VolunteerDashboardHome from './VolunteerDashboardHome';
 import VolunteerRequestsScreen from './VolunteerRequestsScreen';
 import VolunteerScheduleScreen from './VolunteerScheduleScreen';
@@ -43,8 +43,15 @@ export default function VolunteerHomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome, Amasha!</Text>
-      <Text style={styles.subtitle}>Nearby Assistance Requests</Text>
+      <View style={styles.screenArea}>
+        {renderActiveScreen()}
+      </View>
+      <AppBottomNav
+        role="volunteer"
+        activeTab={currentTab}
+        onTabPress={setCurrentTab}
+        requestBadgeCount={2}
+      />
     </View>
   );
 }

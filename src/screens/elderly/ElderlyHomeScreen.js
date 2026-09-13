@@ -1,7 +1,7 @@
 // src/screens/elderly/ElderlyHomeScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
-import ElderlyBottomNav from '../../components/elderly/ElderlyBottomNav';
+import AppBottomNav from '../../components/common/AppBottomNav';
 import ElderlyDashboardHome from './ElderlyDashboardHome';
 import MyScheduleScreen from './MyScheduleScreen';
 import CreateCompanionshipScreen from './CreateCompanionshipScreen';
@@ -103,9 +103,10 @@ export default function ElderlyHomeScreen() {
         {renderActiveScreen()}
       </View>
 
-      <ElderlyBottomNav
+      <AppBottomNav
+        role="elderly"
         activeTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onTabPress={setCurrentTab}
       />
     </View>
   );
