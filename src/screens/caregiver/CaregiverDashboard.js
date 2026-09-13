@@ -11,10 +11,11 @@ import VolunteerProfileReviewScreen from './VolunteerProfileReviewScreen';
 import LiveTrackingScreen from './LiveTrackingScreen';
 import FeedbackScreen from './FeedbackScreen';
 import ProfileScreen from '../auth/ProfileScreen';
+import AppBottomNav from '../../components/common/AppBottomNav';
 import client from '../../api/client';
 
 export default function CaregiverDashboard() {
-  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'add-dependent' | 'request-help' | 'volunteer-selection' | 'volunteer-profile' | 'live-tracking' | 'feedback'
+  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'add-dependent' | 'request-help' | 'volunteer-selection' | 'volunteer-profile' | 'live-tracking' | 'feedback' | 'profile'
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -54,6 +55,42 @@ export default function CaregiverDashboard() {
       }
     } catch (error) {
       console.error('Navigate to request view error:', error);
+    }
+  };
+
+  const getActiveTab = () => {
+    switch (currentScreen) {
+      case 'add-dependent':
+        return 'dependents';
+      case 'request-help':
+      case 'volunteer-selection':
+      case 'volunteer-profile':
+      case 'live-tracking':
+      case 'feedback':
+        return 'requests';
+      case 'profile':
+        return 'profile';
+      case 'home':
+      default:
+        return 'home';
+    }
+  };
+
+  const handleSelectTab = (tabKey) => {
+    switch (tabKey) {
+      case 'dependents':
+        setCurrentScreen('add-dependent');
+        break;
+      case 'requests':
+        setCurrentScreen('request-help');
+        break;
+      case 'profile':
+        setCurrentScreen('profile');
+        break;
+      case 'home':
+      default:
+        setCurrentScreen('home');
+        break;
     }
   };
 
@@ -167,13 +204,27 @@ export default function CaregiverDashboard() {
     }
   };
 
-  return <View style={styles.container}>{renderScreen()}</View>;
+  return (
+    <View style={styles.container}>
+      <View style={styles.screenArea}>
+        {renderScreen()}
+      </View>
+      <AppBottomNav
+        role="caregiver"
+        activeTab={getActiveTab()}
+        onTabPress={handleSelectTab}
+      />
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.background,
+  },
+  screenArea: {
+    flex: 1,
   },
   profileNavHeader: {
     flexDirection: 'row',
