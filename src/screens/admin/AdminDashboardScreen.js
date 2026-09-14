@@ -1,8 +1,8 @@
 // src/screens/admin/AdminDashboardScreen.js
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, SafeAreaView, Platform, StatusBar, BackHandler } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppBottomNav from '../../components/common/AppBottomNav';
+import AppHeader from '../../components/common/AppHeader';
 import ProfileScreen from '../auth/ProfileScreen';
 import AdminDashboardHome from './AdminDashboardHome';
 import AdminUsersScreen from './AdminUsersScreen';
@@ -62,9 +62,6 @@ export default function AdminDashboardScreen() {
   const volunteerCount = users.filter((u) => u.role === 'volunteer').length;
   const caregiverCount = users.filter((u) => u.role === 'caregiver').length;
 
-  const insets = useSafeAreaInsets();
-  const topPadding = Math.max(insets.top, Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0) + (Platform.OS === 'android' ? 6 : 0);
-
   const renderActiveScreen = () => {
     switch (activeTab) {
       case 'users':
@@ -83,7 +80,7 @@ export default function AdminDashboardScreen() {
       case 'settings':
         return (
           <View style={styles.tabContent}>
-            <ProfileScreen onBack={() => setActiveTab('dashboard')} />
+            <ProfileScreen />
           </View>
         );
       case 'dashboard':
@@ -104,21 +101,29 @@ export default function AdminDashboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={[styles.mainContainer, { paddingTop: topPadding }]}>
+    <View style={styles.container}>
+      {activeTab !== 'settings' && (
+        <AppHeader
+          onProfilePress={() => setActiveTab('settings')}
+          onNotificationPress={() => setActiveTab('alerts')}
+          onNavigateTab={setActiveTab}
+        />
+      )}
+
+      <View style={styles.mainContainer}>
         {renderActiveScreen()}
       </View>
 
       {/* Fixed Mobile Bottom Navigation */}
       <AppBottomNav role="admin" activeTab={activeTab} onTabPress={setActiveTab} />
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E3A8A',
   },
   mainContainer: {
     flex: 1,

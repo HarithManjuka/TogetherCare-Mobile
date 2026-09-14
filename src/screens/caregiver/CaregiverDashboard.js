@@ -12,6 +12,7 @@ import LiveTrackingScreen from './LiveTrackingScreen';
 import FeedbackScreen from './FeedbackScreen';
 import ProfileScreen from '../auth/ProfileScreen';
 import AppBottomNav from '../../components/common/AppBottomNav';
+import AppHeader from '../../components/common/AppHeader';
 import client from '../../api/client';
 
 export default function CaregiverDashboard() {
@@ -177,19 +178,7 @@ export default function CaregiverDashboard() {
           />
         );
       case 'profile':
-        return (
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
-            <View style={styles.profileNavHeader}>
-              <TouchableOpacity style={styles.backBtn} onPress={() => setCurrentScreen('home')}>
-                <Icon name="arrow-back" size={20} color="#0F172A" />
-                <Text style={styles.backBtnText}>Dashboard</Text>
-              </TouchableOpacity>
-              <Text style={styles.profileHeaderTitle}>User Profile</Text>
-              <View style={{ width: 90 }} />
-            </View>
-            <ProfileScreen />
-          </SafeAreaView>
-        );
+        return <ProfileScreen />;
       case 'home':
       default:
         return (
@@ -206,6 +195,12 @@ export default function CaregiverDashboard() {
 
   return (
     <View style={styles.container}>
+      {currentScreen !== 'profile' && (
+        <AppHeader
+          onProfilePress={() => setCurrentScreen('profile')}
+          onNavigateTab={handleSelectTab}
+        />
+      )}
       <View style={styles.screenArea}>
         {renderScreen()}
       </View>
