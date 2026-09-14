@@ -74,14 +74,15 @@ export default function ElderlyDashboardHome({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
-
+    <View style={styles.safeArea}>
       {/* App Header Component with Profile & Size Switcher */}
       <AppHeader
         onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
         onNotificationPress={() => handleActionPress('Notifications')}
+        onNavigateTab={onNavigateTab}
       />
+
+      <View style={{ flex: 1, backgroundColor: COLORS.background }}>
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}
@@ -313,6 +314,7 @@ export default function ElderlyDashboardHome({
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
+    </View>
   );
 }

@@ -128,7 +128,12 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <AppHeader
+        showLeftAction={!!onBack}
+        onLeftActionPress={onBack}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
 
 
@@ -520,7 +525,8 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         }}
       />
     </ScrollView>
-  );
+  </View>
+);
 }
 
 // Reusable Sub-Row Component

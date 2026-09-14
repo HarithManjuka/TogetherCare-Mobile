@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
 import AppBottomNav from '../../components/common/AppBottomNav';
+import AppHeader from '../../components/common/AppHeader';
 import VolunteerDashboardHome from './VolunteerDashboardHome';
 import VolunteerRequestsScreen from './VolunteerRequestsScreen';
 import VolunteerScheduleScreen from './VolunteerScheduleScreen';
@@ -43,6 +44,12 @@ export default function VolunteerHomeScreen() {
 
   return (
     <View style={styles.container}>
+      {currentTab !== 'profile' && (
+        <AppHeader
+          onProfilePress={() => setCurrentTab('profile')}
+          onNavigateTab={setCurrentTab}
+        />
+      )}
       <View style={styles.screenArea}>
         {renderActiveScreen()}
       </View>
@@ -59,9 +66,10 @@ export default function VolunteerHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1E3A8A',
   },
   screenArea: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
   },
 });

@@ -56,10 +56,6 @@ export default function ElderlyHomeScreen() {
   if (showProfileScreen) {
     return (
       <ProfileScreen
-        onBack={() => {
-          setShowProfileScreen(false);
-          refreshProfile();
-        }}
         onClose={() => {
           setShowProfileScreen(false);
           refreshProfile();
@@ -81,7 +77,6 @@ export default function ElderlyHomeScreen() {
       case 'settings':
         return (
           <ProfileScreen
-            onBack={() => setCurrentTab('home')}
             onClose={() => setCurrentTab('home')}
           />
         );

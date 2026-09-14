@@ -6,8 +6,7 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: COLORS.background,
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+      backgroundColor: '#1E3A8A',
     },
     scrollContent: {
       paddingHorizontal: 20,
