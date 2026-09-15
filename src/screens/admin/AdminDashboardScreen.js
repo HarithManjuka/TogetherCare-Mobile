@@ -1,18 +1,23 @@
 // src/screens/admin/AdminDashboardScreen.js
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, SafeAreaView, Platform, StatusBar, BackHandler } from 'react-native';
+import { View, StyleSheet, BackHandler } from 'react-native';
 import AppBottomNav from '../../components/common/AppBottomNav';
 import AppHeader from '../../components/common/AppHeader';
-import ProfileScreen from '../auth/ProfileScreen';
 import AdminDashboardHome from './AdminDashboardHome';
 import AdminUsersScreen from './AdminUsersScreen';
 import AdminSafetyScreen from './AdminSafetyScreen';
+import AdminSettingsScreen from './settings/AdminSettingsScreen';
+import AdminProfileScreen from './settings/AdminProfileScreen';
+import AdminSystemHealthScreen from './settings/AdminSystemHealthScreen';
+import AdminAnalyticsScreen from './settings/AdminAnalyticsScreen';
+import AdminAccountDetailsScreen from './settings/AdminAccountDetailsScreen';
 import { useAuth } from '../../context/AuthContext';
 import client from '../../api/client';
 
 export default function AdminDashboardScreen() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [settingsScreen, setSettingsScreen] = useState('menu'); // 'menu' | 'profile' | 'health' | 'analytics' | 'account'
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,9 +43,20 @@ export default function AdminDashboardScreen() {
     fetchUsers();
   }, []);
 
-  // Handle mobile hardware/system Back button navigation
+  const handleNavigateTab = (tab, subScreen = null) => {
+    setActiveTab(tab);
+    if (tab === 'settings') {
+      setSettingsScreen(subScreen || 'menu');
+    }
+  };
+
+  // Handle mobile hardware/system Back button navigation safely
   useEffect(() => {
     const onBackPress = () => {
+      if (activeTab === 'settings' && settingsScreen !== 'menu') {
+        setSettingsScreen('menu');
+        return true;
+      }
       if (activeTab !== 'dashboard') {
         setActiveTab('dashboard');
         return true;
@@ -50,7 +66,7 @@ export default function AdminDashboardScreen() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [activeTab]);
+  }, [activeTab, settingsScreen]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -61,6 +77,27 @@ export default function AdminDashboardScreen() {
   const elderlyCount = users.filter((u) => u.role === 'elderly').length;
   const volunteerCount = users.filter((u) => u.role === 'volunteer').length;
   const caregiverCount = users.filter((u) => u.role === 'caregiver').length;
+
+  const renderSettingsContent = () => {
+    switch (settingsScreen) {
+      case 'profile':
+        return <AdminProfileScreen onBack={() => setSettingsScreen('menu')} />;
+      case 'health':
+        return <AdminSystemHealthScreen onBack={() => setSettingsScreen('menu')} />;
+      case 'analytics':
+        return <AdminAnalyticsScreen onBack={() => setSettingsScreen('menu')} />;
+      case 'account':
+        return <AdminAccountDetailsScreen onBack={() => setSettingsScreen('menu')} />;
+      case 'menu':
+      default:
+        return (
+          <AdminSettingsScreen
+            onNavigateScreen={setSettingsScreen}
+            onNavigateTab={handleNavigateTab}
+          />
+        );
+    }
+  };
 
   const renderActiveScreen = () => {
     switch (activeTab) {
@@ -80,7 +117,7 @@ export default function AdminDashboardScreen() {
       case 'settings':
         return (
           <View style={styles.tabContent}>
-            <ProfileScreen />
+            {renderSettingsContent()}
           </View>
         );
       case 'dashboard':
@@ -94,7 +131,7 @@ export default function AdminDashboardScreen() {
             caregiverCount={caregiverCount}
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            onNavigateTab={setActiveTab}
+            onNavigateTab={handleNavigateTab}
           />
         );
     }
@@ -104,9 +141,9 @@ export default function AdminDashboardScreen() {
     <View style={styles.container}>
       {activeTab !== 'settings' && (
         <AppHeader
-          onProfilePress={() => setActiveTab('settings')}
+          onProfilePress={() => handleNavigateTab('settings', 'profile')}
           onNotificationPress={() => setActiveTab('alerts')}
-          onNavigateTab={setActiveTab}
+          onNavigateTab={handleNavigateTab}
         />
       )}
 
@@ -115,7 +152,11 @@ export default function AdminDashboardScreen() {
       </View>
 
       {/* Fixed Mobile Bottom Navigation */}
-      <AppBottomNav role="admin" activeTab={activeTab} onTabPress={setActiveTab} />
+      <AppBottomNav
+        role="admin"
+        activeTab={activeTab}
+        onTabPress={(tabKey) => handleNavigateTab(tabKey, 'menu')}
+      />
     </View>
   );
 }
