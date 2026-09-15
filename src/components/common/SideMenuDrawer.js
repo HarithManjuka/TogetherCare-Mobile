@@ -121,7 +121,7 @@ export default function SideMenuDrawer({
             subtitle="Platform Configuration"
             onPress={() =>
               handleItemPress(() => {
-                if (onNavigateTab) onNavigateTab('settings');
+                if (onNavigateTab) onNavigateTab('settings', 'menu');
                 else if (onOpenProfile) onOpenProfile();
               })
             }
@@ -130,13 +130,23 @@ export default function SideMenuDrawer({
             icon="pulse-outline"
             title="System Health"
             subtitle="API & Database Metrics"
-            onPress={() => setActiveModal('health')}
+            onPress={() =>
+              handleItemPress(() => {
+                if (onNavigateTab) onNavigateTab('settings', 'health');
+                else setActiveModal('health');
+              })
+            }
           />
           <DrawerItem
             icon="bar-chart-outline"
             title="Analytics"
             subtitle="Usage & Service Stats"
-            onPress={() => setActiveModal('analytics')}
+            onPress={() =>
+              handleItemPress(() => {
+                if (onNavigateTab) onNavigateTab('settings', 'analytics');
+                else setActiveModal('analytics');
+              })
+            }
           />
           <DrawerItem
             icon="people-outline"
@@ -152,7 +162,12 @@ export default function SideMenuDrawer({
             icon="id-card-outline"
             title="Account Details"
             subtitle="Full Identity & Credentials"
-            onPress={() => setActiveModal('account')}
+            onPress={() =>
+              handleItemPress(() => {
+                if (onNavigateTab) onNavigateTab('settings', 'account');
+                else setActiveModal('account');
+              })
+            }
             highlight
           />
         </>
@@ -345,7 +360,7 @@ export default function SideMenuDrawer({
                 onPress={() =>
                   handleItemPress(() => {
                     if (onOpenProfile) onOpenProfile();
-                    else if (onNavigateTab) onNavigateTab('profile');
+                    else if (onNavigateTab) onNavigateTab(role === 'admin' ? 'settings' : 'profile', 'profile');
                   })
                 }
               >
@@ -377,7 +392,7 @@ export default function SideMenuDrawer({
                   onPress={() =>
                     handleItemPress(() => {
                       if (onOpenProfile) onOpenProfile();
-                      else if (onNavigateTab) onNavigateTab('profile');
+                      else if (onNavigateTab) onNavigateTab(role === 'admin' ? 'settings' : 'profile', 'profile');
                     })
                   }
                   activeOpacity={0.8}
