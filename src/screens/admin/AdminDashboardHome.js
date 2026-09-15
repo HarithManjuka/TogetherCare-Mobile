@@ -2,6 +2,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../constants/theme';
 
 export default function AdminDashboardHome({
   user,
@@ -32,7 +33,7 @@ export default function AdminDashboardHome({
       <Text style={styles.sectionHeader}>System Metrics</Text>
       <View style={styles.metricsGrid}>
         <View style={[styles.metricCard, { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }]}>
-          <Ionicons name="people" size={24} color="#1E40AF" />
+          <Ionicons name="people" size={24} color={COLORS.primary} />
           <Text style={styles.metricValue}>{totalUsers}</Text>
           <Text style={styles.metricLabel}>Total Users</Text>
         </View>
@@ -59,7 +60,7 @@ export default function AdminDashboardHome({
       {/* Quick Actions */}
       <Text style={styles.sectionHeader}>Quick Management</Text>
       <TouchableOpacity style={styles.actionCard} onPress={() => onNavigateTab('users')} activeOpacity={0.8}>
-        <Ionicons name="person-add-outline" size={22} color="#1E40AF" style={{ marginRight: 12 }} />
+        <Ionicons name="person-add-outline" size={22} color={COLORS.primary} style={{ marginRight: 12 }} />
         <View style={{ flex: 1 }}>
           <Text style={styles.actionCardTitle}>Manage User Accounts</Text>
           <Text style={styles.actionCardSub}>Review, search, and verify registered users</Text>
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   welcomeBanner: {
-    backgroundColor: '#1E40AF',
+    backgroundColor: COLORS.primary,
     borderRadius: 18,
     padding: 18,
     marginBottom: 16,

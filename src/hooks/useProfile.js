@@ -81,8 +81,7 @@ export function useProfile() {
     setRefreshing(false);
   };
 
-  const isVerified =
-    user?.verificationBadgeStatus === 'verified' || user?.accountStatus === 'active';
+  const isVerified = user?.verificationBadgeStatus === 'verified';
 
   // --- Profile Picture Actions ---
   const handlePickImage = async (useCamera = false) => {

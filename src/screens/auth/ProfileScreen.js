@@ -111,7 +111,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   };
 
   const isVolunteer = user?.role === 'volunteer';
-  const isEmailVerified = user?.isEmailVerified || user?.accountStatus === 'active';
+  const isEmailVerified = Boolean(user?.isEmailVerified);
   const volunteerBadgeStatus = user?.verificationBadgeStatus || 'unverified';
 
   const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase() || 'TC';

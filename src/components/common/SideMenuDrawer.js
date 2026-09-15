@@ -459,7 +459,7 @@ export default function SideMenuDrawer({
               )}
               {role === 'volunteer' && (
                 <>
-                  <DetailRow label="Verification Badge" value={user?.verificationBadgeStatus?.toUpperCase() || 'VERIFIED VOLUNTEER'} />
+                  <DetailRow label="Verification Badge" value={(user?.verificationBadgeStatus || 'unverified').toUpperCase()} />
                   <DetailRow label="ID Document Type" value={user?.volunteerIdType || 'NIC / Student ID'} />
                 </>
               )}
