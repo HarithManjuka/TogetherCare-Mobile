@@ -34,84 +34,54 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
     actionsWrapper: {
       marginBottom: Math.round(24 * scale),
     },
-    sosCard: {
-      backgroundColor: '#FEF2F2',
-      borderRadius: 18,
-      paddingVertical: Math.round(18 * scale),
-      paddingHorizontal: 18,
-      flexDirection: 'row',
-      alignItems: 'center',
+    sosButton: {
+      backgroundColor: '#DC2626',
+      borderRadius: 16,
+      paddingVertical: Math.round(14 * scale),
+      paddingHorizontal: 16,
       marginBottom: 16,
-      borderWidth: 2,
-      borderColor: '#F87171',
       ...Platform.select({
         ios: {
           shadowColor: '#DC2626',
           shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.15,
+          shadowOpacity: 0.25,
           shadowRadius: 8,
         },
         android: {
-          elevation: 3,
+          elevation: 4,
         },
       }),
     },
-    sosCardActive: {
-      backgroundColor: '#DC2626',
-      borderColor: '#B91C1C',
+    sosButtonActive: {
+      backgroundColor: '#991B1B',
     },
-    sosIconContainer: {
-      width: Math.round(52 * scale),
-      height: Math.round(52 * scale),
-      borderRadius: Math.round(26 * scale),
-      backgroundColor: '#FEE2E2',
+    sosButtonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    sosIconCircle: {
+      width: Math.round(44 * scale),
+      height: Math.round(44 * scale),
+      borderRadius: Math.round(22 * scale),
+      backgroundColor: 'rgba(255, 255, 255, 0.22)',
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 14,
-      borderWidth: 1.5,
-      borderColor: '#FCA5A5',
-    },
-    sosIconContainerActive: {
-      backgroundColor: '#B91C1C',
-      borderColor: '#FFFFFF',
     },
     sosTextGroup: {
       flex: 1,
     },
-    sosCardText: {
-      fontSize: Math.round(18 * scale),
+    sosButtonText: {
+      fontSize: Math.round(17 * scale),
       fontWeight: '900',
-      color: '#DC2626',
-      letterSpacing: 0.3,
-    },
-    sosCardTextActive: {
       color: '#FFFFFF',
+      letterSpacing: 0.3,
     },
     sosSubtext: {
       fontSize: Math.round(12 * scale),
-      color: '#7F1D1D',
-      marginTop: 2,
-      fontWeight: '600',
-    },
-    sosSubtextActive: {
       color: '#FEE2E2',
-    },
-    sosActionPill: {
-      backgroundColor: '#DC2626',
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      borderRadius: 20,
-    },
-    sosActionPillActive: {
-      backgroundColor: '#FFFFFF',
-    },
-    sosActionPillText: {
-      color: '#FFFFFF',
-      fontSize: Math.round(12 * scale),
-      fontWeight: '800',
-    },
-    sosActionPillTextActive: {
-      color: '#DC2626',
+      marginTop: 2,
+      fontWeight: '500',
     },
     heroCard: {
       backgroundColor: COLORS.surface,

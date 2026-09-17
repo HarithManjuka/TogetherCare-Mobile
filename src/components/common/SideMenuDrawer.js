@@ -306,121 +306,121 @@ export default function SideMenuDrawer({
 
           <View style={styles.drawerRow}>
             {/* Slide-out Left Drawer */}
-          <Animated.View
-            style={[
-              styles.drawerContainer,
-              {
-                width: DRAWER_WIDTH,
-                transform: [{ translateX }],
-              },
-            ]}
-          >
-            {/* Drawer Top Header Banner */}
-            <View style={styles.drawerHeaderBanner}>
-              <View style={styles.headerBrandRow}>
-                <View style={styles.brandIconBox}>
-                  <Ionicons name="heart" size={20} color="#FFFFFF" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.brandTitle}>TogetherCare</Text>
-                  <Text style={styles.brandTagline}>Community Care System</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={handleClose}
-                  style={styles.closeBtn}
-                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                >
-                  <Ionicons name="close" size={22} color="#FFFFFF" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Role Pill */}
-              <View style={styles.roleBadgeContainer}>
-                <View style={styles.roleDot} />
-                <Text style={styles.roleBadgeText}>
-                  {role.toUpperCase()} ACCESS PANEL
-                </Text>
-              </View>
-            </View>
-
-            {/* Menu List */}
-            <ScrollView
-              style={styles.menuScroll}
-              contentContainerStyle={styles.menuScrollContent}
-              showsVerticalScrollIndicator={false}
+            <Animated.View
+              style={[
+                styles.drawerContainer,
+                {
+                  width: DRAWER_WIDTH,
+                  transform: [{ translateX }],
+                },
+              ]}
             >
-              <Text style={styles.sectionLabel}>QUICK NAVIGATION</Text>
-              {renderMenuItems()}
-            </ScrollView>
+              {/* Drawer Top Header Banner */}
+              <View style={styles.drawerHeaderBanner}>
+                <View style={styles.headerBrandRow}>
+                  <View style={styles.brandIconBox}>
+                    <Ionicons name="heart" size={20} color="#FFFFFF" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.brandTitle}>TogetherCare</Text>
+                    <Text style={styles.brandTagline}>Community Care System</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={styles.closeBtn}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    <Ionicons name="close" size={22} color="#FFFFFF" />
+                  </TouchableOpacity>
+                </View>
 
-            {/* Bottom Profile & Logout Footer Panel */}
-            <View style={styles.bottomUserPanel}>
-              <TouchableOpacity
-                style={styles.userInfoRow}
-                activeOpacity={0.7}
-                onPress={() =>
-                  handleItemPress(() => {
-                    if (onOpenProfile) onOpenProfile();
-                    else if (onNavigateTab) onNavigateTab(role === 'admin' ? 'settings' : 'profile', 'profile');
-                  })
-                }
+                {/* Role Pill */}
+                <View style={styles.roleBadgeContainer}>
+                  <View style={styles.roleDot} />
+                  <Text style={styles.roleBadgeText}>
+                    {role.toUpperCase()} ACCESS PANEL
+                  </Text>
+                </View>
+              </View>
+
+              {/* Menu List */}
+              <ScrollView
+                style={styles.menuScroll}
+                contentContainerStyle={styles.menuScrollContent}
+                showsVerticalScrollIndicator={false}
               >
-                <View style={styles.bottomAvatarWrap}>
-                  {user?.profilePicture ? (
-                    <Image
-                      source={{ uri: user.profilePicture }}
-                      style={styles.bottomAvatarImg}
-                    />
-                  ) : (
-                    <Text style={styles.bottomAvatarInitials}>{initials}</Text>
-                  )}
-                </View>
-                <View style={styles.userNameBlock}>
-                  <Text style={styles.userNameText} numberOfLines={1}>
-                    {user?.firstName} {user?.lastName || ''}
-                  </Text>
-                  <Text style={styles.userRoleText} numberOfLines={1}>
-                    {user?.email || role}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-              </TouchableOpacity>
+                <Text style={styles.sectionLabel}>QUICK NAVIGATION</Text>
+                {renderMenuItems()}
+              </ScrollView>
 
-              {/* Action Buttons Row: View Profile & Logout */}
-              <View style={styles.panelActionsRow}>
+              {/* Bottom Profile & Logout Footer Panel */}
+              <View style={styles.bottomUserPanel}>
                 <TouchableOpacity
-                  style={styles.viewProfileBtn}
+                  style={styles.userInfoRow}
+                  activeOpacity={0.7}
                   onPress={() =>
                     handleItemPress(() => {
                       if (onOpenProfile) onOpenProfile();
                       else if (onNavigateTab) onNavigateTab(role === 'admin' ? 'settings' : 'profile', 'profile');
                     })
                   }
-                  activeOpacity={0.8}
                 >
-                  <Ionicons name="person-outline" size={15} color="#1E40AF" />
-                  <Text style={styles.viewProfileBtnText}>View Profile</Text>
+                  <View style={styles.bottomAvatarWrap}>
+                    {user?.profilePicture ? (
+                      <Image
+                        source={{ uri: user.profilePicture }}
+                        style={styles.bottomAvatarImg}
+                      />
+                    ) : (
+                      <Text style={styles.bottomAvatarInitials}>{initials}</Text>
+                    )}
+                  </View>
+                  <View style={styles.userNameBlock}>
+                    <Text style={styles.userNameText} numberOfLines={1}>
+                      {user?.firstName} {user?.lastName || ''}
+                    </Text>
+                    <Text style={styles.userRoleText} numberOfLines={1}>
+                      {user?.email || role}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.drawerLogoutBtn}
-                  onPress={() => setShowLogoutModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="log-out-outline" size={15} color="#DC2626" />
-                  <Text style={styles.drawerLogoutBtnText}>Logout</Text>
-                </TouchableOpacity>
+                {/* Action Buttons Row: View Profile & Logout */}
+                <View style={styles.panelActionsRow}>
+                  <TouchableOpacity
+                    style={styles.viewProfileBtn}
+                    onPress={() =>
+                      handleItemPress(() => {
+                        if (onOpenProfile) onOpenProfile();
+                        else if (onNavigateTab) onNavigateTab(role === 'admin' ? 'settings' : 'profile', 'profile');
+                      })
+                    }
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="person-outline" size={15} color="#1E40AF" />
+                    <Text style={styles.viewProfileBtnText}>View Profile</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.drawerLogoutBtn}
+                    onPress={() => setShowLogoutModal(true)}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="log-out-outline" size={15} color="#DC2626" />
+                    <Text style={styles.drawerLogoutBtnText}>Logout</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-          </Animated.View>
+            </Animated.View>
 
-          {/* Outside touchable area (remaining right half of screen) */}
-          <TouchableWithoutFeedback onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close side menu">
-            <View style={styles.outsideTouchArea} />
-          </TouchableWithoutFeedback>
+            {/* Outside touchable area (remaining right half of screen) */}
+            <TouchableWithoutFeedback onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close side menu">
+              <View style={styles.outsideTouchArea} />
+            </TouchableWithoutFeedback>
+          </View>
         </View>
-      </View>
-    </Modal>
+      </Modal>
 
       {/* --- Detail Modals Triggered From Side Menu --- */}
 
@@ -636,10 +636,11 @@ export default function SideMenuDrawer({
         </View>
       </Modal>
 
-      {/* 6. Dynamic My Care Circle Modal (Elderly) */}
+      {/* 6. Dynamic My Care Circle Modal (Elderly) - Fetched from backend database */}
       <CareCircleModal
         visible={activeModal === 'circle'}
         onClose={() => setActiveModal(null)}
+        scale={uiScale}
       />
 
       {/* Safe Sign Out Modal */}
