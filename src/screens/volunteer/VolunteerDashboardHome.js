@@ -1,5 +1,5 @@
 // src/screens/volunteer/VolunteerDashboardHome.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,14 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
+import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
   const { user } = useAuth();
@@ -27,7 +30,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
   const [availabilityModalVisible, setAvailabilityModalVisible] = useState(false);
-  const [acceptedRequests, setAcceptedRequests] = useState([]);
+
+  // Live Backend Data
+  const [myOffers, setMyOffers] = useState([]);
+  const [requestsList, setRequestsList] = useState([]);
+  const [stats, setStats] = useState({
+    hoursThisMonth: 0,
+    peopleHelped: 0,
+    averageRating: 5.0,
+    totalCompletedVisits: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form states for Availability
   const [availHours, setAvailHours] = useState('Weekdays & Weekends (9 AM - 6 PM)');
@@ -41,93 +56,74 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     return 'Good evening';
   };
 
-  const volunteerName = user?.firstName || 'Sarah';
+  const volunteerName = user?.firstName || 'Volunteer';
   const volunteerLocation = user?.address?.city
     ? `${user.address.city}, ${user.address.district || 'Colombo'}`
     : 'Colombo 03';
 
-  // Volunteer's active offers (CRUD state)
-  const [myOffers, setMyOffers] = useState([
-    {
-      id: 'offer-1',
-      volunteerName: `${volunteerName} ${user?.lastName || ''}`.trim(),
-      services: ['Grocery Pickup', 'Pharmacy Run'],
-      date: '2026-08-25',
-      startTime: '02:00 PM',
-      endTime: '04:00 PM',
-      serviceArea: 'Colombo 03',
-      radius: 'Within 5 km',
-      capacity: 2,
-      slotsLeft: 2,
-      specialSkills: 'I have a large SUV and can carry heavy grocery loads.',
-      status: 'pending',
-    },
-  ]);
+  // Fetch real data from backend
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [offersRes, reqsRes, statsRes] = await Promise.allSettled([
+        volunteerService.getMyOffers(),
+        volunteerService.getAvailableRequests(),
+        volunteerService.getMyStats(),
+      ]);
 
-  // Requests matching wireframe + rich data
-  const [requestsList, setRequestsList] = useState([
-    {
-      id: 'req-1',
-      type: 'Grocery pickup',
-      category: 'grocery',
-      elderName: 'Mrs. Perera',
-      distance: '1.2 km',
-      duration: '45 min',
-      badge: 'Urgent',
-      badgeType: 'urgent',
-      address: 'No. 42, Galle Road, Colombo 03',
-      phone: '077 123 4567',
-      items: ['Fresh Milk (2L)', 'White Bread (1 Loaf)', 'Eggs (12 Pack)', 'Bananas (1kg)'],
-      notes: 'Please check expiry dates and call before arriving. Gate has buzzer.',
-    },
-    {
-      id: 'req-2',
-      type: 'Grocery pickup',
-      category: 'grocery',
-      elderName: 'Mrs. Perera',
-      distance: '1.2 km',
-      duration: '45 min',
-      badge: 'Today',
-      badgeType: 'today',
-      address: 'No. 18, Flower Road, Colombo 07',
-      phone: '071 987 6543',
-      items: ['Vegetables (Carrots, Beans, Potatoes)', 'Red Rice 5kg', 'Tea Leaves'],
-      notes: 'Assistance needed this afternoon around 3:00 PM.',
-    },
-    {
-      id: 'req-3',
-      type: 'Pharmacy & Medicine',
-      category: 'medical',
-      elderName: 'Mr. Fernando',
-      distance: '2.5 km',
-      duration: '30 min',
-      badge: 'Today',
-      badgeType: 'today',
-      address: 'No. 88, Duplication Road, Colombo 04',
-      phone: '075 555 1234',
-      items: ['Prescription Blood Pressure Pills', 'Eye Drops (Refresh Tears)'],
-      notes: 'Prescription slip will be given upon arrival.',
-    },
-  ]);
-
-  // Offer CRUD Handlers
-  const handleSaveOffer = (offerData) => {
-    if (editingOffer) {
-      // Update existing offer (CRUD Update)
-      setMyOffers((prev) =>
-        prev.map((o) => (o.id === editingOffer.id ? { ...o, ...offerData } : o))
-      );
-      Alert.alert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
-    } else {
-      // Create new offer (CRUD Create)
-      setMyOffers((prev) => [offerData, ...prev]);
-      Alert.alert(
-        '🎉 Offer Posted Successfully!',
-        'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
-      );
+      if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
+        setMyOffers(offersRes.value.data || []);
+      }
+      if (reqsRes.status === 'fulfilled' && reqsRes.value?.success) {
+        setRequestsList(reqsRes.value.data || []);
+      }
+      if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 5.0 });
+      }
+    } catch (err) {
+      console.error('Error loading volunteer dashboard:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
-    setEditingOffer(null);
-    setOfferModalVisible(false);
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
+
+  // Real Offer CRUD Handlers
+  const handleSaveOffer = async (offerData) => {
+    try {
+      setIsSubmitting(true);
+      if (editingOffer) {
+        const id = editingOffer._id || editingOffer.id;
+        const res = await volunteerService.updateOffer(id, offerData);
+        if (res.success) {
+          Alert.alert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
+          loadDashboardData();
+        }
+      } else {
+        const res = await volunteerService.createOffer(offerData);
+        if (res.success) {
+          Alert.alert(
+            '🎉 Offer Posted Successfully!',
+            'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
+          );
+          loadDashboardData();
+        }
+      }
+      setEditingOffer(null);
+      setOfferModalVisible(false);
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to save offer');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleEditOffer = (offer) => {
@@ -144,37 +140,58 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {
           text: 'Delete Offer',
           style: 'destructive',
-          onPress: () => {
-            setMyOffers((prev) => prev.filter((o) => o.id !== offerId));
-            Alert.alert('Offer Removed', 'Your offer has been removed.');
+          onPress: async () => {
+            try {
+              await volunteerService.deleteOffer(offerId);
+              Alert.alert('Offer Removed', 'Your offer has been removed.');
+              loadDashboardData();
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to remove offer');
+            }
           },
         },
       ]
     );
   };
 
-  const handleAcceptRequest = (request) => {
-    if (acceptedRequests.includes(request.id)) {
-      Alert.alert('Already Accepted', 'You have already accepted this request.');
-      return;
+  const handleAcceptRequest = async (request) => {
+    const reqId = request._id || request.id;
+    try {
+      setIsSubmitting(true);
+      const res = await volunteerService.acceptRequest(reqId);
+      if (res.success) {
+        setSelectedRequest(null);
+        Alert.alert(
+          '🎉 Request Accepted!',
+          `You have successfully accepted the task for ${request.elderName}.\nIt has been added to your Schedule tab.`,
+          [
+            { text: 'Stay Here', onPress: () => loadDashboardData() },
+            {
+              text: 'View in Schedule',
+              onPress: () => {
+                loadDashboardData();
+                onNavigateTab('schedule');
+              },
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
+    } finally {
+      setIsSubmitting(false);
     }
-    setAcceptedRequests((prev) => [...prev, request.id]);
-    setSelectedRequest(null);
-    Alert.alert(
-      '🎉 Request Accepted!',
-      `You have successfully accepted the task for ${request.elderName}.\nIt has been added to your Schedule tab.`,
-      [
-        { text: 'Stay Here', style: 'cancel' },
-        { text: 'View in Schedule', onPress: () => onNavigateTab('schedule') },
-      ]
-    );
   };
+
 
   return (
     <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />
+        }
       >
         {/* Header Section */}
         <View style={styles.header}>
@@ -228,24 +245,26 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
           </View>
         </View>
 
-        {/* 3 Metric Cards Row (Matches Wireframe) */}
+        {/* 3 Metric Cards Row (Matches Wireframe with Live Backend Data) */}
         <View style={styles.metricsRow}>
-          {/* Card 1: 12 hrs this month (Lavender) */}
+          {/* Card 1: Hours this month (Lavender) */}
           <View style={[styles.metricCard, styles.metricCardPrimary]}>
-            <Text style={[styles.metricValue, styles.metricValuePrimary]}>12 hrs</Text>
+            <Text style={[styles.metricValue, styles.metricValuePrimary]}>
+              {stats.hoursThisMonth} hrs
+            </Text>
             <Text style={[styles.metricLabel, styles.metricLabelPrimary]}>this month</Text>
           </View>
 
-          {/* Card 2: 34 people */}
+          {/* Card 2: people helped */}
           <View style={styles.metricCard}>
-            <Text style={styles.metricValue}>34</Text>
+            <Text style={styles.metricValue}>{stats.peopleHelped}</Text>
             <Text style={styles.metricLabel}>people</Text>
           </View>
 
-          {/* Card 3: 4.9 ★ your rating */}
+          {/* Card 3: your rating */}
           <View style={styles.metricCard}>
             <View style={styles.ratingValueRow}>
-              <Text style={styles.metricValue}>4.9</Text>
+              <Text style={styles.metricValue}>{stats.averageRating}</Text>
               <Text style={styles.starIcon}>★</Text>
             </View>
             <Text style={styles.metricLabel}>your rating</Text>
@@ -274,12 +293,17 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
             </TouchableOpacity>
           </View>
 
-          {myOffers.length === 0 ? (
+          {loading ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#1E3A8A" />
+              <Text style={{ marginTop: 8, color: '#64748B', fontSize: 13 }}>Loading offers...</Text>
+            </View>
+          ) : myOffers.length === 0 ? (
             <View style={styles.emptyOffersBox}>
               <Text style={styles.emptyOffersEmoji}>🤝</Text>
               <Text style={styles.emptyOffersTitle}>No Active Offers Posted</Text>
               <Text style={styles.emptyOffersSub}>
-                Post your available hours and services to let seniors in Colombo book help.
+                Post your available hours and services to let seniors in your area book help.
               </Text>
               <TouchableOpacity
                 style={styles.postFirstOfferBtn}
@@ -293,94 +317,97 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
             </View>
           ) : (
             <View style={styles.offersList}>
-              {myOffers.map((offer) => (
-                <View key={offer.id} style={styles.offerCard}>
-                  {/* Card Header */}
-                  <View style={styles.offerCardHeader}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.offerVolunteerRow}>
-                        <Text style={styles.offerVolunteerName}>
-                          👤 {offer.volunteerName}
+              {myOffers.map((offer) => {
+                const offerKey = offer._id || offer.id;
+                return (
+                  <View key={offerKey} style={styles.offerCard}>
+                    {/* Card Header */}
+                    <View style={styles.offerCardHeader}>
+                      <View style={{ flex: 1 }}>
+                        <View style={styles.offerVolunteerRow}>
+                          <Text style={styles.offerVolunteerName}>
+                            👤 {offer.volunteerName}
+                          </Text>
+                          <View style={styles.pendingBadge}>
+                            <Text style={styles.pendingBadgeText}>
+                              {(offer.status || 'pending').toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={styles.offerDateTime}>
+                          📅 Available on {offer.date} · 🕒 {offer.startTime} - {offer.endTime}
                         </Text>
-                        <View style={styles.pendingBadge}>
-                          <Text style={styles.pendingBadgeText}>
-                            {offer.status.toUpperCase()}
+                      </View>
+
+                      {/* Slots Left Badge */}
+                      <View style={styles.slotsLeftBadge}>
+                        <Text style={styles.slotsLeftNumber}>{offer.slotsLeft}</Text>
+                        <Text style={styles.slotsLeftLabel}>Slots Left</Text>
+                      </View>
+                    </View>
+
+                    {/* Services Badges */}
+                    <View style={styles.servicesPillsRow}>
+                      {(offer.services || []).map((srv, idx) => (
+                        <View key={idx} style={styles.servicePill}>
+                          <Text style={styles.servicePillText}>
+                            {srv.includes('Grocery')
+                              ? '🛒 '
+                              : srv.includes('Pharmacy')
+                              ? '💊 '
+                              : srv.includes('Companionship')
+                              ? '🤝 '
+                              : srv.includes('Tech')
+                              ? '📱 '
+                              : '🐕 '}
+                            {srv}
                           </Text>
                         </View>
-                      </View>
-                      <Text style={styles.offerDateTime}>
-                        📅 Available on {offer.date} · 🕒 {offer.startTime} - {offer.endTime}
+                      ))}
+                    </View>
+
+                    {/* Area & Radius */}
+                    <View style={styles.offerLocationRow}>
+                      <Ionicons name="navigate-outline" size={14} color="#64748B" />
+                      <Text style={styles.offerLocationText}>
+                        {offer.serviceArea} ({offer.radius})
                       </Text>
                     </View>
 
-                    {/* Slots Left Badge */}
-                    <View style={styles.slotsLeftBadge}>
-                      <Text style={styles.slotsLeftNumber}>{offer.slotsLeft}</Text>
-                      <Text style={styles.slotsLeftLabel}>Slots Left</Text>
-                    </View>
-                  </View>
-
-                  {/* Services Badges */}
-                  <View style={styles.servicesPillsRow}>
-                    {offer.services.map((srv, idx) => (
-                      <View key={idx} style={styles.servicePill}>
-                        <Text style={styles.servicePillText}>
-                          {srv.includes('Grocery')
-                            ? '🛒 '
-                            : srv.includes('Pharmacy')
-                            ? '💊 '
-                            : srv.includes('Companionship')
-                            ? '🤝 '
-                            : srv.includes('Tech')
-                            ? '📱 '
-                            : '🐕 '}
-                          {srv}
-                        </Text>
+                    {/* Special Skills / Extra Details */}
+                    {offer.specialSkills ? (
+                      <View style={styles.skillsBox}>
+                        <Text style={styles.skillsTag}>Special Skills / Notes:</Text>
+                        <Text style={styles.skillsContent}>"{offer.specialSkills}"</Text>
                       </View>
-                    ))}
-                  </View>
+                    ) : null}
 
-                  {/* Area & Radius */}
-                  <View style={styles.offerLocationRow}>
-                    <Ionicons name="navigate-outline" size={14} color="#64748B" />
-                    <Text style={styles.offerLocationText}>
-                      {offer.serviceArea} ({offer.radius})
-                    </Text>
-                  </View>
+                    {/* CRUD Action Buttons */}
+                    <View style={styles.offerActionsRow}>
+                      <TouchableOpacity
+                        style={styles.editOfferBtn}
+                        onPress={() => handleEditOffer(offer)}
+                      >
+                        <Ionicons name="create-outline" size={15} color="#1E40AF" />
+                        <Text style={styles.editOfferBtnText}>Edit Offer</Text>
+                      </TouchableOpacity>
 
-                  {/* Special Skills / Extra Details */}
-                  {offer.specialSkills ? (
-                    <View style={styles.skillsBox}>
-                      <Text style={styles.skillsTag}>Special Skills / Notes:</Text>
-                      <Text style={styles.skillsContent}>"{offer.specialSkills}"</Text>
+                      <TouchableOpacity
+                        style={styles.deleteOfferBtn}
+                        onPress={() => handleDeleteOffer(offerKey)}
+                      >
+                        <Ionicons name="trash-outline" size={15} color="#DC2626" />
+                        <Text style={styles.deleteOfferBtnText}>Cancel Offer</Text>
+                      </TouchableOpacity>
                     </View>
-                  ) : null}
-
-                  {/* CRUD Action Buttons */}
-                  <View style={styles.offerActionsRow}>
-                    <TouchableOpacity
-                      style={styles.editOfferBtn}
-                      onPress={() => handleEditOffer(offer)}
-                    >
-                      <Ionicons name="create-outline" size={15} color="#1E40AF" />
-                      <Text style={styles.editOfferBtnText}>Edit Offer</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.deleteOfferBtn}
-                      onPress={() => handleDeleteOffer(offer.id)}
-                    >
-                      <Ionicons name="trash-outline" size={15} color="#DC2626" />
-                      <Text style={styles.deleteOfferBtnText}>Cancel Offer</Text>
-                    </TouchableOpacity>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
         </View>
 
-        {/* Section: Nearby requests (Matches Wireframe) */}
+        {/* Section: Nearby requests (Live Community Feed) */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Nearby requests</Text>
@@ -389,66 +416,67 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
               activeOpacity={0.7}
               style={styles.seeAllBtn}
             >
-              <Text style={styles.seeAllText}>See all</Text>
+              <Text style={styles.seeAllText}>See all ({requestsList.length})</Text>
             </TouchableOpacity>
           </View>
 
           {/* Request Cards */}
           <View style={styles.requestList}>
-            {requestsList.slice(0, 2).map((req) => {
-              const isAccepted = acceptedRequests.includes(req.id);
-              const isUrgent = req.badgeType === 'urgent';
-              return (
-                <TouchableOpacity
-                  key={req.id}
-                  style={[
-                    styles.requestCard,
-                    isAccepted && styles.requestCardAccepted,
-                  ]}
-                  onPress={() => setSelectedRequest(req)}
-                  activeOpacity={0.85}
-                >
-                  {/* Category icon avatar */}
-                  <View style={styles.reqAvatarContainer}>
-                    <View style={styles.reqAvatarInner}>
-                      <Text style={styles.reqAvatarEmoji}>
-                        {req.category === 'grocery' ? '🛒' : '💊'}
+            {requestsList.length === 0 ? (
+              <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+                <Text style={{ color: '#64748B', fontSize: 13 }}>No pending requests in your area right now.</Text>
+              </View>
+            ) : (
+              requestsList.slice(0, 3).map((req) => {
+                const reqKey = req._id || req.id;
+                const isUrgent = req.badgeType === 'urgent';
+                return (
+                  <TouchableOpacity
+                    key={reqKey}
+                    style={styles.requestCard}
+                    onPress={() => setSelectedRequest(req)}
+                    activeOpacity={0.85}
+                  >
+                    {/* Category icon avatar */}
+                    <View style={styles.reqAvatarContainer}>
+                      <View style={styles.reqAvatarInner}>
+                        <Text style={styles.reqAvatarEmoji}>
+                          {req.category === 'grocery' ? '🛒' : req.category === 'medical' ? '💊' : '🤝'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Info */}
+                    <View style={styles.reqInfoContainer}>
+                      <Text style={styles.reqTitle}>{req.type}</Text>
+                      <Text style={styles.reqElderName}>{req.elderName}</Text>
+                      <Text style={styles.reqMeta}>
+                        {req.distance || '1.2 km'} · {req.duration || '45 min'}
                       </Text>
                     </View>
-                  </View>
 
-                  {/* Info */}
-                  <View style={styles.reqInfoContainer}>
-                    <Text style={styles.reqTitle}>{req.type}</Text>
-                    <Text style={styles.reqElderName}>{req.elderName}</Text>
-                    <Text style={styles.reqMeta}>
-                      {req.distance} · {req.duration}
-                    </Text>
-                  </View>
-
-                  {/* Badge */}
-                  <View style={styles.badgeContainer}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        isUrgent ? styles.urgentBadge : styles.todayBadge,
-                        isAccepted && styles.acceptedBadge,
-                      ]}
-                    >
-                      <Text
+                    {/* Badge */}
+                    <View style={styles.badgeContainer}>
+                      <View
                         style={[
-                          styles.badgeText,
-                          isUrgent ? styles.urgentBadgeText : styles.todayBadgeText,
-                          isAccepted && styles.acceptedBadgeText,
+                          styles.statusBadge,
+                          isUrgent ? styles.urgentBadge : styles.todayBadge,
                         ]}
                       >
-                        {isAccepted ? '✓ Accepted' : req.badge}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.badgeText,
+                            isUrgent ? styles.urgentBadgeText : styles.todayBadgeText,
+                          ]}
+                        >
+                          {req.badge || 'Open'}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         </View>
 
@@ -599,18 +627,15 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[
-                      styles.modalPrimaryBtn,
-                      acceptedRequests.includes(selectedRequest.id) &&
-                        styles.modalAcceptedBtn,
-                    ]}
+                    style={[styles.modalPrimaryBtn, isSubmitting && { opacity: 0.7 }]}
                     onPress={() => handleAcceptRequest(selectedRequest)}
+                    disabled={isSubmitting}
                   >
-                    <Text style={styles.modalPrimaryBtnText}>
-                      {acceptedRequests.includes(selectedRequest.id)
-                        ? '✓ Accepted'
-                        : '🤝 Accept Request'}
-                    </Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.modalPrimaryBtnText}>🤝 Accept Request</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </>

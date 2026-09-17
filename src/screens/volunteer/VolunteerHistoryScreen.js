@@ -1,5 +1,5 @@
 // src/screens/volunteer/VolunteerHistoryScreen.js
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,28 +8,52 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  RefreshControl,
+  ActivityIndicator,
+  TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerHistoryScreen() {
-  const historyLog = [
-    {
-      id: 'hist-1',
-      date: '2026-08-20',
-      elderName: 'Mrs. Jayasinghe',
-      service: 'Pharmacy Delivery',
-      rating: 5,
-      feedback: 'Very punctual and polite! Thank you for the quick help.',
-    },
-    {
-      id: 'hist-2',
-      date: '2026-08-14',
-      elderName: 'Mr. De Silva',
-      service: 'Grocery Run',
-      rating: 5,
-      feedback: 'Carefully checked all expiry dates. Highly recommended!',
-    },
-  ];
+  const [history, setHistory] = useState([]);
+  const [stats, setStats] = useState({
+    totalCompletedVisits: 0,
+    totalHours: '0.0',
+    averageRating: 5.0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchHistoryAndStats = useCallback(async () => {
+    try {
+      const [histRes, statsRes] = await Promise.allSettled([
+        volunteerService.getMyHistory(),
+        volunteerService.getMyStats(),
+      ]);
+
+      if (histRes.status === 'fulfilled' && histRes.value?.success) {
+        setHistory(histRes.value.data || []);
+      }
+      if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+        setStats(statsRes.value.data || { totalCompletedVisits: 0, totalHours: '0.0', averageRating: 5.0 });
+      }
+    } catch (error) {
+      console.error('Fetch history error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHistoryAndStats();
+  }, [fetchHistoryAndStats]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchHistoryAndStats();
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -38,48 +62,75 @@ export default function VolunteerHistoryScreen() {
         <Text style={styles.headerSub}>View completed support trips, total hours, and community feedback</Text>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollPadding} showsVerticalScrollIndicator={false}>
-        {/* Metrics Banner */}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollPadding}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />
+        }
+      >
+        {/* Live Metrics Banner */}
         <View style={styles.metricsRow}>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>14</Text>
+            <Text style={styles.metricVal}>{stats.totalCompletedVisits}</Text>
             <Text style={styles.metricLbl}>Completed Visits</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>18.5</Text>
+            <Text style={styles.metricVal}>{stats.totalHours}</Text>
             <Text style={styles.metricLbl}>Total Hours</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>5.0 ⭐</Text>
+            <Text style={styles.metricVal}>{stats.averageRating} ⭐</Text>
             <Text style={styles.metricLbl}>Rating</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Completed Service Logs</Text>
-        {historyLog.map((log) => (
-          <View key={log.id} style={styles.historyCard}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.serviceName}>{log.service}</Text>
-              <Text style={styles.dateText}>{log.date}</Text>
-            </View>
-            <Text style={styles.elderText}>For: {log.elderName}</Text>
+        <Text style={styles.sectionTitle}>Completed Service Logs ({history.length})</Text>
 
-            <View style={styles.ratingRow}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons
-                  key={star}
-                  name={star <= log.rating ? 'star' : 'star-outline'}
-                  size={14}
-                  color="#F59E0B"
-                />
-              ))}
-            </View>
-
-            {log.feedback ? (
-              <Text style={styles.feedbackText}>"{log.feedback}"</Text>
-            ) : null}
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#1E40AF" />
+            <Text style={styles.loadingText}>Loading your completed service history...</Text>
           </View>
-        ))}
+        ) : history.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="ribbon-outline" size={44} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Completed Visits Yet</Text>
+            <Text style={styles.emptySub}>
+              Once you complete your scheduled volunteer visits, your impact records and feedback reviews will show up here.
+            </Text>
+          </View>
+        ) : (
+          history.map((log) => {
+            const logKey = log._id || log.id;
+            return (
+              <View key={logKey} style={styles.historyCard}>
+                <View style={styles.cardHeader}>
+                  <Text style={styles.serviceName}>{log.service}</Text>
+                  <Text style={styles.dateText}>{log.date}</Text>
+                </View>
+                <Text style={styles.elderText}>For: {log.elderName}</Text>
+
+                <View style={styles.ratingRow}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons
+                      key={star}
+                      name={star <= (log.rating || 5) ? 'star' : 'star-outline'}
+                      size={14}
+                      color="#F59E0B"
+                    />
+                  ))}
+                  <Text style={styles.ratingNumber}>{(log.rating || 5).toFixed(1)}</Text>
+                </View>
+
+                {log.feedback ? (
+                  <Text style={styles.feedbackText}>"{log.feedback}"</Text>
+                ) : null}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -113,6 +164,7 @@ const styles = StyleSheet.create({
   },
   scrollPadding: {
     padding: 16,
+    paddingBottom: 30,
   },
   metricsRow: {
     flexDirection: 'row',
@@ -127,6 +179,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    elevation: 1,
   },
   metricVal: {
     fontSize: 18,
@@ -146,6 +199,37 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     marginBottom: 12,
   },
+  loadingBox: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 13,
+    color: '#64748B',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
   historyCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -153,6 +237,11 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
+    elevation: 1,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -175,12 +264,20 @@ const styles = StyleSheet.create({
   },
   ratingRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 2,
     marginBottom: 6,
+  },
+  ratingNumber: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#D97706',
+    marginLeft: 4,
   },
   feedbackText: {
     fontSize: 12,
     fontStyle: 'italic',
     color: '#475569',
+    lineHeight: 18,
   },
 });

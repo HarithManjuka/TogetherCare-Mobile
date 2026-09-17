@@ -1,5 +1,5 @@
 // src/screens/volunteer/VolunteerRequestsScreen.js
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,47 +9,91 @@ import {
   SafeAreaView,
   Platform,
   StatusBar,
+  RefreshControl,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
-import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
+import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerRequestsScreen({ onNavigateTab }) {
-  const [selectedRequest, setSelectedRequest] = useState(null);
-  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  const [requests, setRequests] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [submittingId, setSubmittingId] = useState(null);
 
-  const availableRequests = [
-    {
-      id: 'req-101',
-      type: 'Grocery Pickup & Delivery',
-      elderName: 'Mrs. Perera',
-      distance: '1.2 km',
-      duration: '45 min',
-      badge: 'Urgent',
-      address: 'No. 42, Galle Road, Colombo 03',
-      items: ['Fresh Milk (2L)', 'Bread', 'Eggs (12 Pack)', 'Bananas (1kg)'],
-    },
-    {
-      id: 'req-102',
-      type: 'Pharmacy & Medicine',
-      elderName: 'Mr. Silva',
-      distance: '2.5 km',
-      duration: '30 min',
-      badge: 'Today',
-      address: 'No. 18, Flower Road, Colombo 07',
-      items: ['Blood Pressure Medication', 'Vitamin C'],
-    },
-    {
-      id: 'req-103',
-      type: 'Companionship & Walk',
-      elderName: 'Mrs. Fernando',
-      distance: '3.1 km',
-      duration: '60 min',
-      badge: 'Scheduled',
-      address: 'No. 5, Havelock Road, Colombo 05',
-      items: ['Afternoon park walk', 'Friendly chat'],
-    },
+  const categories = [
+    { id: 'all', label: 'All Requests' },
+    { id: 'Grocery', label: '🛒 Grocery' },
+    { id: 'Medicine', label: '💊 Pharmacy' },
+    { id: 'Companionship', label: '🤝 Companionship' },
   ];
+
+  const fetchRequests = useCallback(async () => {
+    try {
+      const res = await volunteerService.getAvailableRequests(selectedCategory);
+      if (res?.success) {
+        setRequests(res.data || []);
+      }
+    } catch (error) {
+      console.error('Fetch requests error:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchRequests();
+  }, [fetchRequests]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchRequests();
+  };
+
+  const handleAccept = (req) => {
+    const reqId = req._id || req.id;
+    Alert.alert(
+      '🤝 Accept Volunteer Task',
+      `Would you like to accept the ${req.type || req.serviceType} visit for ${req.elderName}?\n\nDate: ${req.date} at ${req.time}\nLocation: ${req.address}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Accept Task',
+          onPress: async () => {
+            try {
+              setSubmittingId(reqId);
+              const res = await volunteerService.acceptRequest(reqId);
+              if (res?.success) {
+                Alert.alert(
+                  '🎉 Task Accepted!',
+                  `You have accepted the visit for ${req.elderName}. It is now in your Schedule.`,
+                  [
+                    { text: 'Stay Here', onPress: () => fetchRequests() },
+                    {
+                      text: 'View Schedule',
+                      onPress: () => {
+                        fetchRequests();
+                        if (onNavigateTab) onNavigateTab('schedule');
+                      },
+                    },
+                  ]
+                );
+              }
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept task');
+            } finally {
+              setSubmittingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -58,53 +102,102 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
         <Text style={styles.headerSub}>Browse nearby requests from elderly residents needing assistance</Text>
       </View>
 
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollPadding} showsVerticalScrollIndicator={false}>
-        {availableRequests.map((req) => (
-          <View key={req.id} style={styles.requestCard}>
-            <View style={styles.cardHeader}>
-              <View style={styles.badgeTag}>
-                <Text style={styles.badgeText}>{req.badge}</Text>
-              </View>
-              <Text style={styles.distanceText}>📍 {req.distance} away</Text>
-            </View>
-
-            <Text style={styles.serviceTitle}>{req.type}</Text>
-            <Text style={styles.elderName}>For: {req.elderName}</Text>
-            <Text style={styles.addressText}>Location: {req.address}</Text>
-
-            <View style={styles.itemsBox}>
-              <Text style={styles.itemsHeader}>Requested items / activities:</Text>
-              {req.items.map((item, idx) => (
-                <Text key={idx} style={styles.itemBullet}>• {item}</Text>
-              ))}
-            </View>
-
+      {/* Category Filter Chips */}
+      <View style={styles.filterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {categories.map((cat) => (
             <TouchableOpacity
-              style={styles.offerBtn}
-              activeOpacity={0.8}
-              onPress={() => {
-                setSelectedRequest(req);
-                setOfferModalVisible(true);
-              }}
+              key={cat.id}
+              style={[styles.filterChip, selectedCategory === cat.id && styles.filterChipActive]}
+              onPress={() => setSelectedCategory(cat.id)}
             >
-              <Ionicons name="hand-left-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-              <Text style={styles.offerBtnText}>Offer Assistance</Text>
+              <Text style={[styles.filterChipText, selectedCategory === cat.id && styles.filterChipTextActive]}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollPadding}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#1E3A8A']} />
+        }
+      >
+        {loading ? (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#1E40AF" />
+            <Text style={styles.loadingText}>Loading available requests...</Text>
+          </View>
+        ) : requests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="sparkles-outline" size={42} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Open Requests Found</Text>
+            <Text style={styles.emptySub}>
+              There are currently no open requests matching this category. Please check back soon or switch categories!
+            </Text>
+            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => setSelectedCategory('all')}>
+              <Text style={styles.resetFilterBtnText}>Show All Categories</Text>
             </TouchableOpacity>
           </View>
-        ))}
-      </ScrollView>
+        ) : (
+          requests.map((req) => {
+            const reqKey = req._id || req.id;
+            const isUrgent = req.badgeType === 'urgent' || req.badge === 'Urgent';
+            const isProcessing = submittingId === reqKey;
 
-      {offerModalVisible && selectedRequest && (
-        <OfferHelpModal
-          visible={offerModalVisible}
-          request={selectedRequest}
-          onClose={() => setOfferModalVisible(false)}
-          onSuccess={() => {
-            setOfferModalVisible(false);
-            if (onNavigateTab) onNavigateTab('schedule');
-          }}
-        />
-      )}
+            return (
+              <View key={reqKey} style={styles.requestCard}>
+                <View style={styles.cardHeader}>
+                  <View style={[styles.badgeTag, isUrgent ? styles.urgentTag : styles.todayTag]}>
+                    <Text style={[styles.badgeText, isUrgent ? styles.urgentBadgeText : styles.todayBadgeText]}>
+                      {req.badge || 'Open'}
+                    </Text>
+                  </View>
+                  <Text style={styles.distanceText}>📍 {req.distance || '1.2 km'} away</Text>
+                </View>
+
+                <Text style={styles.serviceTitle}>{req.type || req.serviceType}</Text>
+                <Text style={styles.elderName}>For: {req.elderName}</Text>
+                <Text style={styles.addressText}>Location: {req.address}</Text>
+                <Text style={styles.dateTimeText}>
+                  🕒 {req.date} at {req.time}
+                </Text>
+
+                {req.items && req.items.length > 0 ? (
+                  <View style={styles.itemsBox}>
+                    <Text style={styles.itemsHeader}>Requested items / activities:</Text>
+                    {req.items.map((item, idx) => (
+                      <Text key={idx} style={styles.itemBullet}>
+                        • {item}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+
+                <TouchableOpacity
+                  style={[styles.offerBtn, isProcessing && { opacity: 0.7 }]}
+                  activeOpacity={0.8}
+                  onPress={() => handleAccept(req)}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="hand-left-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                      <Text style={styles.offerBtnText}>Accept & Offer Help</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -117,7 +210,7 @@ const styles = StyleSheet.create({
   headerContainer: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 12,
-    paddingBottom: 14,
+    paddingBottom: 12,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -132,11 +225,86 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  filterRow: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  filterScroll: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  filterChipActive: {
+    backgroundColor: '#1E40AF',
+    borderColor: '#1E40AF',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   container: {
     flex: 1,
   },
   scrollPadding: {
     padding: 16,
+    paddingBottom: 30,
+  },
+  loadingBox: {
+    paddingVertical: 60,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: '#64748B',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 12,
+  },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  resetFilterBtn: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+  },
+  resetFilterBtnText: {
+    color: '#1E40AF',
+    fontWeight: '700',
+    fontSize: 13,
   },
   requestCard: {
     backgroundColor: '#FFFFFF',
@@ -158,15 +326,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   badgeTag: {
-    backgroundColor: '#FEF3C7',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
   },
+  todayTag: {
+    backgroundColor: '#EFF6FF',
+  },
+  urgentTag: {
+    backgroundColor: '#FEE2E2',
+  },
   badgeText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#D97706',
+  },
+  todayBadgeText: {
+    color: '#1D4ED8',
+  },
+  urgentBadgeText: {
+    color: '#DC2626',
   },
   distanceText: {
     fontSize: 12,
@@ -188,6 +366,12 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 12,
     color: '#64748B',
+    marginBottom: 4,
+  },
+  dateTimeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#334155',
     marginBottom: 10,
   },
   itemsBox: {
