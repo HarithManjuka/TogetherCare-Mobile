@@ -760,6 +760,10 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
   },
+  contactCardPrimary: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FCA5A5',
+  },
   contactInfo: {
     flex: 1,
   },
@@ -767,6 +771,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  primaryPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  primaryPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#92400E',
   },
   contactRelation: {
     fontSize: 12,

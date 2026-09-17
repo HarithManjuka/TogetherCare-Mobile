@@ -1,3 +1,4 @@
+// src/screens/elderly/ElderlyDashboardHome.js
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
@@ -7,8 +8,6 @@ import {
   RefreshControl,
   ActivityIndicator,
   Modal,
-  SafeAreaView,
-  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useElderlyHome } from '../../hooks/useElderlyHome';
@@ -73,10 +72,10 @@ export default function ElderlyDashboardHome({
 
   const handleQuickAction = (featureName) => {
     if (featureName === 'Request Help' || featureName === 'Companionship') {
-      if (onRequestHelp) {
-        onRequestHelp();
-      } else if (onNavigateTab) {
+      if (onNavigateTab) {
         onNavigateTab('requests');
+      } else if (onRequestHelp) {
+        onRequestHelp();
       }
       return;
     }
@@ -115,287 +114,284 @@ export default function ElderlyDashboardHome({
       />
 
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={[COLORS.secondary]}
-          />
-        }
-      >
-        {/* Dynamic Greeting */}
-        <View style={styles.greetingContainer}>
-          <Text style={styles.greetingText}>
-            {greeting}{firstName ? ` , ` : ''}
-            {firstName ? <Text style={styles.greetingName}>{firstName}</Text> : null}
-          </Text>
-          <Text style={styles.greetingSubtitle}>Here is your care schedule & quick actions</Text>
-        </View>
-
-        {/* Action Cards */}
-        <View style={styles.actionsWrapper}>
-          {/* Dedicated Emergency SOS Button Card */}
-          <TouchableOpacity
-            style={[styles.sosCard, activeSOS && styles.sosCardActive]}
-            activeOpacity={0.85}
-            onPress={() => setShowSOSModal(true)}
-            accessibilityRole="button"
-            accessibilityLabel="SOS Emergency Button"
-          >
-            <View style={[styles.sosIconContainer, activeSOS && styles.sosIconContainerActive]}>
-              <Ionicons
-                name={activeSOS ? 'radio' : 'warning'}
-                size={isLarge ? 32 : 26}
-                color={activeSOS ? '#FFFFFF' : '#DC2626'}
-              />
-            </View>
-            <View style={styles.sosTextGroup}>
-              <Text style={[styles.sosCardText, activeSOS && styles.sosCardTextActive]}>
-                {activeSOS ? '🚨 EMERGENCY SOS ACTIVE' : 'SOS Emergency Help'}
-              </Text>
-              <Text style={[styles.sosSubtext, activeSOS && styles.sosSubtextActive]}>
-                {activeSOS
-                  ? 'Tap to view hotlines or resolve alert'
-                  : '1-tap urgent help & hotlines (1990 / 119)'}
-              </Text>
-            </View>
-            <View style={[styles.sosActionPill, activeSOS && styles.sosActionPillActive]}>
-              <Text style={[styles.sosActionPillText, activeSOS && styles.sosActionPillTextActive]}>
-                {activeSOS ? 'VIEW SOS' : 'PRESS SOS'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Main Hero Card: Request Help */}
-          <TouchableOpacity
-            style={styles.heroCard}
-            activeOpacity={0.85}
-            onPress={() => handleQuickAction('Request Help')}
-            accessibilityRole="button"
-            accessibilityLabel="Request Help"
-          >
-            <View style={styles.heroIconContainer}>
-              <Ionicons
-                name="search-outline"
-                size={isLarge ? 50 : 42}
-                color={COLORS.primary}
-              />
-            </View>
-            <Text style={styles.heroCardText}>Request Help</Text>
-            <Text style={styles.heroSubtext}>Find a verified volunteer or caregiver</Text>
-          </TouchableOpacity>
-
-          {/* Sub Action Grid (2 Columns) */}
-          <View style={styles.gridRow}>
-            {/* My Schedules */}
-            <TouchableOpacity
-              style={styles.gridCard}
-              activeOpacity={0.85}
-              onPress={() => handleQuickAction('My Schedules')}
-              accessibilityRole="button"
-              accessibilityLabel="My Schedules"
-            >
-              <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
-                <Ionicons
-                  name="calendar-outline"
-                  size={isLarge ? 38 : 32}
-                  color={COLORS.primary}
-                />
-              </View>
-              <Text style={styles.gridCardText}>My Schedule</Text>
-            </TouchableOpacity>
-
-            {/* My Care Circle */}
-            <TouchableOpacity
-              style={styles.gridCard}
-              activeOpacity={0.85}
-              onPress={() => setShowCareCircleModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="My Care Circle"
-            >
-              <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
-                <Ionicons
-                  name="people-outline"
-                  size={isLarge ? 36 : 30}
-                  color={COLORS.primary}
-                />
-              </View>
-              <Text style={styles.gridCardText}>My Care Circle</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* Section: Upcoming visits */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Upcoming visits</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => onNavigateTab && onNavigateTab('schedule')}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-          >
-            {upcomingVisits.length > 0 ? (
-              <Text style={styles.sectionBadge}>{upcomingVisits.length} Scheduled</Text>
-            ) : (
-              <Text style={[styles.sectionBadge, { backgroundColor: '#EEF2FF', color: COLORS.primary }]}>
-                View all ›
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Error Notice */}
-        {fetchError && (
-          <View style={styles.errorNoticeBox}>
-            <Ionicons name="alert-circle-outline" size={20} color={COLORS.danger} />
-            <Text style={styles.errorNoticeText}>{fetchError}</Text>
-          </View>
-        )}
-
-        {/* Visits List */}
-        {isLoading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color={COLORS.secondary} />
-            <Text style={styles.loadingText}>Fetching visits from database...</Text>
-          </View>
-        ) : upcomingVisits.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons
-              name="calendar-clear-outline"
-              size={isLarge ? 56 : 48}
-              color="#94A3B8"
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[COLORS.secondary]}
             />
-            <Text style={styles.emptyTitle}>No Upcoming Visits</Text>
-            <Text style={styles.emptySubtitle}>
-              You currently have no visits scheduled in the database. Tap "Request Help" to create a new companionship request.
+          }
+        >
+          {/* Dynamic Greeting */}
+          <View style={styles.greetingContainer}>
+            <Text style={styles.greetingText}>
+              {greeting}{firstName ? ` , ` : ''}
+              {firstName ? <Text style={styles.greetingName}>{firstName}</Text> : null}
             </Text>
+            <Text style={styles.greetingSubtitle}>Here is your care schedule & quick actions</Text>
+          </View>
+
+          {/* Action Cards */}
+          <View style={styles.actionsWrapper}>
+            {/* Dedicated Emergency SOS Button Card */}
             <TouchableOpacity
-              style={styles.emptyActionBtn}
-              onPress={() => handleQuickAction('Request Help')}
+              style={[styles.sosButton, activeSOS && styles.sosButtonActive]}
+              activeOpacity={0.85}
+              onPress={() => setShowSOSModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="SOS Emergency Button"
             >
-              <Text style={styles.emptyActionBtnText}>+ Request Companionship</Text>
+              <View style={styles.sosButtonContent}>
+                <View style={styles.sosIconCircle}>
+                  <Ionicons
+                    name={activeSOS ? 'radio' : 'warning'}
+                    size={isLarge ? 30 : 24}
+                    color="#FFFFFF"
+                  />
+                </View>
+                <View style={styles.sosTextGroup}>
+                  <Text style={styles.sosButtonText}>
+                    {activeSOS ? '🚨 EMERGENCY SOS ACTIVE' : 'SOS Emergency Help'}
+                  </Text>
+                  <Text style={styles.sosSubtext}>
+                    {activeSOS
+                      ? 'Tap to view hotlines or resolve active alert'
+                      : '1-tap urgent hotlines (1990 / 119) & Care Circle'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+
+            {/* Main Hero Card: Request Help */}
+            <TouchableOpacity
+              style={styles.heroCard}
+              activeOpacity={0.85}
+              onPress={() => handleQuickAction('Request Help')}
+              accessibilityRole="button"
+              accessibilityLabel="Request Help"
+            >
+              <View style={styles.heroIconContainer}>
+                <Ionicons
+                  name="search-outline"
+                  size={isLarge ? 50 : 42}
+                  color={COLORS.primary}
+                />
+              </View>
+              <Text style={styles.heroCardText}>Request Help</Text>
+              <Text style={styles.heroSubtext}>Find a verified volunteer or caregiver</Text>
+            </TouchableOpacity>
+
+            {/* Sub Action Grid (2 Columns) */}
+            <View style={styles.gridRow}>
+              {/* My Schedules */}
+              <TouchableOpacity
+                style={styles.gridCard}
+                activeOpacity={0.85}
+                onPress={() => handleQuickAction('My Schedules')}
+                accessibilityRole="button"
+                accessibilityLabel="My Schedules"
+              >
+                <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
+                  <Ionicons
+                    name="calendar-outline"
+                    size={isLarge ? 38 : 32}
+                    color={COLORS.primary}
+                  />
+                </View>
+                <Text style={styles.gridCardText}>My Schedule</Text>
+              </TouchableOpacity>
+
+              {/* My Care Circle */}
+              <TouchableOpacity
+                style={styles.gridCard}
+                activeOpacity={0.85}
+                onPress={() => setShowCareCircleModal(true)}
+                accessibilityRole="button"
+                accessibilityLabel="My Care Circle"
+              >
+                <View style={[styles.gridIconContainer, { backgroundColor: '#CCFBF1' }]}>
+                  <Ionicons
+                    name="people-outline"
+                    size={isLarge ? 36 : 30}
+                    color={COLORS.secondary}
+                  />
+                </View>
+                <Text style={styles.gridCardText}>My Care Circle</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Section: Upcoming visits */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Upcoming visits</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => onNavigateTab && onNavigateTab('schedule')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+            >
+              {upcomingVisits.length > 0 ? (
+                <Text style={styles.sectionBadge}>{upcomingVisits.length} Scheduled</Text>
+              ) : (
+                <Text style={[styles.sectionBadge, { backgroundColor: '#EEF2FF', color: COLORS.primary }]}>
+                  View all ›
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
-        ) : (
-          <View style={styles.visitsList}>
-            {upcomingVisits.map((visit, index) => {
-              const { date, time } = formatScheduleDate(visit.scheduledDate, visit.timeSlot);
-              const companion =
-                visit.companionName ||
-                (visit.volunteer
-                  ? `${visit.volunteer.firstName}${visit.volunteer.lastName ? ' ' + visit.volunteer.lastName[0] + '.' : ''}`
-                  : '');
 
-              return (
-                <TouchableOpacity
-                  key={visit._id || `visit-${index}`}
-                  style={styles.visitCard}
-                  activeOpacity={0.85}
-                  onPress={() => setSelectedVisit({ ...visit, formattedDate: date, formattedTime: time, companion })}
-                  accessibilityRole="button"
-                >
-                  <View style={styles.iconContainer}>
-                    {renderActivityIcon(visit.activityType)}
-                  </View>
+          {/* Error Notice */}
+          {fetchError && (
+            <View style={styles.errorNoticeBox}>
+              <Ionicons name="alert-circle-outline" size={20} color={COLORS.danger} />
+              <Text style={styles.errorNoticeText}>{fetchError}</Text>
+            </View>
+          )}
 
-                  <View style={styles.visitContent}>
-                    <Text style={styles.visitActivity}>{visit.activityType}</Text>
-                    {companion ? (
-                      <Text style={styles.visitCompanion}>with {companion}</Text>
-                    ) : (
-                      <Text style={styles.visitCompanion}>Awaiting volunteer</Text>
-                    )}
-                  </View>
+          {/* Visits List */}
+          {isLoading && !refreshing ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={COLORS.secondary} />
+              <Text style={styles.loadingText}>Fetching visits from database...</Text>
+            </View>
+          ) : upcomingVisits.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons
+                name="calendar-clear-outline"
+                size={isLarge ? 56 : 48}
+                color="#94A3B8"
+              />
+              <Text style={styles.emptyTitle}>No Upcoming Visits</Text>
+              <Text style={styles.emptySubtitle}>
+                You currently have no visits scheduled. Tap "Volunteer Requests" to browse available helpers or post your request.
+              </Text>
+              <TouchableOpacity
+                style={styles.emptyActionBtn}
+                onPress={() => handleQuickAction('Request Help')}
+              >
+                <Text style={styles.emptyActionBtnText}>Browse Volunteer Offers</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.visitsList}>
+              {upcomingVisits.map((visit, index) => {
+                const { date, time } = formatScheduleDate(visit.scheduledDate, visit.timeSlot);
+                const companion =
+                  visit.companionName ||
+                  (visit.volunteer
+                    ? `${visit.volunteer.firstName}${visit.volunteer.lastName ? ' ' + visit.volunteer.lastName[0] + '.' : ''}`
+                    : '');
 
-                  <View style={styles.visitTimeBlock}>
-                    <Text style={styles.visitDate}>{date}</Text>
-                    <Text style={styles.visitTime}>{time}</Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </ScrollView>
+                return (
+                  <TouchableOpacity
+                    key={visit._id || `visit-${index}`}
+                    style={styles.visitCard}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedVisit({ ...visit, formattedDate: date, formattedTime: time, companion })}
+                    accessibilityRole="button"
+                  >
+                    <View style={styles.iconContainer}>
+                      {renderActivityIcon(visit.activityType)}
+                    </View>
 
-      {/* Visit Details Modal Sheet */}
-      <Modal
-        visible={!!selectedVisit}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSelectedVisit(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedVisit && (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Visit Details</Text>
-                  <TouchableOpacity onPress={() => setSelectedVisit(null)}>
-                    <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                    <View style={styles.visitContent}>
+                      <Text style={styles.visitActivity}>{visit.activityType}</Text>
+                      {companion ? (
+                        <Text style={styles.visitCompanion}>with {companion}</Text>
+                      ) : (
+                        <Text style={styles.visitCompanion}>Awaiting volunteer</Text>
+                      )}
+                    </View>
+
+                    <View style={styles.visitTimeBlock}>
+                      <Text style={styles.visitDate}>{date}</Text>
+                      <Text style={styles.visitTime}>{time}</Text>
+                    </View>
                   </TouchableOpacity>
-                </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
 
-                <View style={styles.modalBody}>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Activity</Text>
-                    <Text style={styles.modalValue}>{selectedVisit.activityType}</Text>
+        {/* Visit Details Modal Sheet */}
+        <Modal
+          visible={!!selectedVisit}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSelectedVisit(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              {selectedVisit && (
+                <>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>Visit Details</Text>
+                    <TouchableOpacity onPress={() => setSelectedVisit(null)}>
+                      <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                    </TouchableOpacity>
                   </View>
 
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Date & Time</Text>
-                    <Text style={styles.modalValue}>
-                      {selectedVisit.formattedDate} at {selectedVisit.formattedTime}
-                    </Text>
+                  <View style={styles.modalBody}>
+                    <View style={styles.modalRow}>
+                      <Text style={styles.modalLabel}>Activity</Text>
+                      <Text style={styles.modalValue}>{selectedVisit.activityType}</Text>
+                    </View>
+
+                    <View style={styles.modalRow}>
+                      <Text style={styles.modalLabel}>Date & Time</Text>
+                      <Text style={styles.modalValue}>
+                        {selectedVisit.formattedDate} at {selectedVisit.formattedTime}
+                      </Text>
+                    </View>
+
+                    <View style={styles.modalRow}>
+                      <Text style={styles.modalLabel}>Status</Text>
+                      <Text style={[styles.modalValue, { color: COLORS.primary, textTransform: 'capitalize' }]}>
+                        {selectedVisit.status || 'Accepted'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.modalRow}>
+                      <Text style={styles.modalLabel}>Companion / Volunteer</Text>
+                      <Text style={styles.modalValue}>
+                        {selectedVisit.companion || 'Awaiting volunteer'}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Status</Text>
-                    <Text style={[styles.modalValue, { color: COLORS.primary, textTransform: 'capitalize' }]}>
-                      {selectedVisit.status || 'Accepted'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Companion / Volunteer</Text>
-                    <Text style={styles.modalValue}>
-                      {selectedVisit.companion || 'Awaiting volunteer'}
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => setSelectedVisit(null)}
-                >
-                  <Text style={styles.modalCloseButtonText}>Close</Text>
-                </TouchableOpacity>
-              </>
-            )}
+                  <TouchableOpacity
+                    style={styles.modalCloseButton}
+                    onPress={() => setSelectedVisit(null)}
+                  >
+                    <Text style={styles.modalCloseButtonText}>Close</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Emergency SOS Modal Sheet */}
-      <EmergencySOSModal
-        visible={showSOSModal}
-        onClose={() => setShowSOSModal(false)}
-        user={user}
-        activeAlert={activeSOS}
-        onAlertStatusChange={(updatedAlert) => setActiveSOS(updatedAlert)}
-        scale={scale}
-      />
+        {/* Emergency SOS Modal Sheet */}
+        <EmergencySOSModal
+          visible={showSOSModal}
+          onClose={() => setShowSOSModal(false)}
+          user={user}
+          activeAlert={activeSOS}
+          onAlertStatusChange={(updatedAlert) => setActiveSOS(updatedAlert)}
+          scale={scale}
+        />
 
-      {/* My Care Circle Modal Sheet */}
-      <CareCircleModal
-        visible={showCareCircleModal}
-        onClose={() => setShowCareCircleModal(false)}
-        scale={scale}
-      />
-    </View>
+        {/* My Care Circle Modal Sheet */}
+        <CareCircleModal
+          visible={showCareCircleModal}
+          onClose={() => setShowCareCircleModal(false)}
+          scale={scale}
+        />
+      </View>
     </View>
   );
 }

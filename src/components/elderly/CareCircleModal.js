@@ -40,6 +40,7 @@ export default function CareCircleModal({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Form modal state (Add / Edit)
   const [formVisible, setFormVisible] = useState(false);
@@ -88,6 +89,7 @@ export default function CareCircleModal({
     setPhone('');
     setIsPrimary(contacts.length === 0);
     setNotes('');
+    setFormError('');
     setFormVisible(true);
   };
 
@@ -104,16 +106,18 @@ export default function CareCircleModal({
     setPhone(item.phone || '');
     setIsPrimary(!!item.isPrimary);
     setNotes(item.notes || '');
+    setFormError('');
     setFormVisible(true);
   };
 
   const handleSaveContact = async () => {
+    setFormError('');
     if (!name.trim()) {
-      Alert.alert('Missing Name', 'Please enter the contact name.');
+      setFormError('Please enter the contact full name.');
       return;
     }
     if (!phone.trim()) {
-      Alert.alert('Missing Phone', 'Please enter a valid phone number.');
+      setFormError('Please enter a valid phone number.');
       return;
     }
 
@@ -130,22 +134,39 @@ export default function CareCircleModal({
     try {
       if (editingId) {
         await emergencyService.updateCareCircleContact(editingId, payload);
-        Alert.alert('Success', 'Contact updated successfully.');
       } else {
         await emergencyService.addCareCircleContact(payload);
-        Alert.alert('Success', `${payload.name} added to your Care Circle.`);
       }
       setFormVisible(false);
       fetchContacts();
     } catch (err) {
       console.error('Save Care Circle Contact Error:', err);
-      Alert.alert('Error', err?.response?.data?.message || 'Failed to save contact.');
+      const msg = err?.response?.data?.message || err?.message || 'Failed to save contact.';
+      setFormError(msg);
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleDeleteContact = (contact) => {
+    const doDelete = async () => {
+      try {
+        await emergencyService.deleteCareCircleContact(contact._id);
+        fetchContacts();
+      } catch (err) {
+        console.error('Delete Contact Error:', err);
+        Alert.alert('Error', 'Failed to remove contact.');
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const ok = window.confirm(`Are you sure you want to remove ${contact.name} from your Care Circle?`);
+      if (ok) {
+        doDelete();
+      }
+      return;
+    }
+
     Alert.alert(
       'Remove Contact?',
       `Are you sure you want to remove ${contact.name} from your Care Circle?`,
@@ -154,15 +175,7 @@ export default function CareCircleModal({
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              await emergencyService.deleteCareCircleContact(contact._id);
-              fetchContacts();
-            } catch (err) {
-              console.error('Delete Contact Error:', err);
-              Alert.alert('Error', 'Failed to remove contact.');
-            }
-          },
+          onPress: doDelete,
         },
       ]
     );
@@ -361,6 +374,13 @@ export default function CareCircleModal({
             </View>
 
             <ScrollView showsVerticalScrollIndicator={false}>
+              {Boolean(formError) && (
+                <View style={styles.formErrorBox}>
+                  <Ionicons name="alert-circle" size={18} color="#DC2626" />
+                  <Text style={styles.formErrorText}>{formError}</Text>
+                </View>
+              )}
+
               {/* Name */}
               <Text style={styles.inputLabel}>Contact Full Name *</Text>
               <TextInput
@@ -557,7 +577,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#334155',
-    marginTop: 10,
   },
   emptySub: {
     fontSize: 13,
@@ -732,6 +751,24 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  formErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF2F2',
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    gap: 8,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  formErrorText: {
+    flex: 1,
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
   },
   inputLabel: {
     fontSize: 13,

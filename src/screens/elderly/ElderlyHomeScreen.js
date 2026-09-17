@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
 import AppBottomNav from '../../components/common/AppBottomNav';
 import ElderlyDashboardHome from './ElderlyDashboardHome';
+import ElderlyRequestsScreen from './ElderlyRequestsScreen';
 import MyScheduleScreen from './MyScheduleScreen';
 import CreateCompanionshipScreen from './CreateCompanionshipScreen';
 import ProfileScreen from '../auth/ProfileScreen';
@@ -66,6 +67,14 @@ export default function ElderlyHomeScreen() {
 
   const renderActiveScreen = () => {
     switch (currentTab) {
+      case 'requests':
+        return (
+          <ElderlyRequestsScreen
+            onNavigateToSchedule={() => setCurrentTab('schedule')}
+            onRequestNew={() => setShowCreateScreen(true)}
+            onBack={() => setCurrentTab('home')}
+          />
+        );
       case 'schedule':
         return (
           <MyScheduleScreen
