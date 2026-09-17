@@ -1,5 +1,4 @@
-// src/screens/elderly/ElderlyDashboardHome.js
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,6 +16,9 @@ import { useTheme } from '../../context/ThemeContext';
 import { COLORS } from '../../constants/theme';
 import AppHeader from '../../components/common/AppHeader';
 import { getElderlyHomeScreenStyles } from '../../styles/ElderlyHomeScreen.styles';
+import EmergencySOSModal from '../../components/elderly/EmergencySOSModal';
+import CareCircleModal from '../../components/elderly/CareCircleModal';
+import * as emergencyService from '../../services/emergencyService';
 
 export default function ElderlyDashboardHome({
   onNavigateTab,
@@ -24,6 +26,7 @@ export default function ElderlyDashboardHome({
   onOpenProfile,
 }) {
   const {
+    user,
     firstName,
     greeting,
     upcomingVisits,
@@ -38,8 +41,35 @@ export default function ElderlyDashboardHome({
     handleActionPress,
   } = useElderlyHome();
 
+  const [showSOSModal, setShowSOSModal] = useState(false);
+  const [activeSOS, setActiveSOS] = useState(null);
+  const [showCareCircleModal, setShowCareCircleModal] = useState(false);
+
   const { scale, isLarge } = useTheme();
   const styles = useMemo(() => getElderlyHomeScreenStyles(scale), [scale]);
+
+  // Check if there is an active emergency SOS alert
+  useEffect(() => {
+    let isMounted = true;
+    const checkActiveSOS = async () => {
+      try {
+        const res = await emergencyService.getActiveSOS();
+        if (isMounted) {
+          if (res?.data) {
+            setActiveSOS(res.data);
+          } else {
+            setActiveSOS(null);
+          }
+        }
+      } catch (err) {
+        // Quiet fallback
+      }
+    };
+    checkActiveSOS();
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshing]);
 
   const handleQuickAction = (featureName) => {
     if (featureName === 'Request Help' || featureName === 'Companionship') {
@@ -63,10 +93,12 @@ export default function ElderlyDashboardHome({
       return;
     }
 
-    if (featureName === 'Care Circle') {
-      if (onNavigateTab) {
-        onNavigateTab('messages');
-      }
+    if (
+      featureName === 'Care Circle' ||
+      featureName === 'My Care Circle' ||
+      featureName === 'Messages'
+    ) {
+      setShowCareCircleModal(true);
       return;
     }
 
@@ -106,6 +138,38 @@ export default function ElderlyDashboardHome({
 
         {/* Action Cards */}
         <View style={styles.actionsWrapper}>
+          {/* Dedicated Emergency SOS Button Card */}
+          <TouchableOpacity
+            style={[styles.sosCard, activeSOS && styles.sosCardActive]}
+            activeOpacity={0.85}
+            onPress={() => setShowSOSModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="SOS Emergency Button"
+          >
+            <View style={[styles.sosIconContainer, activeSOS && styles.sosIconContainerActive]}>
+              <Ionicons
+                name={activeSOS ? 'radio' : 'warning'}
+                size={isLarge ? 32 : 26}
+                color={activeSOS ? '#FFFFFF' : '#DC2626'}
+              />
+            </View>
+            <View style={styles.sosTextGroup}>
+              <Text style={[styles.sosCardText, activeSOS && styles.sosCardTextActive]}>
+                {activeSOS ? '🚨 EMERGENCY SOS ACTIVE' : 'SOS Emergency Help'}
+              </Text>
+              <Text style={[styles.sosSubtext, activeSOS && styles.sosSubtextActive]}>
+                {activeSOS
+                  ? 'Tap to view hotlines or resolve alert'
+                  : '1-tap urgent help & hotlines (1990 / 119)'}
+              </Text>
+            </View>
+            <View style={[styles.sosActionPill, activeSOS && styles.sosActionPillActive]}>
+              <Text style={[styles.sosActionPillText, activeSOS && styles.sosActionPillTextActive]}>
+                {activeSOS ? 'VIEW SOS' : 'PRESS SOS'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
           {/* Main Hero Card: Request Help */}
           <TouchableOpacity
             style={styles.heroCard}
@@ -145,22 +209,22 @@ export default function ElderlyDashboardHome({
               <Text style={styles.gridCardText}>My Schedule</Text>
             </TouchableOpacity>
 
-            {/* Care Circle / Messages */}
+            {/* My Care Circle */}
             <TouchableOpacity
               style={styles.gridCard}
               activeOpacity={0.85}
-              onPress={() => handleQuickAction('Care Circle')}
+              onPress={() => setShowCareCircleModal(true)}
               accessibilityRole="button"
-              accessibilityLabel="Care Circle"
+              accessibilityLabel="My Care Circle"
             >
-              <View style={[styles.gridIconContainer, { backgroundColor: '#CCFBF1' }]}>
+              <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
                 <Ionicons
-                  name="chatbubble-ellipses-outline"
+                  name="people-outline"
                   size={isLarge ? 36 : 30}
-                  color={COLORS.secondary}
+                  color={COLORS.primary}
                 />
               </View>
-              <Text style={styles.gridCardText}>Messages</Text>
+              <Text style={styles.gridCardText}>My Care Circle</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -314,6 +378,23 @@ export default function ElderlyDashboardHome({
           </View>
         </View>
       </Modal>
+
+      {/* Emergency SOS Modal Sheet */}
+      <EmergencySOSModal
+        visible={showSOSModal}
+        onClose={() => setShowSOSModal(false)}
+        user={user}
+        activeAlert={activeSOS}
+        onAlertStatusChange={(updatedAlert) => setActiveSOS(updatedAlert)}
+        scale={scale}
+      />
+
+      {/* My Care Circle Modal Sheet */}
+      <CareCircleModal
+        visible={showCareCircleModal}
+        onClose={() => setShowCareCircleModal(false)}
+        scale={scale}
+      />
     </View>
     </View>
   );

@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import LogoutModal from './LogoutModal';
+import CareCircleModal from '../elderly/CareCircleModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const DRAWER_WIDTH = Math.min(Math.round(SCREEN_WIDTH * 0.60), 260);
@@ -635,40 +636,11 @@ export default function SideMenuDrawer({
         </View>
       </Modal>
 
-      {/* 6. My Care Circle Modal (Elderly) */}
-      <Modal
+      {/* 6. Dynamic My Care Circle Modal (Elderly) */}
+      <CareCircleModal
         visible={activeModal === 'circle'}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setActiveModal(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailModalCard}>
-            <View style={styles.modalHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Ionicons name="people" size={22} color="#1E40AF" />
-                <Text style={styles.detailModalTitle}>My Care Circle</Text>
-              </View>
-              <TouchableOpacity onPress={() => setActiveModal(null)}>
-                <Ionicons name="close" size={22} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ gap: 12, paddingVertical: 10 }}>
-              <CareCircleItem name="Nethmini Madhushika" role="Volunteer Companion" status="Verified" icon="heart-circle" />
-              <CareCircleItem name="TogetherCare Care Team" role="Supervising Caregiver" status="24/7 Active" icon="medkit" />
-              <CareCircleItem name="Primary Emergency Contact" role="Family Relative" status="Listed" icon="call" />
-            </View>
-
-            <TouchableOpacity
-              style={styles.modalDoneBtn}
-              onPress={() => setActiveModal(null)}
-            >
-              <Text style={styles.modalDoneBtnText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setActiveModal(null)}
+      />
 
       {/* Safe Sign Out Modal */}
       <LogoutModal
