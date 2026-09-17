@@ -8,9 +8,22 @@ import VolunteerRequestsScreen from './VolunteerRequestsScreen';
 import VolunteerScheduleScreen from './VolunteerScheduleScreen';
 import VolunteerHistoryScreen from './VolunteerHistoryScreen';
 import VolunteerProfileScreen from './VolunteerProfileScreen';
+import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'history' | 'profile'
+  const [requestCount, setRequestCount] = useState(0);
+
+  // Dynamically update available request badge count
+  useEffect(() => {
+    volunteerService.getAvailableRequests()
+      .then((res) => {
+        if (res?.success) {
+          setRequestCount(res.count || res.data?.length || 0);
+        }
+      })
+      .catch(() => {});
+  }, [currentTab]);
 
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
@@ -57,7 +70,7 @@ export default function VolunteerHomeScreen() {
         role="volunteer"
         activeTab={currentTab}
         onTabPress={setCurrentTab}
-        requestBadgeCount={2}
+        requestBadgeCount={requestCount}
       />
     </View>
   );
