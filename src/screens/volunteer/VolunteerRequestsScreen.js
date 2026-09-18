@@ -16,6 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import * as volunteerService from '../../services/volunteerService';
+import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
 
 export default function VolunteerRequestsScreen({ onNavigateTab }) {
   const [requests, setRequests] = useState([]);
@@ -23,6 +24,7 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submittingId, setSubmittingId] = useState(null);
+  const [selectedRequest, setSelectedRequest] = useState(null);
 
   const categories = [
     { id: 'all', label: 'All Requests' },
@@ -150,7 +152,12 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
             const isProcessing = submittingId === reqKey;
 
             return (
-              <View key={reqKey} style={styles.requestCard}>
+              <TouchableOpacity
+                key={reqKey}
+                style={styles.requestCard}
+                activeOpacity={0.92}
+                onPress={() => setSelectedRequest(req)}
+              >
                 <View style={styles.cardHeader}>
                   <View style={[styles.badgeTag, isUrgent ? styles.urgentTag : styles.todayTag]}>
                     <Text style={[styles.badgeText, isUrgent ? styles.urgentBadgeText : styles.todayBadgeText]}>
@@ -162,7 +169,17 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
 
                 <Text style={styles.serviceTitle}>{req.type || req.serviceType}</Text>
                 <Text style={styles.elderName}>For: {req.elderName}</Text>
-                <Text style={styles.addressText}>Location: {req.address}</Text>
+                <TouchableOpacity
+                  style={styles.addressRow}
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedRequest(req)}
+                >
+                  <Ionicons name="location" size={14} color="#DC2626" style={{ marginRight: 4 }} />
+                  <Text style={styles.addressText} numberOfLines={1}>
+                    Location: {req.address}
+                  </Text>
+                  <Text style={styles.viewMapHint}>🗺️ Map</Text>
+                </TouchableOpacity>
                 <Text style={styles.dateTimeText}>
                   🕒 {req.date} at {req.time}
                 </Text>
@@ -178,26 +195,50 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
                   </View>
                 ) : null}
 
-                <TouchableOpacity
-                  style={[styles.offerBtn, isProcessing && { opacity: 0.7 }]}
-                  activeOpacity={0.8}
-                  onPress={() => handleAccept(req)}
-                  disabled={isProcessing}
-                >
-                  {isProcessing ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="hand-left-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                      <Text style={styles.offerBtnText}>Accept & Offer Help</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              </View>
+                {/* Two Action Buttons: View Details & Accept */}
+                <View style={styles.cardActionsRow}>
+                  <TouchableOpacity
+                    style={styles.viewDetailsBtn}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedRequest(req)}
+                  >
+                    <Ionicons name="map-outline" size={16} color="#1E40AF" style={{ marginRight: 4 }} />
+                    <Text style={styles.viewDetailsBtnText}>View Details & Map</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.offerBtn, isProcessing && { opacity: 0.7 }]}
+                    activeOpacity={0.8}
+                    onPress={() => handleAccept(req)}
+                    disabled={isProcessing}
+                  >
+                    {isProcessing ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Ionicons name="hand-left-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.offerBtnText}>Accept & Offer Help</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
             );
           })
         )}
       </ScrollView>
+
+      {/* Elder Request Details & Interactive Map Modal */}
+      <ElderRequestDetailModal
+        visible={!!selectedRequest}
+        request={selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        onAccept={(req) => {
+          setSelectedRequest(null);
+          handleAccept(req);
+        }}
+        isAccepting={submittingId === (selectedRequest?._id || selectedRequest?.id)}
+      />
     </SafeAreaView>
   );
 }
@@ -363,10 +404,25 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
     marginBottom: 2,
   },
+  addressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   addressText: {
     fontSize: 12,
     color: '#64748B',
-    marginBottom: 4,
+    flexShrink: 1,
+  },
+  viewMapHint: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E40AF',
+    marginLeft: 6,
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   dateTimeText: {
     fontSize: 12,
@@ -391,7 +447,30 @@ const styles = StyleSheet.create({
     color: '#334155',
     lineHeight: 18,
   },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+  },
+  viewDetailsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  viewDetailsBtnText: {
+    color: '#1E40AF',
+    fontWeight: '700',
+    fontSize: 13,
+  },
   offerBtn: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -402,6 +481,6 @@ const styles = StyleSheet.create({
   offerBtnText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 13,
   },
 });

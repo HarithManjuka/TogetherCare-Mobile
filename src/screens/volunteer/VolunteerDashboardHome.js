@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
+import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
 import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
@@ -431,49 +432,71 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
                 const reqKey = req._id || req.id;
                 const isUrgent = req.badgeType === 'urgent';
                 return (
-                  <TouchableOpacity
-                    key={reqKey}
-                    style={styles.requestCard}
-                    onPress={() => setSelectedRequest(req)}
-                    activeOpacity={0.85}
-                  >
-                    {/* Category icon avatar */}
-                    <View style={styles.reqAvatarContainer}>
-                      <View style={styles.reqAvatarInner}>
-                        <Text style={styles.reqAvatarEmoji}>
-                          {req.category === 'grocery' ? '🛒' : req.category === 'medical' ? '💊' : '🤝'}
+                  <View key={reqKey} style={styles.requestCard}>
+                    <TouchableOpacity
+                      style={styles.requestCardTop}
+                      onPress={() => setSelectedRequest(req)}
+                      activeOpacity={0.85}
+                    >
+                      {/* Category icon avatar */}
+                      <View style={styles.reqAvatarContainer}>
+                        <View style={styles.reqAvatarInner}>
+                          <Text style={styles.reqAvatarEmoji}>
+                            {req.category === 'grocery' ? '🛒' : req.category === 'medical' ? '💊' : '🤝'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Info */}
+                      <View style={styles.reqInfoContainer}>
+                        <Text style={styles.reqTitle}>{req.type}</Text>
+                        <Text style={styles.reqElderName}>For: {req.elderName}</Text>
+                        <Text style={styles.reqMeta}>
+                          📍 {req.distance || '1.2 km'} · 🕒 {req.duration || '45 min'}
                         </Text>
                       </View>
-                    </View>
 
-                    {/* Info */}
-                    <View style={styles.reqInfoContainer}>
-                      <Text style={styles.reqTitle}>{req.type}</Text>
-                      <Text style={styles.reqElderName}>{req.elderName}</Text>
-                      <Text style={styles.reqMeta}>
-                        {req.distance || '1.2 km'} · {req.duration || '45 min'}
-                      </Text>
-                    </View>
-
-                    {/* Badge */}
-                    <View style={styles.badgeContainer}>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          isUrgent ? styles.urgentBadge : styles.todayBadge,
-                        ]}
-                      >
-                        <Text
+                      {/* Badge */}
+                      <View style={styles.badgeContainer}>
+                        <View
                           style={[
-                            styles.badgeText,
-                            isUrgent ? styles.urgentBadgeText : styles.todayBadgeText,
+                            styles.statusBadge,
+                            isUrgent ? styles.urgentBadge : styles.todayBadge,
                           ]}
                         >
-                          {req.badge || 'Open'}
-                        </Text>
+                          <Text
+                            style={[
+                              styles.badgeText,
+                              isUrgent ? styles.urgentBadgeText : styles.todayBadgeText,
+                            ]}
+                          >
+                            {req.badge || 'Open'}
+                          </Text>
+                        </View>
                       </View>
+                    </TouchableOpacity>
+
+                    {/* Card Actions: View Details & Map + Accept */}
+                    <View style={styles.requestCardActions}>
+                      <TouchableOpacity
+                        style={styles.dashboardViewDetailsBtn}
+                        onPress={() => setSelectedRequest(req)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="map-outline" size={15} color="#1E40AF" style={{ marginRight: 5 }} />
+                        <Text style={styles.dashboardViewDetailsText}>View Details & Map</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.dashboardQuickAcceptBtn}
+                        onPress={() => handleAcceptRequest(req)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="hand-left-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.dashboardQuickAcceptText}>Accept Help</Text>
+                      </TouchableOpacity>
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 );
               })
             )}
@@ -542,107 +565,14 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         currentUser={user}
       />
 
-      {/* --- MODAL: Request Detail & Accept Modal --- */}
-      <Modal
-        visible={selectedRequest !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSelectedRequest(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.detailModalCard}>
-            {selectedRequest && (
-              <>
-                <View style={styles.modalHeaderRow}>
-                  <View style={styles.modalHeaderTitleGroup}>
-                    <Text style={styles.modalTitle}>{selectedRequest.type}</Text>
-                    <Text style={styles.modalSubtitle}>
-                      For {selectedRequest.elderName}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => setSelectedRequest(null)}
-                    style={styles.modalCloseBtn}
-                  >
-                    <Ionicons name="close" size={24} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.detailMetaBox}>
-                  <View style={styles.detailMetaItem}>
-                    <Ionicons name="location-outline" size={18} color="#1E40AF" />
-                    <Text style={styles.detailMetaText}>{selectedRequest.distance}</Text>
-                  </View>
-                  <View style={styles.detailMetaItem}>
-                    <Ionicons name="time-outline" size={18} color="#1E40AF" />
-                    <Text style={styles.detailMetaText}>{selectedRequest.duration}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      selectedRequest.badgeType === 'urgent'
-                        ? styles.urgentBadge
-                        : styles.todayBadge,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.badgeText,
-                        selectedRequest.badgeType === 'urgent'
-                          ? styles.urgentBadgeText
-                          : styles.todayBadgeText,
-                      ]}
-                    >
-                      {selectedRequest.badge}
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={styles.detailSectionHeading}>Address</Text>
-                <Text style={styles.detailAddressText}>{selectedRequest.address}</Text>
-
-                <Text style={styles.detailSectionHeading}>Requested Items / Task</Text>
-                <View style={styles.itemsList}>
-                  {selectedRequest.items.map((item, idx) => (
-                    <View key={idx} style={styles.itemRow}>
-                      <Text style={styles.itemBullet}>•</Text>
-                      <Text style={styles.itemText}>{item}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                {selectedRequest.notes ? (
-                  <>
-                    <Text style={styles.detailSectionHeading}>Notes & Instructions</Text>
-                    <Text style={styles.notesText}>{selectedRequest.notes}</Text>
-                  </>
-                ) : null}
-
-                <View style={styles.modalActionsRow}>
-                  <TouchableOpacity
-                    style={styles.modalSecondaryBtn}
-                    onPress={() => setSelectedRequest(null)}
-                  >
-                    <Text style={styles.modalSecondaryBtnText}>Close</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.modalPrimaryBtn, isSubmitting && { opacity: 0.7 }]}
-                    onPress={() => handleAcceptRequest(selectedRequest)}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.modalPrimaryBtnText}>🤝 Accept Request</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-      </Modal>
+      {/* --- MODAL: Request Detail & Interactive Map Modal --- */}
+      <ElderRequestDetailModal
+        visible={!!selectedRequest}
+        request={selectedRequest}
+        onClose={() => setSelectedRequest(null)}
+        onAccept={(req) => handleAcceptRequest(req)}
+        isAccepting={isSubmitting}
+      />
 
       {/* --- MODAL: Availability Modal --- */}
       <Modal
@@ -1204,9 +1134,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   requestCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
@@ -1216,6 +1144,48 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
+  },
+  requestCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  requestCardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  dashboardViewDetailsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  dashboardViewDetailsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  dashboardQuickAcceptBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1E40AF',
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  dashboardQuickAcceptText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   requestCardAccepted: {
     borderColor: '#86EFAC',
