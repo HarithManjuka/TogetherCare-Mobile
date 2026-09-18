@@ -100,6 +100,23 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
     });
   };
 
+  const handleOpenMaps = (address) => {
+    const query = encodeURIComponent(address || 'Colombo, Sri Lanka');
+    const url =
+      Platform.OS === 'ios'
+        ? `maps:0,0?q=${query}`
+        : `https://www.google.com/maps/search/?api=1&query=${query}`;
+
+    Linking.canOpenURL(url)
+      .then((supported) => {
+        if (supported) return Linking.openURL(url);
+        return Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+      })
+      .catch(() => {
+        Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
+      });
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
@@ -173,6 +190,14 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                       <Text style={styles.callBtnText}>Call</Text>
                     </TouchableOpacity>
                   ) : null}
+
+                  <TouchableOpacity
+                    style={styles.mapBtn}
+                    onPress={() => handleOpenMaps(visit.location)}
+                  >
+                    <Ionicons name="map-outline" size={15} color="#1E40AF" />
+                    <Text style={styles.mapBtnText}>Map</Text>
+                  </TouchableOpacity>
 
                   {!isArrived ? (
                     <TouchableOpacity
@@ -374,6 +399,22 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   callBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  mapBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    gap: 4,
+  },
+  mapBtnText: {
     fontSize: 13,
     fontWeight: '700',
     color: '#1E40AF',
