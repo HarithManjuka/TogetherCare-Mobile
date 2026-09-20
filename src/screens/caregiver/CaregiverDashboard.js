@@ -1,10 +1,15 @@
 // src/screens/caregiver/CaregiverDashboard.js
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, SafeAreaView, Platform, BackHandler } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { View, StyleSheet, BackHandler } from 'react-native';
 import { COLORS } from '../../constants/theme';
+import { useAuth } from '../../context/AuthContext';
 import CaregiverDashboardHome from './CaregiverDashboardHome';
 import AddDependentScreen from './AddDependentScreen';
+import DependentManagementScreen from './DependentManagementScreen';
+import UpcomingVisitsScreen from './UpcomingVisitsScreen';
+import SeniorActivitiesScreen from './SeniorActivitiesScreen';
+import CaregiverAssignmentsScreen from './CaregiverAssignmentsScreen';
+import CaregiverChatScreen from './CaregiverChatScreen';
 import RequestHelpScreen from './RequestHelpScreen';
 import VolunteerSelectionScreen from './VolunteerSelectionScreen';
 import VolunteerProfileReviewScreen from './VolunteerProfileReviewScreen';
@@ -16,10 +21,20 @@ import AppHeader from '../../components/common/AppHeader';
 import client from '../../api/client';
 
 export default function CaregiverDashboard() {
-  const [currentScreen, setCurrentScreen] = useState('home'); // 'home' | 'add-dependent' | 'request-help' | 'volunteer-selection' | 'volunteer-profile' | 'live-tracking' | 'feedback' | 'profile'
+  const { user } = useAuth();
+  const isFamilyMember = user?.caregiverType === 'family_member';
+
+  const [currentScreen, setCurrentScreen] = useState('home');
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Selected chat partner for CaregiverChatScreen (US-403)
+  const [chatPartner, setChatPartner] = useState(null);
+  const [chatSenior, setChatSenior] = useState(null);
+
+  // Selected senior for SeniorActivitiesScreen (Sprint 3)
+  const [monitoredSenior, setMonitoredSenior] = useState(null);
 
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
@@ -59,16 +74,33 @@ export default function CaregiverDashboard() {
     }
   };
 
+  const handleOpenChat = (partner, senior) => {
+    setChatPartner(partner);
+    setChatSenior(senior);
+    setCurrentScreen('chat');
+  };
+
+  const handleMonitorSenior = (senior) => {
+    setMonitoredSenior(senior);
+    setCurrentScreen('activities');
+  };
+
   const getActiveTab = () => {
     switch (currentScreen) {
+      case 'dependents':
       case 'add-dependent':
         return 'dependents';
+      case 'assignments':
+        return 'assignments';
+      case 'upcoming-visits':
       case 'request-help':
       case 'volunteer-selection':
       case 'volunteer-profile':
       case 'live-tracking':
       case 'feedback':
         return 'requests';
+      case 'chat':
+        return 'messages';
       case 'profile':
         return 'profile';
       case 'home':
@@ -80,10 +112,16 @@ export default function CaregiverDashboard() {
   const handleSelectTab = (tabKey) => {
     switch (tabKey) {
       case 'dependents':
-        setCurrentScreen('add-dependent');
+        setCurrentScreen('dependents');
+        break;
+      case 'assignments':
+        setCurrentScreen('assignments');
         break;
       case 'requests':
-        setCurrentScreen('request-help');
+        setCurrentScreen('upcoming-visits');
+        break;
+      case 'messages':
+        setCurrentScreen('chat');
         break;
       case 'profile':
         setCurrentScreen('profile');
@@ -97,14 +135,67 @@ export default function CaregiverDashboard() {
 
   const renderScreen = () => {
     switch (currentScreen) {
+      case 'dependents':
+        return (
+          <DependentManagementScreen
+            onBack={() => setCurrentScreen('home')}
+            onAddDependent={() => setCurrentScreen('add-dependent')}
+            onRequestHelpForSenior={(senior) => {
+              setCurrentScreen('request-help');
+            }}
+            onMonitorSenior={handleMonitorSenior}
+          />
+        );
       case 'add-dependent':
         return (
           <AddDependentScreen
-            onBack={() => setCurrentScreen('home')}
+            onBack={() => setCurrentScreen('dependents')}
             onSuccess={() => {
-              setCurrentScreen('home');
+              setCurrentScreen('dependents');
               triggerRefresh();
             }}
+          />
+        );
+      case 'upcoming-visits':
+        return (
+          <UpcomingVisitsScreen
+            onBack={() => setCurrentScreen('home')}
+            onOpenChat={handleOpenChat}
+            onTrackVisit={(reqId) => {
+              setActiveRequestId(reqId);
+              setCurrentScreen('live-tracking');
+            }}
+          />
+        );
+      case 'assignments':
+        return (
+          <CaregiverAssignmentsScreen
+            onBack={() => setCurrentScreen('home')}
+            onViewCompletedVisits={() => setCurrentScreen('home')}
+          />
+        );
+      case 'activities':
+        return (
+          <SeniorActivitiesScreen
+            senior={monitoredSenior}
+            onBack={() => setCurrentScreen('dependents')}
+            onRequestHelp={() => setCurrentScreen('request-help')}
+          />
+        );
+      case 'chat':
+        return (
+          <CaregiverChatScreen
+            otherUser={
+              chatPartner || {
+                _id: user?.linkedElderlyProfiles?.[0] || user?.linkedCaregiverId || 'general',
+                firstName: 'Community',
+                lastName: 'Coordinator',
+                role: 'caregiver',
+                phone: '0771234567',
+              }
+            }
+            relatedSenior={chatSenior}
+            onBack={() => setCurrentScreen('home')}
           />
         );
       case 'request-help':
@@ -187,6 +278,10 @@ export default function CaregiverDashboard() {
             onRequestHelp={() => setCurrentScreen('request-help')}
             onViewRequest={handleViewRequest}
             onViewProfile={() => setCurrentScreen('profile')}
+            onManageDependents={() => setCurrentScreen('dependents')}
+            onViewUpcomingVisits={() => setCurrentScreen('upcoming-visits')}
+            onViewAssignments={() => setCurrentScreen('assignments')}
+            onViewActivities={handleMonitorSenior}
             refreshTrigger={refreshTrigger}
           />
         );
@@ -201,11 +296,9 @@ export default function CaregiverDashboard() {
           onNavigateTab={handleSelectTab}
         />
       )}
-      <View style={styles.screenArea}>
-        {renderScreen()}
-      </View>
+      <View style={styles.screenArea}>{renderScreen()}</View>
       <AppBottomNav
-        role="caregiver"
+        role={isFamilyMember ? 'family_member' : 'caregiver'}
         activeTab={getActiveTab()}
         onTabPress={handleSelectTab}
       />
@@ -220,33 +313,5 @@ const styles = StyleSheet.create({
   },
   screenArea: {
     flex: 1,
-  },
-  profileNavHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 14 : 8,
-    paddingBottom: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  backBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  backBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  profileHeaderTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#0F172A',
   },
 });

@@ -30,14 +30,16 @@ export const ROLE_TABS = {
   ],
   caregiver: [
     { key: 'home', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
-    { key: 'dependents', label: 'Dependents', icon: 'people', iconOutline: 'people-outline' },
-    { key: 'requests', label: 'Requests', icon: 'clipboard', iconOutline: 'clipboard-outline' },
+    { key: 'assignments', label: 'Tasks', icon: 'briefcase', iconOutline: 'briefcase-outline' },
+    { key: 'requests', label: 'Visits', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
     { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
   ],
   family_member: [
     { key: 'home', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
     { key: 'dependents', label: 'Dependents', icon: 'people', iconOutline: 'people-outline' },
-    { key: 'requests', label: 'Requests', icon: 'clipboard', iconOutline: 'clipboard-outline' },
+    { key: 'requests', label: 'Visits', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
     { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
   ],
 };
