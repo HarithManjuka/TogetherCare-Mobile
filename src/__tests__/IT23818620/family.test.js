@@ -58,12 +58,36 @@ describe('IT23818620: Family Member & Caregiver Mobile Unit Tests', () => {
       expect(result).toEqual(mockData);
     });
 
-    it('should link an elderly dependent', async () => {
-      const mockData = { success: true, message: 'Senior linked successfully' };
+    it('should send link request to an elderly dependent with relationship', async () => {
+      const mockData = { success: true, message: 'Link request sent to senior', status: 'pending_approval' };
       client.post.mockResolvedValueOnce({ data: mockData });
 
-      const result = await dependentService.linkDependent('eld_1');
-      expect(client.post).toHaveBeenCalledWith('/caregiver/dependents/link', { elderlyId: 'eld_1' });
+      const result = await dependentService.requestLinkDependent('eld_1', 'Father');
+      expect(client.post).toHaveBeenCalledWith('/caregiver/dependents/request-link', {
+        elderlyId: 'eld_1',
+        relationship: 'Father',
+      });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should allow senior to accept or decline link request via respondLinkDependent', async () => {
+      const mockData = { success: true, action: 'accepted', message: 'Successfully linked' };
+      client.post.mockResolvedValueOnce({ data: mockData });
+
+      const result = await dependentService.respondLinkDependent('cg_1', 'accept');
+      expect(client.post).toHaveBeenCalledWith('/caregiver/dependents/respond-link', {
+        caregiverId: 'cg_1',
+        action: 'accept',
+      });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should fetch pending link requests via getPendingRequests', async () => {
+      const mockData = { success: true, count: 1, data: [{ caregiverId: 'cg_1', relationship: 'Son' }] };
+      client.get.mockResolvedValueOnce({ data: mockData });
+
+      const result = await dependentService.getPendingRequests();
+      expect(client.get).toHaveBeenCalledWith('/caregiver/dependents/pending-requests');
       expect(result).toEqual(mockData);
     });
 

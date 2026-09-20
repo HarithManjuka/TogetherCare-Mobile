@@ -22,15 +22,22 @@ export default function DependentManagementScreen({
   onMonitorSenior,
 }) {
   const [dependents, setDependents] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
-  const fetchDependents = async () => {
+  const fetchData = async () => {
     try {
-      const res = await dependentService.getDependents();
-      if (res?.success) {
-        setDependents(res.data || []);
+      const [depRes, pendRes] = await Promise.all([
+        dependentService.getDependents(),
+        dependentService.getPendingRequests(),
+      ]);
+      if (depRes?.success) {
+        setDependents(depRes.data || []);
+      }
+      if (pendRes?.success) {
+        setPendingRequests(pendRes.data || []);
       }
     } catch (err) {
       console.error('Fetch Dependents Error:', err);
@@ -41,12 +48,12 @@ export default function DependentManagementScreen({
   };
 
   useEffect(() => {
-    fetchDependents();
+    fetchData();
   }, []);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchDependents();
+    fetchData();
   };
 
   const handleUnlink = (senior) => {
@@ -106,6 +113,51 @@ export default function DependentManagementScreen({
             </Text>
           </View>
         </View>
+
+        {/* Pending Approvals Section */}
+        {pendingRequests.length > 0 ? (
+          <View style={{ marginBottom: 20 }}>
+            <View style={styles.listHeader}>
+              <Text style={[styles.sectionTitle, { color: '#B45309' }]}>
+                Pending Senior Approvals ({pendingRequests.length})
+              </Text>
+            </View>
+            {pendingRequests.map((req) => (
+              <View
+                key={req.seniorId || req._id}
+                style={[
+                  styles.seniorCard,
+                  { borderColor: '#F59E0B', borderWidth: 1.5, backgroundColor: '#FFFBEB' },
+                ]}
+              >
+                <View style={styles.cardTop}>
+                  <View style={[styles.avatar, { backgroundColor: '#FDE68A' }]}>
+                    <Text style={[styles.avatarText, { color: '#92400E' }]}>
+                      {req.firstName ? req.firstName[0] : 'S'}
+                      {req.lastName ? req.lastName[0] : ''}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.seniorName}>
+                        {req.firstName} {req.lastName || ''}
+                      </Text>
+                      <View style={[styles.idPill, { backgroundColor: '#FEF3C7' }]}>
+                        <Text style={[styles.idPillText, { color: '#B45309' }]}>AWAITING APPROVAL</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.seniorDetails}>
+                      ID: {req.customId || 'SENIOR'} • Relationship: {req.relationship || 'Family Member'}
+                    </Text>
+                    <Text style={[styles.seniorPhone, { color: '#92400E', marginTop: 4 }]}>
+                      ⏳ Link request sent. Waiting for senior to accept from their account.
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.listHeader}>
           <Text style={styles.sectionTitle}>

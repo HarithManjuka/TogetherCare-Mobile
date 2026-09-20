@@ -26,10 +26,34 @@ export const getUnlinkedElderly = async () => {
 };
 
 /**
- * Link an existing elderly profile to caregiver / family member
+ * Send request to link an existing elderly profile to caregiver / family member
  */
-export const linkDependent = async (elderlyId) => {
-  const response = await client.post('/caregiver/dependents/link', { elderlyId });
+export const requestLinkDependent = async (elderlyId, relationship = 'Family Member') => {
+  const response = await client.post('/caregiver/dependents/request-link', { elderlyId, relationship });
+  return response.data;
+};
+
+/**
+ * Link an existing elderly profile to caregiver / family member (Backwards-compatible alias)
+ */
+export const linkDependent = async (elderlyId, relationship = 'Family Member') => {
+  const response = await client.post('/caregiver/dependents/link', { elderlyId, relationship });
+  return response.data;
+};
+
+/**
+ * Senior accepts or declines a caregiver link request
+ */
+export const respondLinkDependent = async (caregiverId, action) => {
+  const response = await client.post('/caregiver/dependents/respond-link', { caregiverId, action });
+  return response.data;
+};
+
+/**
+ * Get pending link requests (for elderly: received requests; for caregiver: sent requests)
+ */
+export const getPendingRequests = async () => {
+  const response = await client.get('/caregiver/dependents/pending-requests');
   return response.data;
 };
 
