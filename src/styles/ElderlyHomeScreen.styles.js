@@ -414,6 +414,218 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
       fontSize: Math.round(16 * scale),
       fontWeight: '700',
     },
+
+    // Pending Link Request Banner
+    pendingCard: {
+      backgroundColor: '#FEF3C7',
+      borderRadius: 16,
+      padding: Math.round(16 * scale),
+      marginBottom: 16,
+      borderWidth: 1.5,
+      borderColor: '#F59E0B',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#F59E0B',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.15,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 3,
+        },
+      }),
+    },
+    pendingHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      marginBottom: 12,
+    },
+    pendingIconCircle: {
+      width: Math.round(40 * scale),
+      height: Math.round(40 * scale),
+      borderRadius: Math.round(20 * scale),
+      backgroundColor: '#F59E0B',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pendingBadge: {
+      fontSize: Math.round(11 * scale),
+      fontWeight: '800',
+      color: '#92400E',
+      letterSpacing: 0.5,
+    },
+    pendingTitle: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '800',
+      color: '#78350F',
+      marginTop: 2,
+    },
+    pendingDesc: {
+      fontSize: Math.round(13 * scale),
+      color: '#92400E',
+      marginTop: 4,
+      lineHeight: Math.round(18 * scale),
+    },
+    pendingActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    pendingBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: Math.round(10 * scale),
+      borderRadius: 10,
+      gap: 6,
+    },
+    declineBtn: {
+      backgroundColor: '#FEE2E2',
+      borderWidth: 1,
+      borderColor: '#FCA5A5',
+    },
+    declineBtnText: {
+      color: '#DC2626',
+      fontWeight: '700',
+      fontSize: Math.round(14 * scale),
+    },
+    acceptBtn: {
+      backgroundColor: '#059669',
+    },
+    acceptBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '700',
+      fontSize: Math.round(14 * scale),
+    },
+
+    // Linked Family Caretaker Card
+    caretakerCard: {
+      backgroundColor: COLORS.surface,
+      borderRadius: 16,
+      padding: Math.round(16 * scale),
+      marginBottom: 20,
+      borderWidth: 1.5,
+      borderColor: '#E2E8F0',
+      ...Platform.select({
+        ios: {
+          shadowColor: COLORS.primary,
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+        },
+        android: {
+          elevation: 2,
+        },
+      }),
+    },
+    caretakerTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    caretakerAvatar: {
+      width: Math.round(48 * scale),
+      height: Math.round(48 * scale),
+      borderRadius: Math.round(24 * scale),
+      backgroundColor: '#EEF2FF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: COLORS.primary,
+    },
+    caretakerAvatarText: {
+      fontSize: Math.round(18 * scale),
+      fontWeight: '800',
+      color: COLORS.primary,
+    },
+    caretakerName: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '800',
+      color: COLORS.textPrimary,
+    },
+    caretakerBadge: {
+      backgroundColor: '#DCFCE7',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    caretakerBadgeText: {
+      fontSize: Math.round(11 * scale),
+      fontWeight: '700',
+      color: '#15803D',
+    },
+    caretakerRole: {
+      fontSize: Math.round(13 * scale),
+      color: COLORS.textSecondary,
+      marginTop: 2,
+    },
+    caretakerPhone: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '600',
+      color: COLORS.primary,
+      marginTop: 3,
+    },
+    caretakerActions: {
+      flexDirection: 'row',
+      gap: 10,
+      borderTopWidth: 1,
+      borderTopColor: '#F1F5F9',
+      paddingTop: 12,
+    },
+    caretakerBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: Math.round(10 * scale),
+      borderRadius: 10,
+      gap: 6,
+    },
+    callBtn: {
+      backgroundColor: '#059669',
+    },
+    callBtnText: {
+      color: '#FFFFFF',
+      fontWeight: '700',
+      fontSize: Math.round(13 * scale),
+    },
+    circleBtn: {
+      backgroundColor: '#F0FDFA',
+      borderWidth: 1,
+      borderColor: '#99F6E4',
+    },
+    circleBtnText: {
+      color: COLORS.secondary,
+      fontWeight: '700',
+      fontSize: Math.round(13 * scale),
+    },
+
+    // No Caretaker Guidance Card
+    noCaretakerCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F8FAFC',
+      borderRadius: 14,
+      padding: Math.round(14 * scale),
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      borderStyle: 'dashed',
+    },
+    noCaretakerTitle: {
+      fontSize: Math.round(14 * scale),
+      fontWeight: '700',
+      color: COLORS.textPrimary,
+    },
+    noCaretakerDesc: {
+      fontSize: Math.round(12 * scale),
+      color: COLORS.textSecondary,
+      marginTop: 2,
+      lineHeight: Math.round(17 * scale),
+    },
   });
 
 export default getElderlyHomeScreenStyles(1.0);
