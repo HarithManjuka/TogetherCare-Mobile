@@ -63,3 +63,41 @@ export const markThreadRead = async (otherUserId) => {
   const response = await client.patch(`/messages/${otherUserId}/read`);
   return response.data;
 };
+
+/**
+ * Search registered user by mobile phone number
+ * @param {string} phone - Sri Lankan mobile number (e.g. 0771234567, +94771234567)
+ */
+export const searchContactByPhone = async (phone) => {
+  const response = await client.get('/messages/contacts/search', {
+    params: { phone },
+  });
+  return response.data;
+};
+
+/**
+ * Add a contact by mobile number or user ID
+ * @param {Object|string} payload - { phone, nickname } or phone string
+ */
+export const addContact = async (payload) => {
+  const body = typeof payload === 'string' ? { phone: payload } : payload;
+  const response = await client.post('/messages/contacts', body);
+  return response.data;
+};
+
+/**
+ * Get all contacts for the logged-in user
+ */
+export const getContacts = async () => {
+  const response = await client.get('/messages/contacts');
+  return response.data;
+};
+
+/**
+ * Remove a contact from contacts list
+ * @param {string} contactUserId
+ */
+export const removeContact = async (contactUserId) => {
+  const response = await client.delete(`/messages/contacts/${contactUserId}`);
+  return response.data;
+};

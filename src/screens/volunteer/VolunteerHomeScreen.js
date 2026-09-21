@@ -9,16 +9,31 @@ import VolunteerRequestsScreen from './VolunteerRequestsScreen';
 import VolunteerScheduleScreen from './VolunteerScheduleScreen';
 import VolunteerHistoryScreen from './VolunteerHistoryScreen';
 import VolunteerProfileScreen from './VolunteerProfileScreen';
+import MessagesListScreen from '../common/MessagesListScreen';
+import CaregiverChatScreen from '../caregiver/CaregiverChatScreen';
 import * as volunteerService from '../../services/volunteerService';
 import * as notificationService from '../../services/notificationService';
+import * as messageService from '../../services/messageService';
+import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
 export default function VolunteerHomeScreen() {
-  const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'history' | 'profile'
+  const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'messages' | 'history' | 'profile'
   const [requestCount, setRequestCount] = useState(0);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+  const [activeChatUser, setActiveChatUser] = useState(null);
 
-  // Dynamically update available & direct request badge count + notification status
+  // Real-time unread message count for bottom navigation bar
+  const { unreadCount: msgCount, refreshUnread: refreshUnreadMsgs } =
+    useUnreadMessageCount(activeChatUser?._id || null);
+
+  useEffect(() => {
+    if (!activeChatUser) {
+      refreshUnreadMsgs();
+    }
+  }, [activeChatUser, currentTab]);
+
+  // Dynamically update available & direct request badge count + notification & message status
   useEffect(() => {
     Promise.allSettled([
       volunteerService.getAvailableRequests(),
@@ -26,14 +41,14 @@ export default function VolunteerHomeScreen() {
       notificationService.getUnreadCount ? notificationService.getUnreadCount() : Promise.resolve({ count: 0 }),
     ])
       .then(([availRes, directRes, notifRes]) => {
-        let total = 0;
+        let totalReqs = 0;
         if (availRes.status === 'fulfilled' && availRes.value?.success) {
-          total += (availRes.value.count || availRes.value.data?.length || 0);
+          totalReqs += (availRes.value.count || availRes.value.data?.length || 0);
         }
         if (directRes.status === 'fulfilled' && directRes.value?.success) {
-          total += (directRes.value.count || directRes.value.data?.length || 0);
+          totalReqs += (directRes.value.count || directRes.value.data?.length || 0);
         }
-        setRequestCount(total);
+        setRequestCount(totalReqs);
 
         if (notifRes.status === 'fulfilled' && notifRes.value?.count > 0) {
           setHasUnreadNotifications(true);
@@ -42,11 +57,15 @@ export default function VolunteerHomeScreen() {
         }
       })
       .catch(() => {});
-  }, [currentTab, notificationsVisible]);
+  }, [currentTab, notificationsVisible, activeChatUser]);
 
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
     const onBackPress = () => {
+      if (activeChatUser) {
+        setActiveChatUser(null);
+        return true;
+      }
       if (currentTab !== 'home') {
         setCurrentTab('home');
         return true;
@@ -56,7 +75,7 @@ export default function VolunteerHomeScreen() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [currentTab]);
+  }, [activeChatUser, currentTab]);
 
   const renderActiveScreen = () => {
     switch (currentTab) {
@@ -64,8 +83,23 @@ export default function VolunteerHomeScreen() {
         return <VolunteerRequestsScreen onNavigateTab={setCurrentTab} />;
       case 'schedule':
         return <VolunteerScheduleScreen onNavigateTab={setCurrentTab} />;
+      case 'messages':
+        if (activeChatUser) {
+          return (
+            <CaregiverChatScreen
+              otherUser={activeChatUser}
+              onBack={() => setActiveChatUser(null)}
+            />
+          );
+        }
+        return (
+          <MessagesListScreen
+            onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
+            onBack={() => setCurrentTab('home')}
+          />
+        );
       case 'history':
-        return <VolunteerHistoryScreen />;
+        return <VolunteerHistoryScreen onBack={() => setCurrentTab('home')} />;
       case 'profile':
         return <VolunteerProfileScreen />;
       case 'home':
@@ -92,6 +126,7 @@ export default function VolunteerHomeScreen() {
         activeTab={currentTab}
         onTabPress={setCurrentTab}
         requestBadgeCount={requestCount}
+        msgBadgeCount={msgCount}
       />
       <NotificationsModal
         visible={notificationsVisible}

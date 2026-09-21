@@ -179,6 +179,16 @@ export default function SideMenuDrawer({
       return (
         <>
           <DrawerItem
+            icon="chatbubbles-outline"
+            title="Messages & Chat"
+            subtitle="Coordinate with Seniors & Families"
+            onPress={() =>
+              handleItemPress(() => {
+                if (onNavigateTab) onNavigateTab('messages');
+              })
+            }
+          />
+          <DrawerItem
             icon="shield-checkmark-outline"
             title="Volunteer Guidelines"
             subtitle="Safety Rules & Best Practices"
