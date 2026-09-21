@@ -57,6 +57,19 @@ export const sendVoiceMessage = async (recipientId, audioUrl, durationSeconds = 
 };
 
 /**
+ * Upload voice note audio to server
+ * @param {FormData|Object} data - FormData with audio file or { audioBase64, duration }
+ */
+export const uploadAudio = async (data) => {
+  let headers = {};
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    headers['Content-Type'] = 'multipart/form-data';
+  }
+  const response = await client.post('/messages/upload-audio', data, { headers });
+  return response.data;
+};
+
+/**
  * Mark a message thread as read
  */
 export const markThreadRead = async (otherUserId) => {
