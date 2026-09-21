@@ -237,7 +237,8 @@ export default function CaregiverDashboard() {
               setCurrentScreen('volunteer-selection');
             }}
             onApproveSuccess={() => {
-              setCurrentScreen('live-tracking');
+              triggerRefresh();
+              setCurrentScreen('upcoming-visits');
             }}
           />
         );

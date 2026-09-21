@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import client from '../../api/client';
@@ -20,10 +21,10 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Simulated Coordinates / Distance
-  const [distanceRemaining, setDistanceRemaining] = useState(4.8);
-  const [volunteerLat, setVolunteerLat] = useState(7.2906);
-  const [volunteerLng, setVolunteerLng] = useState(80.6337);
+  // Real volunteer location & distance
+  const volunteerLoc = request?.volunteerLocation;
+  const volunteerLat = volunteerLoc?.lat || 6.9271;
+  const volunteerLng = volunteerLoc?.lng || 79.8612;
 
   // Flashing animation for SOS
   const flashAnim = useRef(new Animated.Value(0)).current;
@@ -49,31 +50,22 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
   // Fetch updates regularly
   useEffect(() => {
     fetchRequestDetails();
-    timerRef.current = setInterval(fetchRequestDetails, 5000);
+    timerRef.current = setInterval(fetchRequestDetails, 4000);
     return () => clearInterval(timerRef.current);
   }, [requestId]);
 
-  // Simulate movement
-  useEffect(() => {
-    if (!request || request.status !== 'confirmed') return;
-
-    const moveTimer = setInterval(() => {
-      setDistanceRemaining((prev) => {
-        if (prev <= 0.2) {
-          clearInterval(moveTimer);
-          return 0;
-        }
-        // Decrement distance by 0.5 km
-        return parseFloat((prev - 0.4).toFixed(1));
-      });
-
-      // Shift lat/lng slightly to simulate motion
-      setVolunteerLat((prev) => prev + 0.0008);
-      setVolunteerLng((prev) => prev - 0.0005);
-    }, 4000);
-
-    return () => clearInterval(moveTimer);
-  }, [request?.status]);
+  const handleOpenGoogleMapsRoute = () => {
+    const destination = encodeURIComponent(request?.location || 'Colombo, Sri Lanka');
+    let url = `https://www.google.com/maps/dir/?api=1&destination=${destination}`;
+    if (volunteerLoc?.lat && volunteerLoc?.lng) {
+      url += `&origin=${volunteerLoc.lat},${volunteerLoc.lng}`;
+    } else if (volunteerLoc?.address) {
+      url += `&origin=${encodeURIComponent(volunteerLoc.address)}`;
+    }
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Unable to open Google Maps route directions.');
+    });
+  };
 
   // Flashing SOS effect
   useEffect(() => {
@@ -149,26 +141,34 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
 
   const volunteer = request?.volunteerId;
   const dependent = request?.elderlyId;
+  const isPendingAcceptance = request?.status === 'matched';
+  const isConfirmed = request?.status === 'confirmed';
+  const isOngoing = request?.status === 'ongoing';
+  const isArrived = request?.status === 'arrived';
 
   const getStatusMessage = () => {
     if (request?.sosTriggered) return '🚨 EMERGENCY ALERTS IN PROGRESS';
     switch (request?.status) {
+      case 'matched':
+        return 'Awaiting volunteer acceptance. Notification sent.';
       case 'confirmed':
-        return distanceRemaining > 0
-          ? `Volunteer heading to location (${distanceRemaining} km away)`
-          : 'Volunteer arrived at gate!';
+        return request?.trackingConsent
+          ? 'Visit confirmed. Volunteer preparing for departure.'
+          : 'Visit confirmed. Waiting for volunteer to start trip.';
+      case 'ongoing':
+        return 'Volunteer is on the way! Live arrival directions active.';
       case 'arrived':
-        return 'Volunteer has checked-in. Visit in progress.';
+        return 'Volunteer has arrived at the destination.';
       case 'completed':
         return 'Visit completed successfully.';
       default:
-        return 'Connecting to volunteer GPS...';
+        return 'Connecting to volunteer tracking system...';
     }
   };
 
   const containerBgColor = flashAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [COLORS.background, '#FEE2E2'], // flash red background during SOS
+    outputRange: [COLORS.background, '#FEE2E2'],
   });
 
   return (
@@ -185,40 +185,88 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
       <Animated.View style={[styles.mainContainer, { backgroundColor: containerBgColor }]}>
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {/* Status Header */}
-          <View style={[styles.statusBanner, request?.sosTriggered && styles.sosBanner]}>
+          <View
+            style={[
+              styles.statusBanner,
+              request?.sosTriggered
+                ? styles.sosBanner
+                : isPendingAcceptance
+                ? styles.pendingBanner
+                : isOngoing
+                ? styles.ongoingBanner
+                : isArrived
+                ? styles.arrivedBanner
+                : styles.confirmedBanner,
+            ]}
+          >
             <Icon
-              name={request?.sosTriggered ? 'warning' : 'navigate-circle-outline'}
+              name={
+                request?.sosTriggered
+                  ? 'warning'
+                  : isPendingAcceptance
+                  ? 'time-outline'
+                  : isOngoing
+                  ? 'navigate-circle'
+                  : isArrived
+                  ? 'checkmark-circle'
+                  : 'calendar-outline'
+              }
               size={22}
               color="#FFFFFF"
             />
             <Text style={styles.statusBannerText}>{getStatusMessage()}</Text>
           </View>
 
-          {/* Simulated Map Design */}
+          {/* Map / Directions Block */}
           <View style={styles.mapMock}>
             <View style={styles.mapCard}>
               <View style={styles.mapGridLines} />
-              {/* Dependent Home Marker */}
-              <View style={styles.dependentMarker}>
-                <Icon name="home" size={16} color="#FFFFFF" />
-              </View>
 
-              {/* Volunteer Marker */}
-              {request?.status === 'confirmed' && distanceRemaining > 0 && (
-                <View style={[styles.volunteerMarker, { top: '35%', left: `${30 + (5 - distanceRemaining) * 10}%` }]}>
-                  <Icon name="walk-outline" size={16} color="#FFFFFF" />
+              {isPendingAcceptance ? (
+                <View style={styles.centerStatusBox}>
+                  <Icon name="time-outline" size={40} color="#D97706" />
+                  <Text style={styles.centerStatusTitle}>Waiting for Volunteer</Text>
+                  <Text style={styles.centerStatusSub}>
+                    Visit request sent to {volunteer?.firstName || 'volunteer'}. Live tracking will activate once accepted and trip starts.
+                  </Text>
                 </View>
-              )}
+              ) : isConfirmed && !request?.trackingConsent ? (
+                <View style={styles.centerStatusBox}>
+                  <Icon name="calendar-outline" size={40} color="#2563EB" />
+                  <Text style={styles.centerStatusTitle}>Visit Confirmed</Text>
+                  <Text style={styles.centerStatusSub}>
+                    Scheduled for {request?.date} at {request?.time}. Live GPS directions will display once {volunteer?.firstName} begins the trip.
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Dependent Home Marker */}
+                  <View style={styles.dependentMarker}>
+                    <Icon name="home" size={16} color="#FFFFFF" />
+                  </View>
 
-              {/* Status Indicator text overlay */}
-              <View style={styles.mapInfoOverlay}>
-                <Text style={styles.mapOverlayLabel}>Volunteer GPS Coordinates</Text>
-                <Text style={styles.mapOverlayVal}>
-                  Lat: {volunteerLat.toFixed(5)} • Lng: {volunteerLng.toFixed(5)}
-                </Text>
-              </View>
+                  {/* Volunteer Marker */}
+                  <View style={[styles.volunteerMarker, { top: '35%', left: '45%' }]}>
+                    <Icon name="walk-outline" size={16} color="#FFFFFF" />
+                  </View>
+
+                  {/* Status Indicator text overlay */}
+                  <View style={styles.mapInfoOverlay}>
+                    <Text style={styles.mapOverlayLabel}>Volunteer GPS Coordinates</Text>
+                    <Text style={styles.mapOverlayVal}>
+                      Lat: {volunteerLat.toFixed(4)} • Lng: {volunteerLng.toFixed(4)}
+                    </Text>
+                  </View>
+                </>
+              )}
             </View>
           </View>
+
+          {/* Real Google Maps Navigation Action */}
+          <TouchableOpacity style={styles.googleMapsBtn} onPress={handleOpenGoogleMapsRoute}>
+            <Icon name="map-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.googleMapsBtnText}>Open Route in Google Maps</Text>
+          </TouchableOpacity>
 
           {/* Details Row */}
           <View style={styles.trackingDetailsSection}>
@@ -344,7 +392,46 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   sosBanner: { backgroundColor: COLORS.danger },
+  pendingBanner: { backgroundColor: '#D97706' },
+  confirmedBanner: { backgroundColor: '#2563EB' },
+  ongoingBanner: { backgroundColor: '#0D9488' },
+  arrivedBanner: { backgroundColor: '#16A34A' },
   statusBannerText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 14 },
+  centerStatusBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  centerStatusTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: 8,
+  },
+  centerStatusSub: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: 4,
+    lineHeight: 18,
+  },
+  googleMapsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#0D9488',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  googleMapsBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   mapMock: { height: 180, width: '100%', marginBottom: 15 },
   mapCard: {
     flex: 1,

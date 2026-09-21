@@ -90,3 +90,50 @@ export const getMyStats = async () => {
   const response = await client.get('/volunteer-offers/my-stats');
   return response.data;
 };
+
+/**
+ * Fetch pending direct visit requests sent specifically to this volunteer
+ */
+export const getDirectRequests = async () => {
+  const response = await client.get('/volunteer-offers/direct-requests');
+  return response.data;
+};
+
+/**
+ * Accept a direct visit request sent by a family member
+ * @param {string} requestId
+ */
+export const acceptDirectRequest = async (requestId) => {
+  const response = await client.post(`/help-requests/${requestId}/volunteer-accept`);
+  return response.data;
+};
+
+/**
+ * Decline a direct visit request sent by a family member
+ * @param {string} requestId
+ */
+export const declineDirectRequest = async (requestId) => {
+  const response = await client.post(`/help-requests/${requestId}/volunteer-decline`);
+  return response.data;
+};
+
+/**
+ * Volunteer starts trip and consents to share live location
+ * @param {string} requestId
+ * @param {Object} [locationData]
+ */
+export const startTrip = async (requestId, locationData = {}) => {
+  const response = await client.post(`/help-requests/${requestId}/start-trip`, locationData);
+  return response.data;
+};
+
+/**
+ * Update volunteer live location during active trip
+ * @param {string} requestId
+ * @param {Object} coords
+ */
+export const updateLocation = async (requestId, coords) => {
+  const response = await client.put(`/help-requests/${requestId}/location`, coords);
+  return response.data;
+};
+
