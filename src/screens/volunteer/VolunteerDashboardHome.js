@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
+import NotificationsModal from '../../components/common/NotificationsModal';
 import * as volunteerService from '../../services/volunteerService';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
@@ -35,6 +36,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   // Live Backend Data
   const [myOffers, setMyOffers] = useState([]);
   const [requestsList, setRequestsList] = useState([]);
+  const [directRequests, setDirectRequests] = useState([]);
   const [stats, setStats] = useState({
     hoursThisMonth: 0,
     peopleHelped: 0,
@@ -65,10 +67,11 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   // Fetch real data from backend
   const loadDashboardData = useCallback(async () => {
     try {
-      const [offersRes, reqsRes, statsRes] = await Promise.allSettled([
+      const [offersRes, reqsRes, statsRes, directRes] = await Promise.allSettled([
         volunteerService.getMyOffers(),
         volunteerService.getAvailableRequests(),
         volunteerService.getMyStats(),
+        volunteerService.getDirectRequests(),
       ]);
 
       if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
@@ -79,6 +82,9 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
         setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 5.0 });
+      }
+      if (directRes.status === 'fulfilled' && directRes.value?.success) {
+        setDirectRequests(directRes.value.data || []);
       }
     } catch (err) {
       console.error('Error loading volunteer dashboard:', err);
@@ -95,6 +101,47 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboardData();
+  };
+
+  const handleAcceptDirect = async (dReq) => {
+    const reqId = dReq._id || dReq.id;
+    try {
+      setIsSubmitting(true);
+      // Immediately remove from UI state so it disappears right away
+      setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
+      const res = await volunteerService.acceptDirectRequest(reqId);
+      if (res?.success) {
+        Alert.alert(
+          '🎉 Visit Request Accepted!',
+          `You have confirmed the visit for ${dReq.elderName}. It is now added to your schedule!`
+        );
+        loadDashboardData();
+      }
+    } catch (err) {
+      loadDashboardData();
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeclineDirect = async (dReq) => {
+    const reqId = dReq._id || dReq.id;
+    try {
+      setIsSubmitting(true);
+      // Immediately remove from UI state so it disappears right away
+      setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
+      const res = await volunteerService.declineDirectRequest(reqId);
+      if (res?.success) {
+        Alert.alert('Request Declined', 'The visit request has been declined.');
+        loadDashboardData();
+      }
+    } catch (err) {
+      loadDashboardData();
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Real Offer CRUD Handlers
@@ -271,6 +318,61 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
             <Text style={styles.metricLabel}>your rating</Text>
           </View>
         </View>
+
+        {/* --- SECTION: DIRECT VISIT REQUESTS (Sent directly to this volunteer) --- */}
+        {directRequests.length > 0 && (
+          <View style={styles.directSectionHome}>
+            <View style={styles.directHeaderHome}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.directBadgeHome}>📬 DIRECT VISIT REQUESTS</Text>
+                <View style={styles.directCountBadgeHome}>
+                  <Text style={styles.directCountTextHome}>{directRequests.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.directSubHome}>A family member sent a visit request to you!</Text>
+            </View>
+
+            {directRequests.map((dReq) => {
+              const dKey = dReq._id || dReq.id;
+              return (
+                <View key={dKey} style={styles.directCardHome}>
+                  <View style={styles.directCardTopHome}>
+                    <View style={styles.directPillHome}>
+                      <Text style={styles.directPillTextHome}>{dReq.type || dReq.serviceType}</Text>
+                    </View>
+                    <Text style={styles.directDateTimeHome}>🕒 {dReq.date} · {dReq.time}</Text>
+                  </View>
+
+                  <Text style={styles.directElderHome}>For: {dReq.elderName}</Text>
+                  {dReq.caregiverName ? (
+                    <Text style={styles.directCaregiverHome}>Requested by: {dReq.caregiverName}</Text>
+                  ) : null}
+                  <Text style={styles.directLocationHome}>📍 {dReq.location || dReq.address}</Text>
+
+                  <View style={styles.directActionsRowHome}>
+                    <TouchableOpacity
+                      style={styles.directDeclineBtnHome}
+                      onPress={() => handleDeclineDirect(dReq)}
+                      disabled={isSubmitting}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                      <Text style={styles.directDeclineBtnTextHome}>Decline</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.directAcceptBtnHome}
+                      onPress={() => handleAcceptDirect(dReq)}
+                      disabled={isSubmitting}
+                    >
+                      <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                      <Text style={styles.directAcceptBtnTextHome}>Accept Visit</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
 
         {/* --- SECTION: My Active Offers / Posted Availability (CRUD Display) --- */}
         <View style={styles.sectionContainer}>
@@ -681,60 +783,15 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- MODAL: Notifications Modal --- */}
-      <Modal
+      {/* --- REAL NOTIFICATIONS MODAL --- */}
+      <NotificationsModal
         visible={notificationsVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setNotificationsVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.formModalCard}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Notifications 🔔</Text>
-              <TouchableOpacity
-                onPress={() => setNotificationsVisible(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.notifItem}>
-              <View style={styles.notifIconCircle}>
-                <Ionicons name="flash" size={18} color="#EF4444" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.notifItemTitle}>Urgent Grocery Request</Text>
-                <Text style={styles.notifItemDesc}>
-                  Mrs. Perera (1.2 km away) requested urgent groceries pickup.
-                </Text>
-                <Text style={styles.notifTime}>10 mins ago</Text>
-              </View>
-            </View>
-
-            <View style={styles.notifItem}>
-              <View style={[styles.notifIconCircle, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="checkmark-circle" size={18} color="#0284C7" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.notifItemTitle}>Volunteer Hours Logged</Text>
-                <Text style={styles.notifItemDesc}>
-                  Your 2 hours for yesterday's companionship visit were confirmed.
-                </Text>
-                <Text style={styles.notifTime}>Yesterday</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.modalSecondaryBtn, { marginTop: 14 }]}
-              onPress={() => setNotificationsVisible(false)}
-            >
-              <Text style={styles.modalSecondaryBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setNotificationsVisible(false)}
+        onNotificationAction={() => {
+          setNotificationsVisible(false);
+          loadDashboardData();
+        }}
+      />
     </View>
   );
 }
@@ -1601,5 +1658,127 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#94A3B8',
     marginTop: 4,
+  },
+  // Direct Requests Styles on Home
+  directSectionHome: {
+    marginBottom: 20,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#FDE68A',
+  },
+  directHeaderHome: {
+    marginBottom: 12,
+  },
+  directBadgeHome: {
+    color: '#B45309',
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.5,
+  },
+  directCountBadgeHome: {
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  directCountTextHome: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 11,
+  },
+  directSubHome: {
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  directCardHome: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    elevation: 2,
+    shadowColor: '#B45309',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  directCardTopHome: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  directPillHome: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  directPillTextHome: {
+    color: '#1E40AF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  directDateTimeHome: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#475569',
+  },
+  directElderHome: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  directCaregiverHome: {
+    fontSize: 12,
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  directLocationHome: {
+    fontSize: 12,
+    color: '#475569',
+    marginBottom: 12,
+  },
+  directActionsRowHome: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  directDeclineBtnHome: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+    backgroundColor: '#FEF2F2',
+  },
+  directDeclineBtnTextHome: {
+    color: '#DC2626',
+    fontWeight: '700',
+    fontSize: 13,
+  },
+  directAcceptBtnHome: {
+    flex: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#16A34A',
+  },
+  directAcceptBtnTextHome: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
   },
 });

@@ -46,6 +46,72 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
     fetchSchedule();
   };
 
+  const handleAcceptDirectRequest = async (visit) => {
+    const id = visit._id || visit.id;
+    try {
+      setActionLoadingId(id);
+      setSchedule((prev) =>
+        prev.map((s) => ((s._id || s.id) === id ? { ...s, status: 'confirmed', isDirectRequest: false } : s))
+      );
+      const res = await volunteerService.acceptDirectRequest(id);
+      if (res?.success) {
+        Alert.alert('🎉 Request Accepted!', `You have confirmed this visit for ${visit.elderName}. It is now scheduled.`);
+        fetchSchedule();
+      }
+    } catch (err) {
+      fetchSchedule();
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleDeclineDirectRequest = async (visit) => {
+    const id = visit._id || visit.id;
+    try {
+      setActionLoadingId(id);
+      setSchedule((prev) => prev.filter((s) => (s._id || s.id) !== id));
+      const res = await volunteerService.declineDirectRequest(id);
+      if (res?.success) {
+        Alert.alert('Request Declined', 'The visit request has been declined.');
+        fetchSchedule();
+      }
+    } catch (err) {
+      fetchSchedule();
+      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleStartTrip = (visit) => {
+    const id = visit._id || visit.id;
+    Alert.alert(
+      '📍 Share Live Location?',
+      `Would you like to start your trip now? This will share your live arrival directions with ${visit.elderName}'s family member until you arrive.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Start Trip & Share Location',
+          onPress: async () => {
+            try {
+              setActionLoadingId(id);
+              const res = await volunteerService.startTrip(id);
+              if (res?.success) {
+                Alert.alert('🚗 Trip Started!', 'Live location sharing is now active. The family member can track your arrival.');
+                fetchSchedule();
+              }
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to start trip');
+            } finally {
+              setActionLoadingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleMarkArrived = async (visit) => {
     const id = visit._id || visit.id;
     try {
@@ -154,25 +220,66 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
         ) : (
           schedule.map((visit) => {
             const visitKey = visit._id || visit.id;
+            const isMatched = visit.status === 'matched';
+            const isConfirmed = visit.status === 'confirmed';
+            const isOngoing = visit.status === 'ongoing';
             const isArrived = visit.status === 'arrived';
             const isActionLoading = actionLoadingId === visitKey;
 
             return (
-              <View key={visitKey} style={styles.visitCard}>
+              <View
+                key={visitKey}
+                style={[
+                  styles.visitCard,
+                  isMatched && styles.matchedCard,
+                  isOngoing && styles.ongoingCard,
+                ]}
+              >
                 <View style={styles.visitHeader}>
                   <Ionicons name="calendar-outline" size={18} color="#1E40AF" style={{ marginRight: 6 }} />
                   <Text style={styles.visitDate}>
                     {visit.date} · {visit.time}
                   </Text>
-                  <View style={[styles.statusBadge, isArrived ? styles.arrivedBadge : styles.confirmedBadge]}>
-                    <Text style={[styles.statusBadgeText, isArrived ? styles.arrivedBadgeText : styles.confirmedBadgeText]}>
-                      {isArrived ? 'ARRIVED' : 'CONFIRMED'}
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      isMatched
+                        ? styles.matchedBadge
+                        : isOngoing
+                        ? styles.ongoingBadge
+                        : isArrived
+                        ? styles.arrivedBadge
+                        : styles.confirmedBadge,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        isMatched
+                          ? styles.matchedBadgeText
+                          : isOngoing
+                          ? styles.ongoingBadgeText
+                          : isArrived
+                          ? styles.arrivedBadgeText
+                          : styles.confirmedBadgeText,
+                      ]}
+                    >
+                      {isMatched
+                        ? 'REQUESTED'
+                        : isOngoing
+                        ? 'ON THE WAY'
+                        : isArrived
+                        ? 'ARRIVED'
+                        : 'CONFIRMED'}
                     </Text>
                   </View>
                 </View>
 
                 <Text style={styles.serviceTitle}>{visit.serviceType}</Text>
                 <Text style={styles.elderName}>Elderly Dependent: {visit.elderName}</Text>
+                {visit.caregiverName ? (
+                  <Text style={styles.caregiverText}>Family Member: {visit.caregiverName}</Text>
+                ) : null}
                 <Text style={styles.locationText}>📍 {visit.location}</Text>
 
                 {visit.notes ? (
@@ -199,7 +306,48 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                     <Text style={styles.mapBtnText}>Map</Text>
                   </TouchableOpacity>
 
-                  {!isArrived ? (
+                  {isMatched ? (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.declineBtn, isActionLoading && { opacity: 0.7 }]}
+                        onPress={() => handleDeclineDirectRequest(visit)}
+                        disabled={isActionLoading}
+                      >
+                        <Ionicons name="close-circle-outline" size={15} color="#EF4444" style={{ marginRight: 4 }} />
+                        <Text style={styles.declineBtnText}>Decline</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.acceptBtn, isActionLoading && { opacity: 0.7 }]}
+                        onPress={() => handleAcceptDirectRequest(visit)}
+                        disabled={isActionLoading}
+                      >
+                        {isActionLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.acceptBtnText}>Accept</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  ) : isConfirmed ? (
+                    <TouchableOpacity
+                      style={[styles.actionBtn, styles.startTripBtn, isActionLoading && { opacity: 0.7 }]}
+                      onPress={() => handleStartTrip(visit)}
+                      disabled={isActionLoading}
+                    >
+                      {isActionLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons name="navigate-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.startTripBtnText}>Start Trip & Share</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  ) : isOngoing ? (
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
                       onPress={() => handleMarkArrived(visit)}
@@ -209,7 +357,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <>
-                          <Ionicons name="navigate-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
                           <Text style={styles.arrivedBtnText}>Mark Arrived</Text>
                         </>
                       )}
@@ -440,6 +588,60 @@ const styles = StyleSheet.create({
   },
   completeBtnText: {
     fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  matchedCard: {
+    borderColor: '#FCD34D',
+    borderWidth: 1.5,
+    backgroundColor: '#FFFBEB',
+  },
+  ongoingCard: {
+    borderColor: '#86EFAC',
+    borderWidth: 1.5,
+    backgroundColor: '#F0FDF4',
+  },
+  matchedBadge: {
+    backgroundColor: '#FEF3C7',
+  },
+  matchedBadgeText: {
+    color: '#D97706',
+  },
+  ongoingBadge: {
+    backgroundColor: '#DCFCE7',
+  },
+  ongoingBadgeText: {
+    color: '#16A34A',
+  },
+  caregiverText: {
+    fontSize: 12,
+    color: '#0369A1',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  acceptBtn: {
+    backgroundColor: '#16A34A',
+  },
+  acceptBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  declineBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  declineBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#EF4444',
+  },
+  startTripBtn: {
+    backgroundColor: '#2563EB',
+  },
+  startTripBtnText: {
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },

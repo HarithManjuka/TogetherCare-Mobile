@@ -138,10 +138,11 @@ export default function CaregiverDashboardHome({
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'searching': return COLORS.accent;
-      case 'matched': return COLORS.secondary;
-      case 'confirmed': return COLORS.primary;
-      case 'arrived': return COLORS.success;
+      case 'searching': return '#F59E0B';
+      case 'matched': return '#D97706';
+      case 'confirmed': return '#2563EB';
+      case 'ongoing': return '#0D9488';
+      case 'arrived': return '#16A34A';
       case 'completed': return '#64748B';
       case 'cancelled': return COLORS.danger;
       default: return '#94A3B8';
@@ -151,9 +152,10 @@ export default function CaregiverDashboardHome({
   const getStatusLabel = (status) => {
     switch (status) {
       case 'searching': return 'Searching Volunteer';
-      case 'matched': return 'Volunteer Found';
-      case 'confirmed': return 'Match Confirmed';
-      case 'arrived': return 'Volunteer Arrived';
+      case 'matched': return '⏳ Awaiting Volunteer Acceptance';
+      case 'confirmed': return '✅ Visit Confirmed';
+      case 'ongoing': return '🚗 Volunteer On The Way';
+      case 'arrived': return '📍 Volunteer Arrived';
       case 'completed': return 'Visit Completed';
       case 'cancelled': return 'Request Cancelled';
       default: return status;
@@ -432,6 +434,52 @@ export default function CaregiverDashboardHome({
                 </View>
               )}
 
+              {/* Status Explanation Callouts */}
+              {req.status === 'matched' && (
+                <View style={styles.statusCalloutMatched}>
+                  <Icon name="time-outline" size={16} color="#B45309" />
+                  <Text style={styles.statusCalloutTextMatched}>
+                    Visit request sent to {req.volunteerId?.firstName || 'volunteer'}. Awaiting their acceptance.
+                  </Text>
+                </View>
+              )}
+
+              {req.status === 'confirmed' && (
+                <View style={styles.statusCalloutConfirmed}>
+                  <Icon name="checkmark-circle-outline" size={16} color="#15803D" />
+                  <Text style={styles.statusCalloutTextConfirmed}>
+                    Accepted by {req.volunteerId?.firstName || 'volunteer'}! Scheduled for {req.date} at {req.time}.
+                  </Text>
+                </View>
+              )}
+
+              {req.status === 'ongoing' && (
+                <View style={styles.statusCalloutOngoing}>
+                  <Icon name="navigate-outline" size={16} color="#0F766E" />
+                  <Text style={styles.statusCalloutTextOngoing}>
+                    {req.volunteerId?.firstName || 'Volunteer'} is on the way! Tap below to track live arrival.
+                  </Text>
+                </View>
+              )}
+
+              {req.status === 'arrived' && (
+                <View style={styles.statusCalloutArrived}>
+                  <Icon name="location-outline" size={16} color="#7E22CE" />
+                  <Text style={styles.statusCalloutTextArrived}>
+                    {req.volunteerId?.firstName || 'Volunteer'} has arrived at the destination.
+                  </Text>
+                </View>
+              )}
+
+              {req.status === 'searching' && (
+                <View style={styles.statusCalloutSearching}>
+                  <Icon name="search-outline" size={16} color="#2563EB" />
+                  <Text style={styles.statusCalloutTextSearching}>
+                    Request created. Tap below to select an available volunteer.
+                  </Text>
+                </View>
+              )}
+
               {req.sosTriggered && (
                 <View style={styles.sosAlertRow}>
                   <Icon name="warning" size={16} color="#FFFFFF" />
@@ -441,11 +489,19 @@ export default function CaregiverDashboardHome({
 
               <View style={styles.actionRow}>
                 <Text style={styles.actionBtnText}>
-                  {req.status === 'matched'
-                    ? 'Review Profile & Approve (Sprint 2)'
+                  {req.status === 'searching'
+                    ? 'Select a Volunteer'
+                    : req.status === 'matched'
+                    ? 'View Request & Status'
+                    : req.status === 'confirmed'
+                    ? 'View Confirmed Visit'
+                    : req.status === 'ongoing'
+                    ? 'Track Live Directions 📍'
+                    : req.status === 'arrived'
+                    ? 'Volunteer Arrived · View Details'
                     : req.status === 'completed'
                     ? 'Rate Visit'
-                    : 'Track Visit / Details'}
+                    : 'View Details'}
                 </Text>
                 <Icon name="chevron-forward-outline" size={16} color={COLORS.secondary} />
               </View>
@@ -755,6 +811,92 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   actionBtnText: { color: COLORS.secondary, fontSize: 13, fontWeight: '700' },
+  // Status callout banners
+  statusCalloutMatched: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  statusCalloutTextMatched: {
+    fontSize: 12,
+    color: '#92400E',
+    fontWeight: '600',
+    flex: 1,
+  },
+  statusCalloutConfirmed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  statusCalloutTextConfirmed: {
+    fontSize: 12,
+    color: '#166534',
+    fontWeight: '600',
+    flex: 1,
+  },
+  statusCalloutOngoing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#CCFBF1',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  statusCalloutTextOngoing: {
+    fontSize: 12,
+    color: '#115E59',
+    fontWeight: '600',
+    flex: 1,
+  },
+  statusCalloutArrived: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  statusCalloutTextArrived: {
+    fontSize: 12,
+    color: '#6B21A8',
+    fontWeight: '600',
+    flex: 1,
+  },
+  statusCalloutSearching: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+  },
+  statusCalloutTextSearching: {
+    fontSize: 12,
+    color: '#1E40AF',
+    fontWeight: '600',
+    flex: 1,
+  },
   historyCard: {
     backgroundColor: COLORS.surface,
     borderRadius: 8,
