@@ -19,6 +19,7 @@ import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import * as messageService from '../../services/messageService';
 import socketService from '../../services/socketService';
+import audioService from '../../services/audioService';
 
 export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }) {
   const { user, token } = useAuth();
@@ -33,6 +34,8 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
   const [isRecording, setIsRecording] = useState(false);
   const [recordDuration, setRecordDuration] = useState(0);
   const [playingMessageId, setPlayingMessageId] = useState(null);
+  const [playbackCurrentTime, setPlaybackCurrentTime] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
 
   const timerRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -137,6 +140,7 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
       unsubStatus();
       clearInterval(interval);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      audioService.stopAudio();
     };
   }, [otherUser?._id, user?._id]);
 
@@ -210,33 +214,62 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
     }
   };
 
-  const handleStartRecording = () => {
-    setIsRecording(true);
+  const handleStartRecording = async () => {
+    try {
+      const hasPermission = await audioService.requestPermission();
+      if (!hasPermission) {
+        Alert.alert(
+          'Microphone Permission Required',
+          'Please grant microphone permission to record and send voice messages.'
+        );
+        return;
+      }
+      await audioService.startRecording();
+      setIsRecording(true);
+      setRecordDuration(0);
+    } catch (err) {
+      console.error('Start recording error:', err);
+      Alert.alert('Error', 'Unable to start audio recording.');
+    }
   };
 
-  const handleCancelRecording = () => {
+  const handleCancelRecording = async () => {
     setIsRecording(false);
     setRecordDuration(0);
+    try {
+      await audioService.stopRecording();
+    } catch (err) {}
   };
 
   const handleSendVoiceMessage = async () => {
-    const duration = recordDuration || 3;
     setIsRecording(false);
+    setSending(true);
 
     try {
-      setSending(true);
+      const recordResult = await audioService.stopRecording();
+      const duration = recordResult.duration || recordDuration || 3;
+
+      // Upload recorded audio to Cloudinary/server
+      const uploadRes = await audioService.uploadVoiceNote({
+        ...recordResult,
+        duration,
+      });
+
+      const finalAudioUrl = uploadRes.audioUrl;
+      const finalDuration = uploadRes.audioDuration || duration;
+
       const res = await messageService.sendMessage({
         recipientId: otherUser._id,
         relatedSeniorId: relatedSenior?._id || null,
         messageType: 'voice',
-        text: `🎤 Voice note (${duration}s)`,
-        audioUrl: 'https://togethercare.app/audio/memo-sample.mp3',
-        audioDuration: duration,
+        text: `🎤 Voice note (${finalDuration}s)`,
+        audioUrl: finalAudioUrl,
+        audioDuration: finalDuration,
       });
 
-      if (res?.success) {
+      if (res?.success && res.data) {
         setMessages((prev) => {
-          if (prev.some((m) => m._id?.toString() === res.data?._id?.toString())) {
+          if (prev.some((m) => m._id?.toString() === res.data._id?.toString())) {
             return prev;
           }
           return [...prev, res.data];
@@ -247,17 +280,31 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
       Alert.alert('Error', 'Failed to send voice message.');
     } finally {
       setSending(false);
+      setRecordDuration(0);
     }
   };
 
-  const handleTogglePlayVoice = (msgId) => {
+  const handleTogglePlayVoice = (msg) => {
+    const msgId = msg._id;
     if (playingMessageId === msgId) {
+      audioService.stopAudio();
       setPlayingMessageId(null);
+      setPlaybackCurrentTime(0);
     } else {
       setPlayingMessageId(msgId);
-      setTimeout(() => {
-        setPlayingMessageId(null);
-      }, 3500);
+      setPlaybackCurrentTime(0);
+      setPlaybackDuration(msg.audioDuration || 3);
+
+      audioService.playAudio(msg.audioUrl, (status) => {
+        if (status.isPlaying) {
+          setPlaybackCurrentTime(status.currentTime || 0);
+          if (status.duration) setPlaybackDuration(status.duration);
+        }
+        if (status.isEnded || !status.isPlaying) {
+          setPlayingMessageId(null);
+          setPlaybackCurrentTime(0);
+        }
+      });
     }
   };
 
@@ -383,7 +430,7 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
                               styles.playBtn,
                               isMine ? styles.myPlayBtn : styles.theirPlayBtn,
                             ]}
-                            onPress={() => handleTogglePlayVoice(msg._id)}
+                            onPress={() => handleTogglePlayVoice(msg)}
                           >
                             <Icon
                               name={isPlaying ? 'pause' : 'play'}
@@ -393,14 +440,18 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
                           </TouchableOpacity>
 
                           <View style={{ flex: 1 }}>
-                            {/* Simulated Audio Waveform */}
+                            {/* Animated Audio Waveform */}
                             <View style={styles.waveRow}>
-                              {[4, 12, 8, 16, 10, 18, 14, 20, 8, 12, 6, 14, 10].map((h, i) => (
+                              {[4, 14, 8, 18, 10, 20, 12, 22, 9, 15, 6, 16, 11, 7].map((h, i) => (
                                 <View
                                   key={i}
                                   style={[
                                     styles.waveBar,
-                                    { height: isPlaying ? ((i % 3) + 1) * 6 : h },
+                                    {
+                                      height: isPlaying
+                                        ? Math.max(4, Math.sin((playbackCurrentTime * 3) + i) * 16 + 8)
+                                        : h,
+                                    },
                                     isMine ? styles.myWaveBar : styles.theirWaveBar,
                                   ]}
                                 />
@@ -413,7 +464,7 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
                               ]}
                             >
                               {isPlaying
-                                ? 'Playing audio...'
+                                ? `${formatSeconds(playbackCurrentTime)} / ${formatSeconds(playbackDuration || msg.audioDuration || 3)}`
                                 : `Voice Note • ${formatSeconds(msg.audioDuration || 3)}`}
                             </Text>
                           </View>

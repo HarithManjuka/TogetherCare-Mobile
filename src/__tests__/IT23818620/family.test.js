@@ -6,6 +6,7 @@ import * as dependentService from '../../services/dependentService';
 import * as caregiverService from '../../services/caregiverService';
 import * as messageService from '../../services/messageService';
 import * as notificationService from '../../services/notificationService';
+import audioService from '../../services/audioService';
 import client from '../../api/client';
 
 // Mock expo vector icons
@@ -297,6 +298,55 @@ describe('IT23818620: Family Member & Caregiver Mobile Unit Tests', () => {
       const result = await messageService.removeContact('user_2');
       expect(client.delete).toHaveBeenCalledWith('/messages/contacts/user_2');
       expect(result).toEqual(mockData);
+    });
+
+    it('should upload audio voice note to backend', async () => {
+      const mockData = {
+        success: true,
+        data: { audioUrl: 'https://res.cloudinary.com/demo/audio.m4a', audioDuration: 4 },
+      };
+      client.post.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.uploadAudio({ audioBase64: 'data:audio/m4a;base64,AAAA', duration: 4 });
+      expect(client.post).toHaveBeenCalledWith('/messages/upload-audio', { audioBase64: 'data:audio/m4a;base64,AAAA', duration: 4 }, { headers: {} });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should send a voice message with audioUrl and duration', async () => {
+      const mockData = {
+        success: true,
+        data: {
+          _id: 'msg_voice_1',
+          messageType: 'voice',
+          audioUrl: 'https://res.cloudinary.com/demo/audio.m4a',
+          audioDuration: 5,
+        },
+      };
+      client.post.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.sendVoiceMessage('user_2', 'https://res.cloudinary.com/demo/audio.m4a', 5);
+      expect(client.post).toHaveBeenCalledWith('/messages', {
+        recipientId: 'user_2',
+        content: 'Voice note (5s)',
+        messageType: 'voice',
+        audioUrl: 'https://res.cloudinary.com/demo/audio.m4a',
+        durationSeconds: 5,
+      });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should provide audioService with startRecording, stopRecording, and playAudio', async () => {
+      expect(typeof audioService.startRecording).toBe('function');
+      expect(typeof audioService.stopRecording).toBe('function');
+      expect(typeof audioService.playAudio).toBe('function');
+      expect(typeof audioService.stopAudio).toBe('function');
+
+      const startResult = await audioService.startRecording();
+      expect(startResult.success).toBe(true);
+
+      const stopResult = await audioService.stopRecording();
+      expect(stopResult).toBeDefined();
+      expect(typeof stopResult.duration).toBe('number');
     });
   });
 
