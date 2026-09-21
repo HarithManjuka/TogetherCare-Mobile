@@ -11,6 +11,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Platform,
+  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import client from '../../api/client';
@@ -74,6 +75,7 @@ export default function VolunteerProfileReviewScreen({
       }
     } catch (error) {
       console.error('Confirm Match Error:', error);
+      Alert.alert('Unable to Confirm', error.response?.data?.message || 'Failed to confirm volunteer match.');
     } finally {
       setActionLoading(false);
     }
