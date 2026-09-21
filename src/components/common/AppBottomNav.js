@@ -25,7 +25,7 @@ export const ROLE_TABS = {
     { key: 'home', label: 'Home', icon: 'grid', iconOutline: 'grid-outline' },
     { key: 'request', label: 'Request', icon: 'clipboard', iconOutline: 'clipboard-outline' },
     { key: 'schedule', label: 'Schedule', icon: 'calendar', iconOutline: 'calendar-outline' },
-    { key: 'history', label: 'History', icon: 'time', iconOutline: 'time-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
     { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
   ],
   caregiver: [
@@ -82,7 +82,10 @@ export default function AppBottomNav({
     if ((tab.key === 'requests' || tab.key === 'request') && requestBadgeCount !== undefined) {
       return { ...tab, badge: requestBadgeCount };
     }
-    if (tab.key === 'messages' && msgBadgeCount !== undefined) {
+    if (
+      (tab.key === 'messages' || tab.key === 'msg' || tab.key === 'chat') &&
+      msgBadgeCount !== undefined
+    ) {
       return { ...tab, badge: msgBadgeCount };
     }
     return tab;
@@ -122,7 +125,7 @@ export default function AppBottomNav({
                 {badgeCount && badgeCount > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
-                      {badgeCount > 9 ? '9+' : badgeCount}
+                      {badgeCount > 99 ? '99+' : badgeCount}
                     </Text>
                   </View>
                 ) : null}
@@ -187,22 +190,29 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: -4,
-    right: -2,
+    right: 4,
     backgroundColor: '#EF4444',
     borderRadius: 9,
-    minWidth: 16,
-    height: 16,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
     zIndex: 10,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.35,
+    shadowRadius: 2,
+    elevation: 4,
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 12,
   },
   tabLabel: {
     fontWeight: '600',

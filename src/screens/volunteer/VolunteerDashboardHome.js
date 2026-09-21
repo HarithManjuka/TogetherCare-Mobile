@@ -21,6 +21,7 @@ import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
 import NotificationsModal from '../../components/common/NotificationsModal';
 import * as volunteerService from '../../services/volunteerService';
+import * as messageService from '../../services/messageService';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     averageRating: 5.0,
     totalCompletedVisits: 0,
   });
+  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,11 +69,12 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   // Fetch real data from backend
   const loadDashboardData = useCallback(async () => {
     try {
-      const [offersRes, reqsRes, statsRes, directRes] = await Promise.allSettled([
+      const [offersRes, reqsRes, statsRes, directRes, convoRes] = await Promise.allSettled([
         volunteerService.getMyOffers(),
         volunteerService.getAvailableRequests(),
         volunteerService.getMyStats(),
         volunteerService.getDirectRequests(),
+        messageService.getConversations(),
       ]);
 
       if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
@@ -85,6 +88,13 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       }
       if (directRes.status === 'fulfilled' && directRes.value?.success) {
         setDirectRequests(directRes.value.data || []);
+      }
+      if (convoRes.status === 'fulfilled' && convoRes.value?.success) {
+        const unreadTotal = (convoRes.value.data || []).reduce(
+          (sum, c) => sum + (c.unreadCount || 0),
+          0
+        );
+        setUnreadMsgCount(unreadTotal);
       }
     } catch (err) {
       console.error('Error loading volunteer dashboard:', err);
@@ -318,6 +328,36 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
             <Text style={styles.metricLabel}>your rating</Text>
           </View>
         </View>
+
+        {/* Messages & Coordination Quick Access Card */}
+        <TouchableOpacity
+          style={styles.messagesBannerCard}
+          onPress={() => onNavigateTab && onNavigateTab('messages')}
+          activeOpacity={0.85}
+        >
+          <View style={styles.messagesBannerIconWrap}>
+            <Ionicons name="chatbubbles" size={22} color="#FFFFFF" />
+          </View>
+          <View style={styles.messagesBannerContent}>
+            <View style={styles.messagesBannerHeader}>
+              <Text style={styles.messagesBannerTitle}>Messages & Coordination</Text>
+              {unreadMsgCount > 0 ? (
+                <View style={styles.messagesBannerBadge}>
+                  <Text style={styles.messagesBannerBadgeText}>{unreadMsgCount} NEW</Text>
+                </View>
+              ) : (
+                <View style={styles.messagesLiveBadge}>
+                  <View style={styles.messagesLiveDot} />
+                  <Text style={styles.messagesLiveText}>REAL-TIME</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.messagesBannerSub}>
+              Chat in real-time with seniors and family caregivers
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
         {/* --- SECTION: DIRECT VISIT REQUESTS (Sent directly to this volunteer) --- */}
         {directRequests.length > 0 && (
@@ -1780,5 +1820,81 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
     fontSize: 13,
+  },
+  // Messages Banner Card on Dashboard
+  messagesBannerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: 16,
+    marginTop: 14,
+    marginBottom: 6,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    gap: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  messagesBannerIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#1E40AF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messagesBannerContent: {
+    flex: 1,
+  },
+  messagesBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  messagesBannerTitle: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  messagesBannerBadge: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  messagesBannerBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  messagesLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  messagesLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#16A34A',
+  },
+  messagesLiveText: {
+    color: '#15803D',
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  messagesBannerSub: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 3,
   },
 });

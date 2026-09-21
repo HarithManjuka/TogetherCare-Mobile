@@ -12,18 +12,22 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Linking,
 } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { Ionicons as Icon } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import * as messageService from '../../services/messageService';
+import socketService from '../../services/socketService';
 
 export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }) {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
+  const [isOtherUserOnline, setIsOtherUserOnline] = useState(false);
 
   // Voice recording states (US-411)
   const [isRecording, setIsRecording] = useState(false);
@@ -31,9 +35,10 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
   const [playingMessageId, setPlayingMessageId] = useState(null);
 
   const timerRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
   const scrollViewRef = useRef(null);
 
-  const fetchThread = async () => {
+  const fetchThread = async (markRead = true) => {
     try {
       if (!otherUser?._id) return;
       const res = await messageService.getMessages(otherUser._id);
@@ -47,12 +52,95 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
     }
   };
 
+  // Socket setup & real-time listeners
   useEffect(() => {
-    fetchThread();
-    const interval = setInterval(fetchThread, 4000); // 4-second poll for live chat feel
-    return () => clearInterval(interval);
-  }, [otherUser?._id]);
+    if (!otherUser?._id || !user?._id) return;
 
+    // Connect socket
+    socketService.connect(token, user._id);
+    socketService.joinThread(otherUser._id);
+
+    // Initial fetch
+    fetchThread();
+
+    // Check if other user is online
+    socketService.checkOnline(otherUser._id, ({ isOnline }) => {
+      setIsOtherUserOnline(!!isOnline);
+    });
+
+    // 1. Listen for real-time incoming messages
+    const unsubMsg = socketService.onReceiveMessage((newMsg) => {
+      const isFromOther =
+        newMsg.sender?._id?.toString() === otherUser._id?.toString() ||
+        newMsg.sender?.toString() === otherUser._id?.toString();
+      const isFromMe =
+        newMsg.sender?._id?.toString() === user._id?.toString() ||
+        newMsg.sender?.toString() === user._id?.toString();
+      const isToOther =
+        newMsg.recipient?._id?.toString() === otherUser._id?.toString() ||
+        newMsg.recipient?.toString() === otherUser._id?.toString();
+
+      if ((isFromOther && isToOther) || (isFromMe && isToOther) || (isFromOther && !isFromMe)) {
+        setMessages((prev) => {
+          // Prevent duplicates
+          if (prev.some((m) => m._id?.toString() === newMsg._id?.toString())) {
+            return prev;
+          }
+          return [...prev, newMsg];
+        });
+
+        // Mark as read in real time
+        if (isFromOther) {
+          socketService.sendReadThread(otherUser._id);
+        }
+      }
+    });
+
+    // 2. Listen for typing indicators
+    const unsubTyping = socketService.onUserTyping(({ senderId, isTyping }) => {
+      if (senderId?.toString() === otherUser._id?.toString()) {
+        setIsOtherUserTyping(!!isTyping);
+      }
+    });
+
+    // 3. Listen for read receipts
+    const unsubRead = socketService.onMessagesRead(({ readBy }) => {
+      if (readBy?.toString() === otherUser._id?.toString()) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.sender?._id?.toString() === user._id?.toString()) {
+              return { ...m, isRead: true };
+            }
+            return m;
+          })
+        );
+      }
+    });
+
+    // 4. Listen for user online status changes
+    const unsubStatus = socketService.onStatusChanged(({ userId, status }) => {
+      if (userId?.toString() === otherUser._id?.toString()) {
+        setIsOtherUserOnline(status === 'online');
+      }
+    });
+
+    // Background safety poll (10 seconds) in case of socket reconnection
+    const interval = setInterval(() => {
+      fetchThread(false);
+    }, 10000);
+
+    return () => {
+      socketService.leaveThread(otherUser._id);
+      unsubMsg();
+      unsubTyping();
+      unsubRead();
+      unsubStatus();
+      clearInterval(interval);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [otherUser?._id, user?._id]);
+
+  // Auto-scroll on new message
   useEffect(() => {
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollToEnd({ animated: true });
@@ -74,10 +162,28 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
     };
   }, [isRecording]);
 
+  // Handle typing indicator emission
+  const handleInputChange = (text) => {
+    setInputText(text);
+
+    if (otherUser?._id) {
+      socketService.sendTyping(otherUser._id, true);
+
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socketService.sendTyping(otherUser._id, false);
+      }, 2000);
+    }
+  };
+
   const handleSendText = async () => {
     if (!inputText.trim()) return;
     const textToSend = inputText.trim();
     setInputText('');
+
+    if (otherUser?._id) {
+      socketService.sendTyping(otherUser._id, false);
+    }
 
     try {
       setSending(true);
@@ -89,7 +195,12 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
       });
 
       if (res?.success) {
-        setMessages((prev) => [...prev, res.data]);
+        setMessages((prev) => {
+          if (prev.some((m) => m._id?.toString() === res.data?._id?.toString())) {
+            return prev;
+          }
+          return [...prev, res.data];
+        });
       }
     } catch (err) {
       console.error('Send Text Error:', err);
@@ -124,7 +235,12 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
       });
 
       if (res?.success) {
-        setMessages((prev) => [...prev, res.data]);
+        setMessages((prev) => {
+          if (prev.some((m) => m._id?.toString() === res.data?._id?.toString())) {
+            return prev;
+          }
+          return [...prev, res.data];
+        });
       }
     } catch (err) {
       console.error('Send Voice Error:', err);
@@ -139,10 +255,21 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
       setPlayingMessageId(null);
     } else {
       setPlayingMessageId(msgId);
-      // Auto-stop after 3 seconds simulation
       setTimeout(() => {
         setPlayingMessageId(null);
       }, 3500);
+    }
+  };
+
+  const handleCallUser = () => {
+    const phone = otherUser?.phone;
+    if (phone) {
+      const cleanNumber = phone.replace(/[^0-9+]/g, '');
+      Linking.openURL(`tel:${cleanNumber}`).catch(() => {
+        Alert.alert('Simulating Call', `Calling ${otherUser.firstName} at ${phone}...`);
+      });
+    } else {
+      Alert.alert('Notice', 'No phone number available for this user.');
     }
   };
 
@@ -165,20 +292,36 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
           <Icon name="arrow-back" size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
+
         <View style={styles.headerInfo}>
-          <Text style={styles.headerName}>
-            {otherUser?.firstName} {otherUser?.lastName || ''}
-          </Text>
-          <Text style={styles.headerRole}>
-            {otherUser?.role === 'caregiver'
-              ? 'Caregiver'
-              : otherUser?.role === 'volunteer'
-              ? 'Volunteer'
-              : 'Senior User'}
-            {relatedSenior ? ` • For ${relatedSenior.firstName}` : ''}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={styles.headerName}>
+              {otherUser?.firstName} {otherUser?.lastName || ''}
+            </Text>
+            <View
+              style={[
+                styles.headerOnlineDot,
+                { backgroundColor: isOtherUserOnline ? '#16A34A' : '#94A3B8' },
+              ]}
+            />
+          </View>
+
+          {isOtherUserTyping ? (
+            <Text style={styles.typingText}>typing...</Text>
+          ) : (
+            <Text style={styles.headerRole}>
+              {otherUser?.role === 'caregiver'
+                ? 'Caregiver'
+                : otherUser?.role === 'volunteer'
+                ? 'Volunteer'
+                : 'Senior User'}
+              {relatedSenior ? ` • For ${relatedSenior.firstName}` : ''}
+              {isOtherUserOnline ? ' • Online' : ''}
+            </Text>
+          )}
         </View>
-        <TouchableOpacity style={styles.callBtn} onPress={() => Alert.alert('Simulating Call', `Calling ${otherUser?.phone || 'user'}...`)}>
+
+        <TouchableOpacity style={styles.callBtn} onPress={handleCallUser}>
           <Icon name="call" size={18} color={COLORS.primary} />
         </TouchableOpacity>
       </View>
@@ -202,7 +345,9 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
           >
             <View style={styles.securityPill}>
               <Icon name="lock-closed" size={12} color="#64748B" />
-              <Text style={styles.securityText}>End-to-end coordinated care messaging (US-403)</Text>
+              <Text style={styles.securityText}>
+                End-to-end coordinated care messaging (US-403)
+              </Text>
             </View>
 
             {messages.length === 0 ? (
@@ -215,21 +360,29 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
               </View>
             ) : (
               messages.map((msg) => {
-                const isMine = msg.sender?._id?.toString() === user?._id?.toString();
+                const senderIdStr = msg.sender?._id?.toString() || msg.sender?.toString();
+                const myIdStr = user?._id?.toString();
+                const isMine = senderIdStr === myIdStr;
                 const isVoice = msg.messageType === 'voice';
                 const isPlaying = playingMessageId === msg._id;
 
                 return (
                   <View
                     key={msg._id}
-                    style={[styles.msgWrapper, isMine ? styles.myMsgWrapper : styles.theirMsgWrapper]}
+                    style={[
+                      styles.msgWrapper,
+                      isMine ? styles.myMsgWrapper : styles.theirMsgWrapper,
+                    ]}
                   >
                     <View style={[styles.bubble, isMine ? styles.myBubble : styles.theirBubble]}>
                       {isVoice ? (
                         /* Voice Message Bubble (US-411) */
                         <View style={styles.voiceBubbleRow}>
                           <TouchableOpacity
-                            style={[styles.playBtn, isMine ? styles.myPlayBtn : styles.theirPlayBtn]}
+                            style={[
+                              styles.playBtn,
+                              isMine ? styles.myPlayBtn : styles.theirPlayBtn,
+                            ]}
                             onPress={() => handleTogglePlayVoice(msg._id)}
                           >
                             <Icon
@@ -253,28 +406,45 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
                                 />
                               ))}
                             </View>
-                            <Text style={[styles.voiceDurationText, isMine && { color: '#EFF6FF' }]}>
-                              {isPlaying ? 'Playing audio...' : `Voice Note • ${formatSeconds(msg.audioDuration || 3)}`}
+                            <Text
+                              style={[
+                                styles.voiceDurationText,
+                                isMine && { color: '#EFF6FF' },
+                              ]}
+                            >
+                              {isPlaying
+                                ? 'Playing audio...'
+                                : `Voice Note • ${formatSeconds(msg.audioDuration || 3)}`}
                             </Text>
                           </View>
                         </View>
                       ) : (
                         /* Text Message Bubble */
-                        <Text style={[styles.msgText, isMine ? styles.myMsgText : styles.theirMsgText]}>
+                        <Text
+                          style={[
+                            styles.msgText,
+                            isMine ? styles.myMsgText : styles.theirMsgText,
+                          ]}
+                        >
                           {msg.text}
                         </Text>
                       )}
 
                       {/* Timestamp & read status */}
                       <View style={styles.msgFooter}>
-                        <Text style={[styles.msgTime, isMine ? styles.myMsgTime : styles.theirMsgTime]}>
+                        <Text
+                          style={[
+                            styles.msgTime,
+                            isMine ? styles.myMsgTime : styles.theirMsgTime,
+                          ]}
+                        >
                           {formatMsgTime(msg.createdAt)}
                         </Text>
                         {isMine && (
                           <Icon
                             name={msg.isRead ? 'checkmark-done' : 'checkmark'}
                             size={14}
-                            color={msg.isRead ? '#93C5FD' : '#E2E8F0'}
+                            color={msg.isRead ? '#93C5FD' : '#CBD5E1'}
                           />
                         )}
                       </View>
@@ -321,12 +491,15 @@ export default function CaregiverChatScreen({ otherUser, relatedSenior, onBack }
               placeholder="Type message..."
               placeholderTextColor="#94A3B8"
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputChange}
               multiline
             />
 
             <TouchableOpacity
-              style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
+              style={[
+                styles.sendBtn,
+                (!inputText.trim() || sending) && styles.sendBtnDisabled,
+              ]}
               onPress={handleSendText}
               disabled={!inputText.trim() || sending}
             >
@@ -357,6 +530,8 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   headerInfo: { flex: 1, marginLeft: 12 },
   headerName: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary },
+  headerOnlineDot: { width: 8, height: 8, borderRadius: 4 },
+  typingText: { fontSize: 12, fontStyle: 'italic', color: COLORS.secondary, fontWeight: '600' },
   headerRole: { fontSize: 12, color: COLORS.textSecondary },
   callBtn: {
     padding: 8,
@@ -378,7 +553,13 @@ const styles = StyleSheet.create({
   securityText: { fontSize: 11, color: '#64748B' },
   emptyBox: { alignItems: 'center', paddingVertical: 60 },
   emptyText: { fontSize: 16, fontWeight: 'bold', color: '#334155', marginTop: 10 },
-  emptySub: { fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 4, paddingHorizontal: 30 },
+  emptySub: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+    paddingHorizontal: 30,
+  },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 10, color: '#64748B' },
   msgWrapper: { marginBottom: 10, maxWidth: '80%' },
@@ -386,11 +567,22 @@ const styles = StyleSheet.create({
   theirMsgWrapper: { alignSelf: 'flex-start' },
   bubble: { borderRadius: 14, padding: 12 },
   myBubble: { backgroundColor: COLORS.primary, borderBottomRightRadius: 2 },
-  theirBubble: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderBottomLeftRadius: 2 },
+  theirBubble: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderBottomLeftRadius: 2,
+  },
   msgText: { fontSize: 14, lineHeight: 20 },
   myMsgText: { color: '#FFFFFF' },
   theirMsgText: { color: '#0F172A' },
-  msgFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 4 },
+  msgFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 4,
+  },
   msgTime: { fontSize: 10 },
   myMsgTime: { color: '#BFDBFE' },
   theirMsgTime: { color: '#94A3B8' },

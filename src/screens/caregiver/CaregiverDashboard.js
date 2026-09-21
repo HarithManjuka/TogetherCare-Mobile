@@ -10,6 +10,7 @@ import UpcomingVisitsScreen from './UpcomingVisitsScreen';
 import SeniorActivitiesScreen from './SeniorActivitiesScreen';
 import CaregiverAssignmentsScreen from './CaregiverAssignmentsScreen';
 import CaregiverChatScreen from './CaregiverChatScreen';
+import MessagesListScreen from '../common/MessagesListScreen';
 import RequestHelpScreen from './RequestHelpScreen';
 import VolunteerSelectionScreen from './VolunteerSelectionScreen';
 import VolunteerProfileReviewScreen from './VolunteerProfileReviewScreen';
@@ -19,6 +20,7 @@ import ProfileScreen from '../auth/ProfileScreen';
 import AppBottomNav from '../../components/common/AppBottomNav';
 import AppHeader from '../../components/common/AppHeader';
 import client from '../../api/client';
+import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
 export default function CaregiverDashboard() {
   const { user } = useAuth();
@@ -32,13 +34,29 @@ export default function CaregiverDashboard() {
   // Selected chat partner for CaregiverChatScreen (US-403)
   const [chatPartner, setChatPartner] = useState(null);
   const [chatSenior, setChatSenior] = useState(null);
+  const [chatReturnScreen, setChatReturnScreen] = useState('messages');
 
   // Selected senior for SeniorActivitiesScreen (Sprint 3)
   const [monitoredSenior, setMonitoredSenior] = useState(null);
 
+  // Unread message count tracking for bottom navigation bar
+  const activeChatPartnerId = currentScreen === 'chat' && chatPartner?._id ? chatPartner._id : null;
+  const { unreadCount: msgBadgeCount, refreshUnread: refreshUnreadMsgs } =
+    useUnreadMessageCount(activeChatPartnerId);
+
+  useEffect(() => {
+    if (currentScreen !== 'chat') {
+      refreshUnreadMsgs();
+    }
+  }, [currentScreen]);
+
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
     const onBackPress = () => {
+      if (currentScreen === 'chat') {
+        setCurrentScreen(chatReturnScreen);
+        return true;
+      }
       if (currentScreen !== 'home') {
         setCurrentScreen('home');
         return true;
@@ -48,7 +66,7 @@ export default function CaregiverDashboard() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [currentScreen]);
+  }, [currentScreen, chatReturnScreen]);
 
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
@@ -82,6 +100,14 @@ export default function CaregiverDashboard() {
   const handleOpenChat = (partner, senior) => {
     setChatPartner(partner);
     setChatSenior(senior);
+    setChatReturnScreen('upcoming-visits');
+    setCurrentScreen('chat');
+  };
+
+  const handleSelectConversation = (partner, senior) => {
+    setChatPartner(partner);
+    setChatSenior(senior || null);
+    setChatReturnScreen('messages');
     setCurrentScreen('chat');
   };
 
@@ -104,6 +130,7 @@ export default function CaregiverDashboard() {
       case 'live-tracking':
       case 'feedback':
         return 'requests';
+      case 'messages':
       case 'chat':
         return 'messages';
       case 'profile':
@@ -126,7 +153,7 @@ export default function CaregiverDashboard() {
         setCurrentScreen('upcoming-visits');
         break;
       case 'messages':
-        setCurrentScreen('chat');
+        setCurrentScreen('messages');
         break;
       case 'profile':
         setCurrentScreen('profile');
@@ -187,6 +214,13 @@ export default function CaregiverDashboard() {
             onRequestHelp={() => setCurrentScreen('request-help')}
           />
         );
+      case 'messages':
+        return (
+          <MessagesListScreen
+            onSelectConversation={handleSelectConversation}
+            onBack={() => setCurrentScreen('home')}
+          />
+        );
       case 'chat':
         return (
           <CaregiverChatScreen
@@ -200,7 +234,7 @@ export default function CaregiverDashboard() {
               }
             }
             relatedSenior={chatSenior}
-            onBack={() => setCurrentScreen('home')}
+            onBack={() => setCurrentScreen(chatReturnScreen)}
           />
         );
       case 'request-help':
@@ -307,6 +341,7 @@ export default function CaregiverDashboard() {
         role={isFamilyMember ? 'family_member' : 'caregiver'}
         activeTab={getActiveTab()}
         onTabPress={handleSelectTab}
+        msgBadgeCount={msgBadgeCount}
       />
     </View>
   );

@@ -1,5 +1,6 @@
 // src/__tests__/IT23818620/family.test.js
 import React from 'react';
+import { render } from '@testing-library/react-native';
 import AppBottomNav from '../../components/common/AppBottomNav';
 import * as dependentService from '../../services/dependentService';
 import * as caregiverService from '../../services/caregiverService';
@@ -42,6 +43,29 @@ describe('IT23818620: Family Member & Caregiver Mobile Unit Tests', () => {
     it('should configure family member tabs correctly (dependents, upcoming, chat, profile)', () => {
       // AppBottomNav renders for caregiver role with family_member type
       expect(AppBottomNav).toBeDefined();
+    });
+
+    it('should display unread message count badge on messages tab when msgBadgeCount is provided', () => {
+      const { getByText } = render(
+        <AppBottomNav role="elderly" activeTab="home" msgBadgeCount={3} />
+      );
+      expect(getByText('3')).toBeTruthy();
+      expect(getByText('Msg')).toBeTruthy();
+    });
+
+    it('should display 99+ on badge when msgBadgeCount exceeds 99', () => {
+      const { getByText } = render(
+        <AppBottomNav role="caregiver" activeTab="home" msgBadgeCount={150} />
+      );
+      expect(getByText('99+')).toBeTruthy();
+      expect(getByText('Chat')).toBeTruthy();
+    });
+
+    it('should not display badge when msgBadgeCount is 0 or undefined', () => {
+      const { queryByText } = render(
+        <AppBottomNav role="caregiver" activeTab="home" msgBadgeCount={0} />
+      );
+      expect(queryByText('0')).toBeNull();
     });
   });
 
@@ -231,6 +255,47 @@ describe('IT23818620: Family Member & Caregiver Mobile Unit Tests', () => {
 
       const result = await messageService.getConversations();
       expect(client.get).toHaveBeenCalledWith('/messages/conversations');
+      expect(result).toEqual(mockData);
+    });
+
+    it('should search contact by mobile phone number', async () => {
+      const mockData = { success: true, data: { _id: 'user_2', firstName: 'Kasun', phone: '0771234567' } };
+      client.get.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.searchContactByPhone('0771234567');
+      expect(client.get).toHaveBeenCalledWith('/messages/contacts/search', {
+        params: { phone: '0771234567' },
+      });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should add a contact with phone and nickname', async () => {
+      const mockData = { success: true, message: 'Contact added successfully' };
+      client.post.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.addContact({ phone: '0771234567', nickname: 'Family Doctor' });
+      expect(client.post).toHaveBeenCalledWith('/messages/contacts', {
+        phone: '0771234567',
+        nickname: 'Family Doctor',
+      });
+      expect(result).toEqual(mockData);
+    });
+
+    it('should fetch contacts list', async () => {
+      const mockData = { success: true, data: [{ _id: 'user_2', firstName: 'Kasun' }] };
+      client.get.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.getContacts();
+      expect(client.get).toHaveBeenCalledWith('/messages/contacts');
+      expect(result).toEqual(mockData);
+    });
+
+    it('should remove a contact from contacts list', async () => {
+      const mockData = { success: true, message: 'Contact removed successfully' };
+      client.delete.mockResolvedValueOnce({ data: mockData });
+
+      const result = await messageService.removeContact('user_2');
+      expect(client.delete).toHaveBeenCalledWith('/messages/contacts/user_2');
       expect(result).toEqual(mockData);
     });
   });
