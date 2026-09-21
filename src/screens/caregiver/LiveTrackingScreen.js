@@ -11,6 +11,8 @@ import {
   Alert,
   Animated,
   Linking,
+  Platform,
+  Modal,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import client from '../../api/client';
@@ -20,6 +22,7 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
   const [request, setRequest] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [mapModalVisible, setMapModalVisible] = useState(false);
 
   // Real volunteer location & distance
   const volunteerLoc = request?.volunteerLocation;
@@ -53,6 +56,18 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
     timerRef.current = setInterval(fetchRequestDetails, 4000);
     return () => clearInterval(timerRef.current);
   }, [requestId]);
+
+  const getEmbedMapUrl = () => {
+    const destination = encodeURIComponent(request?.location || 'Colombo, Sri Lanka');
+    if (
+      volunteerLoc?.lat &&
+      volunteerLoc?.lng &&
+      (request?.status === 'confirmed' || request?.status === 'ongoing' || request?.status === 'arrived')
+    ) {
+      return `https://maps.google.com/maps?saddr=${volunteerLoc.lat},${volunteerLoc.lng}&daddr=${destination}&output=embed`;
+    }
+    return `https://maps.google.com/maps?q=${destination}&output=embed`;
+  };
 
   const handleOpenGoogleMapsRoute = () => {
     const destination = encodeURIComponent(request?.location || 'Colombo, Sri Lanka');
@@ -217,55 +232,83 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
             <Text style={styles.statusBannerText}>{getStatusMessage()}</Text>
           </View>
 
-          {/* Map / Directions Block */}
-          <View style={styles.mapMock}>
-            <View style={styles.mapCard}>
-              <View style={styles.mapGridLines} />
+          {/* In-App Live Map Container */}
+          <View style={styles.mapContainer}>
+            <View style={styles.mapHeaderRow}>
+              <View style={styles.mapHeaderLeft}>
+                <Icon name="map-outline" size={18} color={COLORS.primary} />
+                <Text style={styles.mapHeaderTitle}>Live Route Map</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.expandMapTouch}
+                onPress={() => setMapModalVisible(true)}
+              >
+                <Icon name="scan-outline" size={15} color={COLORS.secondary} />
+                <Text style={styles.expandMapTouchText}>Fullscreen</Text>
+              </TouchableOpacity>
+            </View>
 
-              {isPendingAcceptance ? (
-                <View style={styles.centerStatusBox}>
-                  <Icon name="time-outline" size={40} color="#D97706" />
-                  <Text style={styles.centerStatusTitle}>Waiting for Volunteer</Text>
-                  <Text style={styles.centerStatusSub}>
-                    Visit request sent to {volunteer?.firstName || 'volunteer'}. Live tracking will activate once accepted and trip starts.
-                  </Text>
-                </View>
-              ) : isConfirmed && !request?.trackingConsent ? (
-                <View style={styles.centerStatusBox}>
-                  <Icon name="calendar-outline" size={40} color="#2563EB" />
-                  <Text style={styles.centerStatusTitle}>Visit Confirmed</Text>
-                  <Text style={styles.centerStatusSub}>
-                    Scheduled for {request?.date} at {request?.time}. Live GPS directions will display once {volunteer?.firstName} begins the trip.
-                  </Text>
-                </View>
+            <View style={styles.mapFrameWrapper}>
+              {Platform.OS === 'web' ? (
+                React.createElement('iframe', {
+                  title: 'In-App Live Map',
+                  src: getEmbedMapUrl(),
+                  style: {
+                    width: '100%',
+                    height: '100%',
+                    border: 'none',
+                    borderRadius: 8,
+                  },
+                  loading: 'lazy',
+                  allowFullScreen: true,
+                })
               ) : (
-                <>
-                  {/* Dependent Home Marker */}
-                  <View style={styles.dependentMarker}>
-                    <Icon name="home" size={16} color="#FFFFFF" />
-                  </View>
-
-                  {/* Volunteer Marker */}
-                  <View style={[styles.volunteerMarker, { top: '35%', left: '45%' }]}>
-                    <Icon name="walk-outline" size={16} color="#FFFFFF" />
-                  </View>
-
-                  {/* Status Indicator text overlay */}
-                  <View style={styles.mapInfoOverlay}>
-                    <Text style={styles.mapOverlayLabel}>Volunteer GPS Coordinates</Text>
-                    <Text style={styles.mapOverlayVal}>
-                      Lat: {volunteerLat.toFixed(4)} • Lng: {volunteerLng.toFixed(4)}
-                    </Text>
-                  </View>
-                </>
+                <View style={styles.nativeMapCard}>
+                  <Icon name="navigate-circle-outline" size={44} color={COLORS.secondary} />
+                  <Text style={styles.nativeMapTitle}>In-App Navigation Active</Text>
+                  <Text style={styles.nativeMapSub}>
+                    To: {request?.location || 'Dependent Address'}
+                  </Text>
+                </View>
               )}
+
+              {/* Status pill overlay */}
+              <View style={styles.mapStatusPill}>
+                <View
+                  style={[
+                    styles.mapStatusDot,
+                    {
+                      backgroundColor: isOngoing
+                        ? '#0D9488'
+                        : isConfirmed
+                        ? '#2563EB'
+                        : isArrived
+                        ? '#16A34A'
+                        : '#D97706',
+                    },
+                  ]}
+                />
+                <Text style={styles.mapStatusPillText}>
+                  {isOngoing
+                    ? '🚗 Live Trip Active'
+                    : isConfirmed
+                    ? '✅ Confirmed Destination'
+                    : isArrived
+                    ? '📍 Volunteer Arrived'
+                    : '⏳ Scheduled Route'}
+                </Text>
+              </View>
             </View>
           </View>
 
-          {/* Real Google Maps Navigation Action */}
-          <TouchableOpacity style={styles.googleMapsBtn} onPress={handleOpenGoogleMapsRoute}>
-            <Icon name="map-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.googleMapsBtnText}>Open Route in Google Maps</Text>
+          {/* Primary In-App Map Navigation Action */}
+          <TouchableOpacity
+            style={styles.inAppMapBtn}
+            onPress={() => setMapModalVisible(true)}
+          >
+            <Icon name="navigate-circle-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.inAppMapBtnText}>Open In-App Navigation Map</Text>
+            <Icon name="expand-outline" size={16} color="#FFFFFF" style={{ marginLeft: 4 }} />
           </TouchableOpacity>
 
           {/* Details Row */}
@@ -358,6 +401,118 @@ export default function LiveTrackingScreen({ requestId, onBack, onTripCompleted 
           </View>
         </ScrollView>
       </Animated.View>
+
+      {/* IN-APP FULLSCREEN MAP MODAL */}
+      <Modal
+        visible={mapModalVisible}
+        animationType="slide"
+        onRequestClose={() => setMapModalVisible(false)}
+      >
+        <SafeAreaView style={styles.modalSafeArea}>
+          {/* In-App Map Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity
+              onPress={() => setMapModalVisible(false)}
+              style={styles.modalBackBtn}
+            >
+              <Icon name="arrow-back-outline" size={24} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+            <View style={{ flex: 1, marginLeft: 8 }}>
+              <Text style={styles.modalHeaderTitle}>In-App Navigation & Route</Text>
+              <Text style={styles.modalHeaderSub} numberOfLines={1}>
+                To: {request?.location || 'Dependent Location'}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => setMapModalVisible(false)}
+              style={styles.modalCloseBtn}
+            >
+              <Icon name="close" size={22} color={COLORS.textPrimary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Embedded Fullscreen Map */}
+          <View style={styles.modalMapArea}>
+            {Platform.OS === 'web' ? (
+              React.createElement('iframe', {
+                title: 'In-App Fullscreen Live Map',
+                src: getEmbedMapUrl(),
+                style: {
+                  width: '100%',
+                  height: '100%',
+                  border: 'none',
+                },
+                loading: 'lazy',
+                allowFullScreen: true,
+              })
+            ) : (
+              <View style={styles.modalNativeMapFallback}>
+                <Icon name="map-outline" size={54} color={COLORS.secondary} />
+                <Text style={styles.modalNativeTitle}>Interactive Route View</Text>
+                <Text style={styles.modalNativeSub}>
+                  Destination: {request?.location}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Bottom Route Details & Control Card */}
+          <View style={styles.modalBottomCard}>
+            <View style={styles.modalRouteSummary}>
+              <View style={styles.modalStopRow}>
+                <View style={[styles.stopDot, { backgroundColor: COLORS.secondary }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stopLabel}>Origin (Volunteer)</Text>
+                  <Text style={styles.stopValue}>
+                    {volunteer?.firstName} {volunteer?.lastName || ''} ({volunteerLoc?.address || 'Current GPS Location'})
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.stopLine} />
+
+              <View style={styles.modalStopRow}>
+                <View style={[styles.stopDot, { backgroundColor: COLORS.primary }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.stopLabel}>Destination (Senior)</Text>
+                  <Text style={styles.stopValue}>
+                    {dependent?.firstName} {dependent?.lastName || ''} • {request?.location}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.modalBtnRow}>
+              {volunteer?.phone && (
+                <TouchableOpacity
+                  style={styles.modalCallBtn}
+                  onPress={() =>
+                    Alert.alert('Simulating Call', `Dialing volunteer at ${volunteer.phone}...`)
+                  }
+                >
+                  <Icon name="call" size={16} color="#FFFFFF" />
+                  <Text style={styles.modalCallBtnText}>Call Volunteer</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                style={styles.modalDismissBtn}
+                onPress={() => setMapModalVisible(false)}
+              >
+                <Text style={styles.modalDismissBtnText}>Close Map</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Optional external fallback link */}
+            <TouchableOpacity
+              style={styles.externalLinkBtn}
+              onPress={handleOpenGoogleMapsRoute}
+            >
+              <Text style={styles.externalLinkText}>Open in external Google Maps app ↗</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -416,76 +571,156 @@ const styles = StyleSheet.create({
     marginTop: 4,
     lineHeight: 18,
   },
-  googleMapsBtn: {
+  // In-App Map Styles
+  mapContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  mapHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
+  },
+  mapHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mapHeaderTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary },
+  expandMapTouch: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  expandMapTouchText: { fontSize: 12, color: COLORS.secondary, fontWeight: '600' },
+  mapFrameWrapper: {
+    height: 240,
+    width: '100%',
+    position: 'relative',
+    backgroundColor: '#E2E8F0',
+  },
+  mapStatusPill: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+  },
+  mapStatusDot: { width: 8, height: 8, borderRadius: 4 },
+  mapStatusPillText: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' },
+  nativeMapCard: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F0FDFA',
+  },
+  nativeMapTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, marginTop: 8 },
+  nativeMapSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4, textAlign: 'center' },
+  inAppMapBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#0D9488',
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 15,
+    borderRadius: 10,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  googleMapsBtnText: {
+  inAppMapBtnText: {
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
   },
-  mapMock: { height: 180, width: '100%', marginBottom: 15 },
-  mapCard: {
+  // In-App Modal Styles
+  modalSafeArea: { flex: 1, backgroundColor: '#FFFFFF' },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  modalBackBtn: { padding: 4 },
+  modalCloseBtn: { padding: 4 },
+  modalHeaderTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary },
+  modalHeaderSub: { fontSize: 12, color: COLORS.textSecondary, marginTop: 1 },
+  modalMapArea: { flex: 1, width: '100%', backgroundColor: '#E2E8F0' },
+  modalNativeMapFallback: {
     flex: 1,
-    backgroundColor: '#E0F2F1',
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#B2DFDB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
-  mapGridLines: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    right: 0,
-    borderWidth: 1,
-    borderColor: 'rgba(0,150,136,0.06)',
+  modalNativeTitle: { fontSize: 16, fontWeight: 'bold', color: COLORS.textPrimary, marginTop: 12 },
+  modalNativeSub: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4, textAlign: 'center' },
+  modalBottomCard: {
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 8,
   },
-  dependentMarker: {
-    position: 'absolute',
-    bottom: '25%',
-    right: '25%',
-    backgroundColor: COLORS.primary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  modalRouteSummary: { marginBottom: 14 },
+  modalStopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  stopDot: { width: 12, height: 12, borderRadius: 6 },
+  stopLine: {
+    width: 2,
+    height: 16,
+    backgroundColor: '#CBD5E1',
+    marginLeft: 5,
+    marginVertical: 2,
+  },
+  stopLabel: { fontSize: 10, fontWeight: '700', color: COLORS.textSecondary, textTransform: 'uppercase' },
+  stopValue: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary, marginTop: 1 },
+  modalBtnRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
+  modalCallBtn: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  volunteerMarker: {
-    position: 'absolute',
+    gap: 6,
     backgroundColor: COLORS.secondary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  modalCallBtnText: { color: '#FFFFFF', fontWeight: 'bold', fontSize: 13 },
+  modalDismissBtn: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    backgroundColor: '#F1F5F9',
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  mapInfoOverlay: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    backgroundColor: 'rgba(15,23,42,0.85)',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-  },
-  mapOverlayLabel: { color: '#94A3B8', fontSize: 8, fontWeight: 'bold' },
-  mapOverlayVal: { color: '#FFFFFF', fontSize: 10, fontWeight: '500', marginTop: 1 },
+  modalDismissBtnText: { color: COLORS.textPrimary, fontWeight: '700', fontSize: 13 },
+  externalLinkBtn: { alignItems: 'center', marginTop: 10 },
+  externalLinkText: { fontSize: 11, color: '#64748B', textDecorationLine: 'underline' },
   trackingDetailsSection: {
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
