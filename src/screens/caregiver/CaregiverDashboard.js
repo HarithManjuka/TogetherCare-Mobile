@@ -59,9 +59,14 @@ export default function CaregiverDashboard() {
         const req = res.data.data;
         setActiveRequestId(requestId);
 
-        if (req.status === 'searching' || req.status === 'matched') {
+        if (req.status === 'searching') {
           setCurrentScreen('volunteer-selection');
-        } else if (req.status === 'confirmed' || req.status === 'arrived') {
+        } else if (
+          req.status === 'matched' ||
+          req.status === 'confirmed' ||
+          req.status === 'ongoing' ||
+          req.status === 'arrived'
+        ) {
           setCurrentScreen('live-tracking');
         } else if (req.status === 'completed' && req.rating === null) {
           setCurrentScreen('feedback');

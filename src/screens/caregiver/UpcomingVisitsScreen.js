@@ -65,14 +65,16 @@ export default function UpcomingVisitsScreen({
     switch (status) {
       case 'confirmed':
       case 'accepted':
-        return { label: 'Confirmed', bg: '#DCFCE7', color: '#16A34A' };
+        return { label: '✅ Confirmed', bg: '#DCFCE7', color: '#16A34A' };
       case 'matched':
-        return { label: 'Volunteer Found', bg: '#DBEAFE', color: '#2563EB' };
+        return { label: '⏳ Awaiting Volunteer', bg: '#FEF3C7', color: '#B45309' };
       case 'searching':
       case 'pending':
-        return { label: 'Searching Volunteer', bg: '#FEF3C7', color: '#D97706' };
+        return { label: '🔍 Searching Volunteer', bg: '#EFF6FF', color: '#2563EB' };
+      case 'ongoing':
+        return { label: '🚗 On The Way', bg: '#CCFBF1', color: '#0F766E' };
       case 'arrived':
-        return { label: 'Volunteer Arrived', bg: '#F3E8FF', color: '#7E22CE' };
+        return { label: '📍 Arrived', bg: '#F3E8FF', color: '#7E22CE' };
       default:
         return { label: status, bg: '#F1F5F9', color: '#64748B' };
     }
@@ -209,13 +211,61 @@ export default function UpcomingVisitsScreen({
                   </View>
                 )}
 
+                {/* Status Notice Box */}
+                {visit.status === 'matched' && (
+                  <View style={styles.noticeBoxMatched}>
+                    <Icon name="time-outline" size={16} color="#B45309" />
+                    <Text style={styles.noticeTextMatched}>
+                      Request sent to {volunteer?.firstName || 'volunteer'}. Awaiting their acceptance.
+                    </Text>
+                  </View>
+                )}
+
+                {visit.status === 'confirmed' && (
+                  <View style={styles.noticeBoxConfirmed}>
+                    <Icon name="checkmark-circle-outline" size={16} color="#16A34A" />
+                    <Text style={styles.noticeTextConfirmed}>
+                      Visit accepted by {volunteer?.firstName || 'volunteer'}. They will arrive on {visit.date} at {visit.time}.
+                    </Text>
+                  </View>
+                )}
+
+                {visit.status === 'ongoing' && (
+                  <View style={styles.noticeBoxOngoing}>
+                    <Icon name="navigate-outline" size={16} color="#0F766E" />
+                    <Text style={styles.noticeTextOngoing}>
+                      {volunteer?.firstName || 'Volunteer'} is on the way! Live tracking is active.
+                    </Text>
+                  </View>
+                )}
+
+                {visit.status === 'arrived' && (
+                  <View style={styles.noticeBoxArrived}>
+                    <Icon name="location-outline" size={16} color="#7E22CE" />
+                    <Text style={styles.noticeTextArrived}>
+                      {volunteer?.firstName || 'Volunteer'} has arrived at {senior?.firstName}'s location.
+                    </Text>
+                  </View>
+                )}
+
                 {/* Card Actions */}
-                {(visit.status === 'confirmed' || visit.status === 'arrived') && (
+                {(visit.status === 'matched' ||
+                  visit.status === 'confirmed' ||
+                  visit.status === 'ongoing' ||
+                  visit.status === 'arrived') && (
                   <TouchableOpacity
                     style={styles.trackBtn}
                     onPress={() => onTrackVisit && onTrackVisit(visit.id)}
                   >
-                    <Text style={styles.trackBtnText}>Track Live Status</Text>
+                    <Text style={styles.trackBtnText}>
+                      {visit.status === 'matched'
+                        ? 'View Request & Status'
+                        : visit.status === 'confirmed'
+                        ? 'View Confirmed Visit'
+                        : visit.status === 'ongoing'
+                        ? 'Track Live Directions 📍'
+                        : 'Volunteer Arrived · View Details'}
+                    </Text>
                     <Icon name="chevron-forward" size={16} color={COLORS.secondary} />
                   </TouchableOpacity>
                 )}
@@ -354,4 +404,56 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
   },
   trackBtnText: { color: COLORS.secondary, fontSize: 13, fontWeight: '700' },
+  noticeBoxMatched: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  noticeTextMatched: { fontSize: 12, color: '#92400E', fontWeight: '600', flex: 1 },
+  noticeBoxConfirmed: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  noticeTextConfirmed: { fontSize: 12, color: '#166534', fontWeight: '600', flex: 1 },
+  noticeBoxOngoing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#CCFBF1',
+    borderWidth: 1,
+    borderColor: '#99F6E4',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  noticeTextOngoing: { fontSize: 12, color: '#115E59', fontWeight: '600', flex: 1 },
+  noticeBoxArrived: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#F3E8FF',
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 8,
+    marginBottom: 6,
+  },
+  noticeTextArrived: { fontSize: 12, color: '#6B21A8', fontWeight: '600', flex: 1 },
 });
