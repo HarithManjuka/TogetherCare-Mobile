@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import * as volunteerService from '../../services/volunteerService';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
+import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerRequestsScreen({ onNavigateTab }) {
   const [requests, setRequests] = useState([]);
@@ -65,44 +66,35 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
     fetchRequests();
   };
 
-  const handleAccept = (req) => {
+  const handleAccept = async (req) => {
     const reqId = req._id || req.id;
-    Alert.alert(
-      '🤝 Accept Volunteer Task',
-      `Would you like to accept the ${req.type || req.serviceType} visit for ${req.elderName}?\n\nDate: ${req.date} at ${req.time}\nLocation: ${req.address}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Yes, Accept Task',
-          onPress: async () => {
-            try {
-              setSubmittingId(reqId);
-              const res = await volunteerService.acceptRequest(reqId);
-              if (res?.success) {
-                Alert.alert(
-                  '🎉 Task Accepted!',
-                  `You have accepted the visit for ${req.elderName}. It is now in your Schedule.`,
-                  [
-                    { text: 'Stay Here', onPress: () => fetchRequests() },
-                    {
-                      text: 'View Schedule',
-                      onPress: () => {
-                        fetchRequests();
-                        if (onNavigateTab) onNavigateTab('schedule');
-                      },
-                    },
-                  ]
-                );
-              }
-            } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept task');
-            } finally {
-              setSubmittingId(null);
-            }
-          },
-        },
-      ]
-    );
+    try {
+      setSubmittingId(reqId);
+      // Optimistically remove from list immediately
+      setRequests((prev) => prev.filter((r) => (r._id || r.id) !== reqId));
+      const res = await volunteerService.acceptRequest(reqId);
+      if (res?.success) {
+        showAppAlert(
+          '🎉 Request Accepted!',
+          `You have accepted the visit for ${req.elderName}.\nIt has been added to your Volunteer Schedule.`,
+          [
+            { text: 'Stay Here', onPress: () => fetchRequests() },
+            {
+              text: 'View Schedule',
+              onPress: () => {
+                fetchRequests();
+                if (onNavigateTab) onNavigateTab('schedule');
+              },
+            },
+          ]
+        );
+      }
+    } catch (err) {
+      fetchRequests();
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept task');
+    } finally {
+      setSubmittingId(null);
+    }
   };
 
   const handleAcceptDirect = async (req) => {
@@ -113,15 +105,25 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
       setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
       const res = await volunteerService.acceptDirectRequest(reqId);
       if (res?.success) {
-        Alert.alert(
-          '🎉 Direct Request Accepted!',
-          `You have confirmed the visit for ${req.elderName}. It is now added to your schedule!`
+        showAppAlert(
+          '🎉 Request Accepted!',
+          `You have confirmed the visit for ${req.elderName}.\nIt has been added to your Volunteer Schedule!`,
+          [
+            { text: 'Stay Here', onPress: () => fetchRequests() },
+            {
+              text: 'View Schedule',
+              onPress: () => {
+                fetchRequests();
+                if (onNavigateTab) onNavigateTab('schedule');
+              },
+            },
+          ]
         );
         fetchRequests();
       }
     } catch (err) {
       fetchRequests();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
     } finally {
       setSubmittingId(null);
     }
@@ -135,12 +137,12 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
       setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
       const res = await volunteerService.declineDirectRequest(reqId);
       if (res?.success) {
-        Alert.alert('Request Declined', 'The visit request has been declined.');
+        showAppAlert('Request Declined', 'The visit request has been declined.');
         fetchRequests();
       }
     } catch (err) {
       fetchRequests();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
     } finally {
       setSubmittingId(null);
     }

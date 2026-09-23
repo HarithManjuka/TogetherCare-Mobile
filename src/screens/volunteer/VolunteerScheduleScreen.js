@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as volunteerService from '../../services/volunteerService';
+import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerScheduleScreen({ onNavigateTab }) {
   const [schedule, setSchedule] = useState([]);
@@ -55,12 +56,12 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
       );
       const res = await volunteerService.acceptDirectRequest(id);
       if (res?.success) {
-        Alert.alert('🎉 Request Accepted!', `You have confirmed this visit for ${visit.elderName}. It is now scheduled.`);
+        showAppAlert('🎉 Request Accepted!', `You have confirmed this visit for ${visit.elderName}. It is now scheduled.`);
         fetchSchedule();
       }
     } catch (err) {
       fetchSchedule();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
     } finally {
       setActionLoadingId(null);
     }
@@ -73,12 +74,12 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
       setSchedule((prev) => prev.filter((s) => (s._id || s.id) !== id));
       const res = await volunteerService.declineDirectRequest(id);
       if (res?.success) {
-        Alert.alert('Request Declined', 'The visit request has been declined.');
+        showAppAlert('Request Declined', 'The visit request has been declined.');
         fetchSchedule();
       }
     } catch (err) {
       fetchSchedule();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
     } finally {
       setActionLoadingId(null);
     }
@@ -86,7 +87,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
 
   const handleStartTrip = (visit) => {
     const id = visit._id || visit.id;
-    Alert.alert(
+    showAppAlert(
       '📍 Share Live Location?',
       `Would you like to start your trip now? This will share your live arrival directions with ${visit.elderName}'s family member until you arrive.`,
       [
@@ -98,11 +99,11 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
               setActionLoadingId(id);
               const res = await volunteerService.startTrip(id);
               if (res?.success) {
-                Alert.alert('🚗 Trip Started!', 'Live location sharing is now active. The family member can track your arrival.');
+                showAppAlert('🚗 Trip Started!', 'Live location sharing is now active. The family member can track your arrival.');
                 fetchSchedule();
               }
             } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to start trip');
+              showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to start trip');
             } finally {
               setActionLoadingId(null);
             }
@@ -118,11 +119,11 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
       setActionLoadingId(id);
       const res = await volunteerService.updateTaskStatus(id, 'arrived');
       if (res?.success) {
-        Alert.alert('📍 Marked as Arrived', 'The elder and caregiver have been notified that you have reached the location.');
+        showAppAlert('📍 Marked as Arrived', 'The elder and caregiver have been notified that you have reached the location.');
         fetchSchedule();
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to update status');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to update status');
     } finally {
       setActionLoadingId(null);
     }
@@ -130,7 +131,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
 
   const handleCompleteVisit = (visit) => {
     const id = visit._id || visit.id;
-    Alert.alert(
+    showAppAlert(
       '✅ Complete Visit',
       `Are you sure you have completed the ${visit.serviceType} visit for ${visit.elderName}? This will log your volunteer hours.`,
       [
@@ -142,11 +143,11 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
               setActionLoadingId(id);
               const res = await volunteerService.updateTaskStatus(id, 'completed');
               if (res?.success) {
-                Alert.alert('🎉 Great Job!', 'Visit completed and your volunteer hours have been logged successfully!');
+                showAppAlert('🎉 Great Job!', 'Visit completed and your volunteer hours have been logged successfully!');
                 fetchSchedule();
               }
             } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to complete visit');
+              showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to complete visit');
             } finally {
               setActionLoadingId(null);
             }
@@ -158,11 +159,11 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
 
   const handleCallElder = (phone) => {
     if (!phone) {
-      Alert.alert('No Phone', 'No phone number is registered for this resident.');
+      showAppAlert('No Phone', 'No phone number is registered for this resident.');
       return;
     }
     Linking.openURL(`tel:${phone}`).catch(() => {
-      Alert.alert('Error', 'Unable to open telephone dialer.');
+      showAppAlert('Error', 'Unable to open telephone dialer.');
     });
   };
 

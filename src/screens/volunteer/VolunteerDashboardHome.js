@@ -22,6 +22,7 @@ import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDeta
 import NotificationsModal from '../../components/common/NotificationsModal';
 import * as volunteerService from '../../services/volunteerService';
 import * as messageService from '../../services/messageService';
+import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
   const { user } = useAuth();
@@ -121,15 +122,25 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
       const res = await volunteerService.acceptDirectRequest(reqId);
       if (res?.success) {
-        Alert.alert(
-          '🎉 Visit Request Accepted!',
-          `You have confirmed the visit for ${dReq.elderName}. It is now added to your schedule!`
+        showAppAlert(
+          '🎉 Request Accepted!',
+          `You have confirmed the visit for ${dReq.elderName}.\nIt has been added to your Volunteer Schedule!`,
+          [
+            { text: 'Stay Here', onPress: () => loadDashboardData() },
+            {
+              text: 'View Schedule',
+              onPress: () => {
+                loadDashboardData();
+                onNavigateTab('schedule');
+              },
+            },
+          ]
         );
         loadDashboardData();
       }
     } catch (err) {
       loadDashboardData();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
     } finally {
       setIsSubmitting(false);
     }
@@ -143,12 +154,12 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
       const res = await volunteerService.declineDirectRequest(reqId);
       if (res?.success) {
-        Alert.alert('Request Declined', 'The visit request has been declined.');
+        showAppAlert('Request Declined', 'The visit request has been declined.');
         loadDashboardData();
       }
     } catch (err) {
       loadDashboardData();
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
     } finally {
       setIsSubmitting(false);
     }
@@ -162,13 +173,13 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         const id = editingOffer._id || editingOffer.id;
         const res = await volunteerService.updateOffer(id, offerData);
         if (res.success) {
-          Alert.alert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
+          showAppAlert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
           loadDashboardData();
         }
       } else {
         const res = await volunteerService.createOffer(offerData);
         if (res.success) {
-          Alert.alert(
+          showAppAlert(
             '🎉 Offer Posted Successfully!',
             'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
           );
@@ -178,7 +189,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       setEditingOffer(null);
       setOfferModalVisible(false);
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to save offer');
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to save offer');
     } finally {
       setIsSubmitting(false);
     }
@@ -190,7 +201,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   };
 
   const handleDeleteOffer = (offerId) => {
-    Alert.alert(
+    showAppAlert(
       'Cancel & Delete Offer',
       'Are you sure you want to remove this availability offer from the community board?',
       [
@@ -201,10 +212,10 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
           onPress: async () => {
             try {
               await volunteerService.deleteOffer(offerId);
-              Alert.alert('Offer Removed', 'Your offer has been removed.');
+              showAppAlert('Offer Removed', 'Your offer has been removed.');
               loadDashboardData();
             } catch (err) {
-              Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to remove offer');
+              showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to remove offer');
             }
           },
         },
@@ -216,16 +227,18 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     const reqId = request._id || request.id;
     try {
       setIsSubmitting(true);
+      // Immediately remove from UI list
+      setRequestsList((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
       const res = await volunteerService.acceptRequest(reqId);
       if (res.success) {
         setSelectedRequest(null);
-        Alert.alert(
+        showAppAlert(
           '🎉 Request Accepted!',
-          `You have successfully accepted the task for ${request.elderName}.\nIt has been added to your Schedule tab.`,
+          `You have successfully accepted the task for ${request.elderName}.\nIt has been added to your Volunteer Schedule.`,
           [
             { text: 'Stay Here', onPress: () => loadDashboardData() },
             {
-              text: 'View in Schedule',
+              text: 'View Schedule',
               onPress: () => {
                 loadDashboardData();
                 onNavigateTab('schedule');
@@ -235,7 +248,8 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         );
       }
     } catch (err) {
-      Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
+      loadDashboardData();
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept request');
     } finally {
       setIsSubmitting(false);
     }
