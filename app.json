@@ -26,14 +26,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store",
-      [
-        "expo-audio",
-        {
-          "microphonePermission": "Allow TogetherCare to access your microphone for voice messaging.",
-          "recordAudioAndroid": true
-        }
-      ]
+      "expo-secure-store"
     ]
   }
 }

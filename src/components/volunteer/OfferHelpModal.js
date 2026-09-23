@@ -140,8 +140,7 @@ export default function OfferHelpModal({
     }
 
     const payload = {
-      id: initialData ? (initialData._id || initialData.id) : undefined,
-      _id: initialData ? (initialData._id || initialData.id) : undefined,
+      id: initialData ? initialData.id : `offer-${Date.now()}`,
       volunteerName: volunteerFullName,
       services: selectedServices,
       date: availableDate,
