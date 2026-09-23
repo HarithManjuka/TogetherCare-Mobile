@@ -11,7 +11,6 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Platform,
-  Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import client from '../../api/client';
@@ -75,7 +74,6 @@ export default function VolunteerProfileReviewScreen({
       }
     } catch (error) {
       console.error('Confirm Match Error:', error);
-      Alert.alert('Unable to Confirm', error.response?.data?.message || 'Failed to confirm volunteer match.');
     } finally {
       setActionLoading(false);
     }
@@ -251,8 +249,8 @@ export default function VolunteerProfileReviewScreen({
             style={styles.approveBtn}
             onPress={() => setConfirmModalVisible(true)}
           >
-            <Icon name="paper-plane-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.approveBtnText}>Send Visit Request</Text>
+            <Icon name="checkmark-circle-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.approveBtnText}>Confirm Match</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -269,15 +267,15 @@ export default function VolunteerProfileReviewScreen({
             <TouchableWithoutFeedback onPress={() => {}}>
               <View style={styles.modalCard}>
                 <View style={styles.modalIconWrap}>
-                  <Icon name="paper-plane-outline" size={32} color={COLORS.secondary} />
+                  <Icon name="calendar-outline" size={32} color={COLORS.secondary} />
                 </View>
-                <Text style={styles.modalTitle}>Send Visit Request</Text>
+                <Text style={styles.modalTitle}>Confirm Volunteer Match</Text>
                 <Text style={styles.modalBodyText}>
-                  Would you like to request{' '}
+                  Are you sure you want to book{' '}
                   <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>
                     {volunteerName}
                   </Text>{' '}
-                  for this visit? They will be notified to review and accept the request.
+                  for this visit?
                 </Text>
 
                 <View style={styles.modalActions}>
@@ -297,7 +295,7 @@ export default function VolunteerProfileReviewScreen({
                     {actionLoading ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.modalConfirmBtnText}>Send Request</Text>
+                      <Text style={styles.modalConfirmBtnText}>Confirm Match</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -329,23 +327,19 @@ export default function VolunteerProfileReviewScreen({
                 <View style={[styles.modalIconWrap, { backgroundColor: '#E8F5E9' }]}>
                   <Icon name="checkmark-circle-outline" size={32} color={COLORS.success} />
                 </View>
-                <Text style={styles.modalTitle}>Request Sent! 🎉</Text>
+                <Text style={styles.modalTitle}>Match Confirmed!</Text>
                 <Text style={styles.modalBodyText}>
-                  Your visit request has been sent to{' '}
-                  <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>
-                    {volunteerName}
-                  </Text>
-                  . Once they accept, you will be notified, and you can view live tracking when their trip begins.
+                  The volunteer visit has been scheduled. You can track their arrival status now!
                 </Text>
 
                 <TouchableOpacity
-                  style={[styles.modalConfirmBtn, { width: '100%', backgroundColor: COLORS.secondary }]}
+                  style={[styles.modalConfirmBtn, { width: '100%', backgroundColor: COLORS.success }]}
                   onPress={() => {
                     setSuccessModalVisible(false);
                     onApproveSuccess();
                   }}
                 >
-                  <Text style={styles.modalConfirmBtnText}>View Upcoming Visits</Text>
+                  <Text style={styles.modalConfirmBtnText}>Track Arrival</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>

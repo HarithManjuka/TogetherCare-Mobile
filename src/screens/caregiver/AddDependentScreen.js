@@ -434,9 +434,9 @@ export default function AddDependentScreen({ onBack, onSuccess }) {
                 <View style={styles.modalIconWrap}>
                   <Icon name="link-outline" size={32} color={COLORS.secondary} />
                 </View>
-                <Text style={styles.modalTitle}>Request to Link Senior</Text>
+                <Text style={styles.modalTitle}>Link Dependent Account</Text>
                 <Text style={styles.modalBodyText}>
-                  A link request will be sent to <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>{profileToLink?.name}</Text>. They must approve your request from their account before they are linked to your care dashboard.
+                  Are you sure you want to link <Text style={{ fontWeight: 'bold', color: COLORS.textPrimary }}>{profileToLink?.name}</Text> to your caregiver account?
                 </Text>
 
                 <View style={styles.modalActions}>
@@ -458,19 +458,15 @@ export default function AddDependentScreen({ onBack, onSuccess }) {
                         });
                         if (res.data?.success) {
                           setLinkConfirmVisible(false);
-                          showCustomAlert(
-                            'Request Sent! ⏳',
-                            `A link request has been sent to ${profileToLink?.name}. Once they approve the request from their dashboard, they will be linked to your account.`,
-                            () => onSuccess()
-                          );
+                          showCustomAlert('Success', `${profileToLink?.name} has been linked to your account!`, () => onSuccess());
                         } else {
-                          showCustomAlert('Failed', res.data?.message || 'Failed to send link request');
+                          showCustomAlert('Failed', res.data?.message || 'Failed to link profile');
                         }
                       } catch (error) {
                         console.error('Link Dependent Error:', error);
                         showCustomAlert(
                           'Error',
-                          error.response?.data?.message || 'Server error while sending link request'
+                          error.response?.data?.message || 'Server error while linking profile'
                         );
                       } finally {
                         setLoading(false);
@@ -481,7 +477,7 @@ export default function AddDependentScreen({ onBack, onSuccess }) {
                     {loading ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.modalConfirmBtnText}>Send Link Request</Text>
+                      <Text style={styles.modalConfirmBtnText}>Link Account</Text>
                     )}
                   </TouchableOpacity>
                 </View>
