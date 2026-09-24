@@ -11,18 +11,28 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  RefreshControl,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
+import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
+import AvatarActionModal from '../../components/common/AvatarActionModal';
+import * as volunteerService from '../../services/volunteerService';
+import * as messageService from '../../services/messageService';
+import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
-  const { user } = useAuth();
+  const { user, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
 
   // State management
   const [isOnline, setIsOnline] = useState(true);
-  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
@@ -46,85 +56,223 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     ? `${user.address.city}, ${user.address.district || 'Colombo'}`
     : 'Colombo 03';
 
-  // Volunteer's active offers (CRUD state)
-  const [myOffers, setMyOffers] = useState([
-    {
-      id: 'offer-1',
-      volunteerName: `${volunteerName} ${user?.lastName || ''}`.trim(),
-      services: ['Grocery Pickup', 'Pharmacy Run'],
-      date: '2026-08-25',
-      startTime: '02:00 PM',
-      endTime: '04:00 PM',
-      serviceArea: 'Colombo 03',
-      radius: 'Within 5 km',
-      capacity: 2,
-      slotsLeft: 2,
-      specialSkills: 'I have a large SUV and can carry heavy grocery loads.',
-      status: 'pending',
-    },
-  ]);
+  // Profile Picture Status & Handlers
+  const hasProfilePic = Boolean(user?.profilePicture || user?.avatar);
+  const initials = `${user?.firstName?.[0] || 'V'}${user?.lastName?.[0] || ''}`.toUpperCase();
 
-  // Requests matching wireframe + rich data
-  const [requestsList, setRequestsList] = useState([
-    {
-      id: 'req-1',
-      type: 'Grocery pickup',
-      category: 'grocery',
-      elderName: 'Mrs. Perera',
-      distance: '1.2 km',
-      duration: '45 min',
-      badge: 'Urgent',
-      badgeType: 'urgent',
-      address: 'No. 42, Galle Road, Colombo 03',
-      phone: '077 123 4567',
-      items: ['Fresh Milk (2L)', 'White Bread (1 Loaf)', 'Eggs (12 Pack)', 'Bananas (1kg)'],
-      notes: 'Please check expiry dates and call before arriving. Gate has buzzer.',
-    },
-    {
-      id: 'req-2',
-      type: 'Grocery pickup',
-      category: 'grocery',
-      elderName: 'Mrs. Perera',
-      distance: '1.2 km',
-      duration: '45 min',
-      badge: 'Today',
-      badgeType: 'today',
-      address: 'No. 18, Flower Road, Colombo 07',
-      phone: '071 987 6543',
-      items: ['Vegetables (Carrots, Beans, Potatoes)', 'Red Rice 5kg', 'Tea Leaves'],
-      notes: 'Assistance needed this afternoon around 3:00 PM.',
-    },
-    {
-      id: 'req-3',
-      type: 'Pharmacy & Medicine',
-      category: 'medical',
-      elderName: 'Mr. Fernando',
-      distance: '2.5 km',
-      duration: '30 min',
-      badge: 'Today',
-      badgeType: 'today',
-      address: 'No. 88, Duplication Road, Colombo 04',
-      phone: '075 555 1234',
-      items: ['Prescription Blood Pressure Pills', 'Eye Drops (Refresh Tears)'],
-      notes: 'Prescription slip will be given upon arrival.',
-    },
-  ]);
+  const handlePickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required to change profile picture.');
+        return;
+      }
 
-  // Offer CRUD Handlers
-  const handleSaveOffer = (offerData) => {
-    if (editingOffer) {
-      // Update existing offer (CRUD Update)
-      setMyOffers((prev) =>
-        prev.map((o) => (o.id === editingOffer.id ? { ...o, ...offerData } : o))
-      );
-      Alert.alert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
-    } else {
-      // Create new offer (CRUD Create)
-      setMyOffers((prev) => [offerData, ...prev]);
-      Alert.alert(
-        '🎉 Offer Posted Successfully!',
-        'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
-      );
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar gallery pick/upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required to take a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar camera upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      if (deleteProfilePicture) {
+        await deleteProfilePicture();
+      }
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+      Alert.alert('Success', 'Profile picture removed successfully');
+    } catch (err) {
+      console.error('Remove avatar error:', err);
+      Alert.alert('Error', err.message || 'Could not remove profile picture');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  // Fetch real data from backend
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [offersRes, reqsRes, statsRes, directRes, convoRes] = await Promise.allSettled([
+        volunteerService.getMyOffers(),
+        volunteerService.getAvailableRequests(),
+        volunteerService.getMyStats(),
+        volunteerService.getDirectRequests(),
+        messageService.getConversations(),
+      ]);
+
+      if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
+        setMyOffers(offersRes.value.data || []);
+      }
+      if (reqsRes.status === 'fulfilled' && reqsRes.value?.success) {
+        setRequestsList(reqsRes.value.data || []);
+      }
+      if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
+        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 5.0 });
+      }
+      if (directRes.status === 'fulfilled' && directRes.value?.success) {
+        setDirectRequests(directRes.value.data || []);
+      }
+      if (convoRes.status === 'fulfilled' && convoRes.value?.success) {
+        const unreadTotal = (convoRes.value.data || []).reduce(
+          (sum, c) => sum + (c.unreadCount || 0),
+          0
+        );
+        setUnreadMsgCount(unreadTotal);
+      }
+    } catch (err) {
+      console.error('Error loading volunteer dashboard:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadDashboardData();
+  };
+
+  const handleAcceptDirect = async (dReq) => {
+    const reqId = dReq._id || dReq.id;
+    try {
+      setIsSubmitting(true);
+      // Immediately remove from UI state so it disappears right away
+      setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
+      const res = await volunteerService.acceptDirectRequest(reqId);
+      if (res?.success) {
+        showAppAlert(
+          '🎉 Request Accepted!',
+          `You have confirmed the visit for ${dReq.elderName}.\nIt has been added to your Volunteer Schedule!`,
+          [
+            { text: 'Stay Here', onPress: () => loadDashboardData() },
+            {
+              text: 'View Schedule',
+              onPress: () => {
+                loadDashboardData();
+                onNavigateTab('schedule');
+              },
+            },
+          ]
+        );
+        loadDashboardData();
+      }
+    } catch (err) {
+      loadDashboardData();
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept visit request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeclineDirect = async (dReq) => {
+    const reqId = dReq._id || dReq.id;
+    try {
+      setIsSubmitting(true);
+      // Immediately remove from UI state so it disappears right away
+      setDirectRequests((prev) => prev.filter((item) => (item._id || item.id) !== reqId));
+      const res = await volunteerService.declineDirectRequest(reqId);
+      if (res?.success) {
+        showAppAlert('Request Declined', 'The visit request has been declined.');
+        loadDashboardData();
+      }
+    } catch (err) {
+      loadDashboardData();
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to decline request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Real Offer CRUD Handlers
+  const handleSaveOffer = async (offerData) => {
+    try {
+      setIsSubmitting(true);
+      if (editingOffer) {
+        const id = editingOffer._id || editingOffer.id;
+        const res = await volunteerService.updateOffer(id, offerData);
+        if (res.success) {
+          showAppAlert('✅ Offer Updated', 'Your availability offer has been updated on the community board.');
+          loadDashboardData();
+        }
+      } else {
+        const res = await volunteerService.createOffer(offerData);
+        if (res.success) {
+          showAppAlert(
+            '🎉 Offer Posted Successfully!',
+            'Your offer is now Pending on the dashboard. When an elder in your area accepts, your slot count will update automatically.'
+          );
+          loadDashboardData();
+        }
+      }
+      setEditingOffer(null);
+      setOfferModalVisible(false);
+    } catch (err) {
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to save offer');
+    } finally {
+      setIsSubmitting(false);
     }
     setEditingOffer(null);
     setOfferModalVisible(false);
@@ -180,27 +328,39 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* Avatar matching wireframe flame badge */}
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatarInner}>
-                <Text style={styles.avatarEmoji}>🔥</Text>
+            {/* Changeable Profile Picture */}
+            <TouchableOpacity
+              style={styles.avatarTouchable}
+              onPress={() => setAvatarModalVisible(true)}
+              activeOpacity={0.8}
+              disabled={uploadingAvatar}
+              accessibilityLabel="Change profile picture"
+              accessibilityRole="button"
+            >
+              <View style={styles.avatarContainer}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#1E3A8A" />
+                ) : hasProfilePic ? (
+                  <Image
+                    source={{ uri: user.profilePicture || user.avatar }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={styles.avatarInner}>
+                    <Text style={styles.avatarEmoji}>🔥</Text>
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Ionicons name={hasProfilePic ? 'pencil' : 'camera'} size={10} color="#FFFFFF" />
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.greetingContainer}>
               <View style={styles.greetingRow}>
                 <Text style={styles.greetingText}>
                   {getGreeting()}, {volunteerName} 👋
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setNotificationsVisible(true)}
-                  style={styles.bellButton}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Notifications"
-                >
-                  <Text style={styles.bellEmoji}>🔔</Text>
-                  <View style={styles.notifDot} />
-                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -727,61 +887,16 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- MODAL: Notifications Modal --- */}
-      <Modal
-        visible={notificationsVisible}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setNotificationsVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.formModalCard}>
-            <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Notifications 🔔</Text>
-              <TouchableOpacity
-                onPress={() => setNotificationsVisible(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={24} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.notifItem}>
-              <View style={styles.notifIconCircle}>
-                <Ionicons name="flash" size={18} color="#EF4444" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.notifItemTitle}>Urgent Grocery Request</Text>
-                <Text style={styles.notifItemDesc}>
-                  Mrs. Perera (1.2 km away) requested urgent groceries pickup.
-                </Text>
-                <Text style={styles.notifTime}>10 mins ago</Text>
-              </View>
-            </View>
-
-            <View style={styles.notifItem}>
-              <View style={[styles.notifIconCircle, { backgroundColor: '#E0F2FE' }]}>
-                <Ionicons name="checkmark-circle" size={18} color="#0284C7" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.notifItemTitle}>Volunteer Hours Logged</Text>
-                <Text style={styles.notifItemDesc}>
-                  Your 2 hours for yesterday's companionship visit were confirmed.
-                </Text>
-                <Text style={styles.notifTime}>Yesterday</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.modalSecondaryBtn, { marginTop: 14 }]}
-              onPress={() => setNotificationsVisible(false)}
-            >
-              <Text style={styles.modalSecondaryBtnText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+      {/* --- AVATAR ACTION MODAL (CAMERA / GALLERY / REMOVE) --- */}
+      <AvatarActionModal
+        visible={avatarModalVisible}
+        onClose={() => setAvatarModalVisible(false)}
+        onTakePhoto={handleTakePhoto}
+        onPickPhoto={handlePickFromGallery}
+        onRemovePhoto={handleRemoveAvatar}
+        hasExistingPhoto={hasProfilePic}
+      />
+    </View>
   );
 }
 
@@ -802,6 +917,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarTouchable: {
+    marginRight: 14,
+  },
   avatarContainer: {
     width: 48,
     height: 48,
@@ -809,7 +927,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   avatarInner: {
     width: 40,
@@ -822,35 +945,36 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 22,
   },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#1E3A8A',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
   greetingContainer: {
     flex: 1,
   },
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   greetingText: {
     fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
     flex: 1,
-  },
-  bellButton: {
-    padding: 6,
-    position: 'relative',
-  },
-  bellEmoji: {
-    fontSize: 20,
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
   },
   locationRow: {
     flexDirection: 'row',
