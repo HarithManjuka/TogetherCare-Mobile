@@ -38,7 +38,6 @@ export default function LoginScreen({ onNavigate }) {
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [bannedMessage, setBannedMessage] = useState('');
 
   const emailInputRef = useRef(null);
   const passwordInputRef = useRef(null);
@@ -90,17 +89,10 @@ export default function LoginScreen({ onNavigate }) {
 
     try {
       setLoading(true);
-      setBannedMessage('');
       await login({ email: email.trim(), password });
     } catch (err) {
-      const isBanned = err.response?.data?.isBanned;
       const errorMsg = err.response?.data?.message || err.message || 'Login failed';
-      if (isBanned) {
-        setBannedMessage(errorMsg);
-        Alert.alert('Account Banned', errorMsg);
-      } else {
-        Alert.alert('Sign In Error', errorMsg);
-      }
+      Alert.alert('Sign In Error', errorMsg);
     } finally {
       setLoading(false);
     }
@@ -149,15 +141,6 @@ export default function LoginScreen({ onNavigate }) {
           <Animated.View
             style={[styles.form, { opacity: fadeForm, transform: [{ translateY: slideForm }] }]}
           >
-            {bannedMessage ? (
-              <View style={styles.bannedWarningCard}>
-                <View style={styles.bannedWarningHeader}>
-                  <Icon name="warning" size={20} color="#DC2626" />
-                  <Text style={styles.bannedWarningTitle}>Account Access Suspended</Text>
-                </View>
-                <Text style={styles.bannedWarningText}>{bannedMessage}</Text>
-              </View>
-            ) : null}
             <TouchableOpacity
               style={[
                 styles.inputWrapper,
@@ -331,31 +314,6 @@ const styles = StyleSheet.create({
   },
   form: {
     marginVertical: 24,
-  },
-  bannedWarningCard: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FCA5A5',
-    borderWidth: 1.5,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 18,
-  },
-  bannedWarningHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
-  },
-  bannedWarningTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#991B1B',
-  },
-  bannedWarningText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#B91C1C',
-    lineHeight: 18,
   },
   inputWrapper: {
     flexDirection: 'row',

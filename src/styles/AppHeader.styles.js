@@ -1,117 +1,81 @@
 // src/styles/AppHeader.styles.js
-import { StyleSheet, Platform } from 'react-native';
-
-export const HEADER_BG_COLOR = '#1E3A8A'; // Premium deep care-blue matching the status bar seamlessly
+import { StyleSheet } from 'react-native';
+import { COLORS } from '../constants/theme';
 
 export default StyleSheet.create({
-  container: {
-    backgroundColor: HEADER_BG_COLOR,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 999,
+  topHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: COLORS.background,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  contentRow: {
-    height: 56,
+  brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
   },
-  leftPlaceholder: {
-    width: 38,
-    height: 38,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  hamburgerBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  centerTitleContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'none', // Allows clicking icons underneath if tight
+  brandLogo: {
+    width: 34,
+    height: 34,
+    marginRight: 8,
   },
   brandTitle: {
-    color: '#FFFFFF',
+    fontSize: 21,
     fontWeight: '800',
-    letterSpacing: 0.8,
-    textAlign: 'center',
+    color: COLORS.primary,
+    letterSpacing: -0.4,
   },
-  rightActionsGroup: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 10,
-    zIndex: 10,
+    gap: 8,
   },
-  iconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fontScalePill: {
-    paddingHorizontal: 8,
-    height: 32,
+  sizeToggleButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-  },
-  fontScaleText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#EF4444',
+    backgroundColor: '#EEF2FF',
     borderWidth: 1.5,
-    borderColor: HEADER_BG_COLOR,
+    borderColor: '#C7D2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 46,
   },
-  avatarContainer: {
+  sizeToggleButtonActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  sizeToggleText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: COLORS.primary,
+  },
+  sizeToggleTextActive: {
+    color: '#FFFFFF',
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  profileButton: {
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerAvatarImg: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    borderWidth: 1.8,
-    borderColor: '#FFFFFF',
-    overflow: 'hidden',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarImg: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarInitials: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
   },
 });

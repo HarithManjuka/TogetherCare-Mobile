@@ -1,65 +1,99 @@
 // src/context/ThemeContext.js
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
-import { getItem, setItem } from '../utils/storage';
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS, getScaledSizes } from '../constants/theme';
 
-const SCALE_KEY = '@togethercare_ui_scale';
-const THEME_KEY = '@togethercare_theme_mode';
+const SIZE_MODE_KEY = '@togethercare_size_mode';
+const LANGUAGE_KEY = '@togethercare_language';
+
+export const AVAILABLE_LANGUAGES = [
+  { code: 'en', label: 'English', native: 'English', icon: 'globe-outline' },
+  { code: 'si', label: 'Sinhala', native: 'සිංහල', icon: 'language-outline' },
+  { code: 'ta', label: 'Tamil', native: 'தமிழ்', icon: 'language-outline' },
+];
+
+export const AVAILABLE_DISPLAY_SIZES = [
+  { code: 'standard', label: 'Standard', sublabel: '100% Regular scale' },
+  { code: 'large', label: 'Large', sublabel: '125% Senior-friendly' },
+  { code: 'xlarge', label: 'Extra Large', sublabel: '140% High visibility' },
+];
 
 const ThemeContext = createContext({});
 
 export const ThemeProvider = ({ children }) => {
-  const systemColorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  // Accessibility UI Scale: 1.0 (Regular), 1.15 (Medium / Clear), 1.30 (Large / Senior Friendly)
-  const [uiScale, setUiScale] = useState(1.0);
+  const [sizeMode, setSizeModeState] = useState('standard'); // 'standard' | 'large' | 'xlarge'
+  const [language, setLanguageState] = useState('English');
+  const [isLoadingPreferences, setIsLoadingPreferences] = useState(true);
 
+  // Load persisted preferences on app launch
   useEffect(() => {
-    const loadPreferences = async () => {
+    const loadStoredPreferences = async () => {
       try {
-        const savedTheme = await getItem(THEME_KEY);
-        if (savedTheme !== null) {
-          setIsDarkMode(savedTheme === 'dark');
-        } else {
-          setIsDarkMode(systemColorScheme === 'dark');
+        const [savedMode, savedLanguage] = await Promise.all([
+          AsyncStorage.getItem(SIZE_MODE_KEY),
+          AsyncStorage.getItem(LANGUAGE_KEY),
+        ]);
+        if (savedMode === 'large' || savedMode === 'standard' || savedMode === 'xlarge') {
+          setSizeModeState(savedMode);
         }
-
-        const savedScale = await getItem(SCALE_KEY);
-        if (savedScale) {
-          setUiScale(Number(savedScale));
+        if (savedLanguage) {
+          setLanguageState(savedLanguage);
         }
-      } catch (err) {
-        console.error('Error loading theme preferences:', err);
+      } catch (e) {
+        console.log('Error loading preferences from storage:', e.message);
+      } finally {
+        setIsLoadingPreferences(false);
       }
     };
-    loadPreferences();
-  }, [systemColorScheme]);
 
-  const toggleTheme = async () => {
-    const nextMode = !isDarkMode;
-    setIsDarkMode(nextMode);
-    await setItem(THEME_KEY, nextMode ? 'dark' : 'light');
+    loadStoredPreferences();
+  }, []);
+
+  // Toggle or explicitly set size mode
+  const setSizeMode = async (mode) => {
+    const targetMode = mode === 'xlarge' ? 'xlarge' : mode === 'large' ? 'large' : 'standard';
+    setSizeModeState(targetMode);
+    try {
+      await AsyncStorage.setItem(SIZE_MODE_KEY, targetMode);
+    } catch (e) {
+      console.log('Error saving size mode:', e.message);
+    }
   };
 
-  // Cycles through normal (1.0) -> medium (1.15) -> large (1.30)
-  const cycleUiScale = async () => {
-    let nextScale = 1.0;
-    if (uiScale === 1.0) nextScale = 1.15;
-    else if (uiScale === 1.15) nextScale = 1.30;
-    else nextScale = 1.0;
-
-    setUiScale(nextScale);
-    await setItem(SCALE_KEY, nextScale);
+  const toggleSizeMode = async () => {
+    const nextMode = sizeMode === 'large' || sizeMode === 'xlarge' ? 'standard' : 'large';
+    await setSizeMode(nextMode);
   };
+
+  // Set Language
+  const setLanguage = async (newLang) => {
+    setLanguageState(newLang);
+    try {
+      await AsyncStorage.setItem(LANGUAGE_KEY, newLang);
+    } catch (e) {
+      console.log('Error saving language:', e.message);
+    }
+  };
+
+  // Scale multiplier: 1.0 for Standard, 1.25 for Large, 1.4 for Extra Large
+  const scale = sizeMode === 'xlarge' ? 1.4 : sizeMode === 'large' ? 1.25 : 1.0;
+  const sizes = getScaledSizes(scale);
 
   return (
     <ThemeContext.Provider
       value={{
-        isDarkMode,
-        toggleTheme,
-        uiScale,
-        scale: uiScale,
-        cycleUiScale,
+        sizeMode,
+        isLarge: sizeMode !== 'standard',
+        scale,
+        sizes,
+        language,
+        setLanguage,
+        availableLanguages: AVAILABLE_LANGUAGES,
+        availableDisplaySizes: AVAILABLE_DISPLAY_SIZES,
+        colors: COLORS,
+        setSizeMode,
+        toggleSizeMode,
+        isLoadingPreferences,
       }}
     >
       {children}
@@ -68,3 +102,4 @@ export const ThemeProvider = ({ children }) => {
 };
 
 export const useTheme = () => useContext(ThemeContext);
+
