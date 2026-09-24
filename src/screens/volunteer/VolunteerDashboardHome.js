@@ -13,23 +13,26 @@ import {
   Platform,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
-import NotificationsModal from '../../components/common/NotificationsModal';
+import AvatarActionModal from '../../components/common/AvatarActionModal';
 import * as volunteerService from '../../services/volunteerService';
 import * as messageService from '../../services/messageService';
 import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerDashboardHome({ onNavigateTab }) {
-  const { user } = useAuth();
+  const { user, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
 
   // State management
   const [isOnline, setIsOnline] = useState(true);
-  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
@@ -66,6 +69,98 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const volunteerLocation = user?.address?.city
     ? `${user.address.city}, ${user.address.district || 'Colombo'}`
     : 'Colombo 03';
+
+  // Profile Picture Status & Handlers
+  const hasProfilePic = Boolean(user?.profilePicture || user?.avatar);
+  const initials = `${user?.firstName?.[0] || 'V'}${user?.lastName?.[0] || ''}`.toUpperCase();
+
+  const handlePickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required to change profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar gallery pick/upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required to take a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar camera upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      if (deleteProfilePicture) {
+        await deleteProfilePicture();
+      }
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+      Alert.alert('Success', 'Profile picture removed successfully');
+    } catch (err) {
+      console.error('Remove avatar error:', err);
+      Alert.alert('Error', err.message || 'Could not remove profile picture');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   // Fetch real data from backend
   const loadDashboardData = useCallback(async () => {
@@ -268,27 +363,39 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* Avatar matching wireframe flame badge */}
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatarInner}>
-                <Text style={styles.avatarEmoji}>🔥</Text>
+            {/* Changeable Profile Picture */}
+            <TouchableOpacity
+              style={styles.avatarTouchable}
+              onPress={() => setAvatarModalVisible(true)}
+              activeOpacity={0.8}
+              disabled={uploadingAvatar}
+              accessibilityLabel="Change profile picture"
+              accessibilityRole="button"
+            >
+              <View style={styles.avatarContainer}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#1E3A8A" />
+                ) : hasProfilePic ? (
+                  <Image
+                    source={{ uri: user.profilePicture || user.avatar }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={styles.avatarInner}>
+                    <Text style={styles.avatarEmoji}>🔥</Text>
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Ionicons name={hasProfilePic ? 'pencil' : 'camera'} size={10} color="#FFFFFF" />
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.greetingContainer}>
               <View style={styles.greetingRow}>
                 <Text style={styles.greetingText}>
                   {getGreeting()}, {volunteerName} 👋
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setNotificationsVisible(true)}
-                  style={styles.bellButton}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Notifications"
-                >
-                  <Text style={styles.bellEmoji}>🔔</Text>
-                  <View style={styles.notifDot} />
-                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -837,14 +944,14 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- REAL NOTIFICATIONS MODAL --- */}
-      <NotificationsModal
-        visible={notificationsVisible}
-        onClose={() => setNotificationsVisible(false)}
-        onNotificationAction={() => {
-          setNotificationsVisible(false);
-          loadDashboardData();
-        }}
+      {/* --- AVATAR ACTION MODAL (CAMERA / GALLERY / REMOVE) --- */}
+      <AvatarActionModal
+        visible={avatarModalVisible}
+        onClose={() => setAvatarModalVisible(false)}
+        onTakePhoto={handleTakePhoto}
+        onPickPhoto={handlePickFromGallery}
+        onRemovePhoto={handleRemoveAvatar}
+        hasExistingPhoto={hasProfilePic}
       />
     </View>
   );
@@ -867,6 +974,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarTouchable: {
+    marginRight: 14,
+  },
   avatarContainer: {
     width: 48,
     height: 48,
@@ -874,7 +984,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   avatarInner: {
     width: 40,
@@ -887,35 +1002,36 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 22,
   },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#1E3A8A',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
   greetingContainer: {
     flex: 1,
   },
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   greetingText: {
     fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
     flex: 1,
-  },
-  bellButton: {
-    padding: 6,
-    position: 'relative',
-  },
-  bellEmoji: {
-    fontSize: 20,
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
   },
   locationRow: {
     flexDirection: 'row',
