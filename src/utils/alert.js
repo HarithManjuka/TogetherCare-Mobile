@@ -53,4 +53,6 @@ export const showAppAlert = (title, message = '', buttons = []) => {
   Alert.alert(title, message, buttons);
 };
 
+export const showAlert = showAppAlert;
 export default showAppAlert;
+
