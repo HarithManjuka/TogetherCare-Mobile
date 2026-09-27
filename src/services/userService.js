@@ -61,3 +61,17 @@ export const deleteProfilePicture = async () => {
   const response = await client.delete('/auth/profile-picture');
   return response.data;
 };
+
+/**
+ * Submit volunteer identity verification evidence (NIC / Student ID / Passport)
+ * @param {FormData} formData
+ */
+export const submitVolunteerVerification = async (formData) => {
+  const response = await client.post('/auth/volunteer-verification', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+  return response.data;
+};
+
