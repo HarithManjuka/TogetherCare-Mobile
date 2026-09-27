@@ -635,27 +635,6 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
               <Text style={styles.infoValue}>{(user.verificationBadgeStatus || 'unverified').toUpperCase()}</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              {user.verificationBadgeStatus !== 'verified' ? (
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
-                  onPress={() => handleUpdateVerificationStatus('verified')}
-                  disabled={isActionLoading}
-                >
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Approve Badge</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#DC2626', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
-                  onPress={() => handleUpdateVerificationStatus('rejected')}
-                  disabled={isActionLoading}
-                >
-                  <Ionicons name="close-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Revoke Badge</Text>
-                </TouchableOpacity>
-              )}
-            </View>
           </View>
         )}
 
