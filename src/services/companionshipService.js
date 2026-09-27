@@ -54,4 +54,14 @@ export const cancelRequest = async (id) => {
   return response.data;
 };
 
+/**
+ * Update status of companionship visit (accepted -> ongoing -> completed / cancelled)
+ * @param {string} id
+ * @param {string} status
+ */
+export const updateStatus = async (id, status) => {
+  const response = await client.put(`/companionship/${id}/status`, { status });
+  return response.data;
+};
+
 

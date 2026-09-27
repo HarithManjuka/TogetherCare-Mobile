@@ -45,6 +45,14 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     },
   });
 
+  // Mutation to update status (accepted -> ongoing -> completed)
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => companionshipService.updateStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
+    },
+  });
+
   // Helper to categorize schedules
   const categorized = useMemo(() => {
     const requested = [];
@@ -52,29 +60,19 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     const ongoing = [];
     const completed = [];
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
     const schedulesList = Array.isArray(schedule) ? schedule : [];
 
     schedulesList.forEach((item) => {
       const status = (item.status || 'pending').toLowerCase();
-      const schedDate = item.scheduledDate
-        ? new Date(item.scheduledDate).toISOString().split('T')[0]
-        : '';
 
       if (status === 'pending') {
         requested.push(item);
       } else if (status === 'completed' || status === 'cancelled') {
         completed.push(item);
-      } else if (status === 'ongoing' || status === 'in_progress') {
+      } else if (status === 'ongoing' || status === 'in_progress' || status === 'arrived') {
         ongoing.push(item);
       } else if (status === 'accepted' || status === 'scheduled') {
-        if (schedDate === todayStr) {
-          upcoming.push(item);
-        } else {
-          upcoming.push(item);
-        }
+        upcoming.push(item);
       } else {
         requested.push(item);
       }
@@ -244,6 +242,8 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     onRefresh: refetch,
     cancelRequest: cancelMutation.mutateAsync,
     isCancelling: cancelMutation.isPending,
+    updateVisitStatus: updateStatusMutation.mutateAsync,
+    isUpdatingStatus: updateStatusMutation.isPending,
     activeTab,
     setActiveTab,
     currentList,

@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
 import { getAllOffers, acceptOffer } from '../../services/volunteerOfferService';
 import VolunteerProfileDetailModal from '../../components/elderly/VolunteerProfileDetailModal';
+import VolunteerOfferDetailModal from '../../components/elderly/VolunteerOfferDetailModal';
 
 const CATEGORIES = [
   'All',
@@ -45,6 +46,10 @@ export default function ElderlyRequestsScreen({
   // Selected offer for detailed profile inspection modal
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [profileModalVisible, setProfileModalVisible] = useState(false);
+
+  // Selected offer for full details & interactive map modal
+  const [selectedDetailOffer, setSelectedDetailOffer] = useState(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   // In-app Confirmation Modal State (Reliable across Web, iOS, Android)
   const [confirmingOffer, setConfirmingOffer] = useState(null);
@@ -92,6 +97,11 @@ export default function ElderlyRequestsScreen({
     setProfileModalVisible(true);
   };
 
+  const handleOpenDetails = (offer) => {
+    setSelectedDetailOffer(offer);
+    setDetailModalVisible(true);
+  };
+
   // Open the confirmation modal sheet
   const handlePromptAccept = (offer) => {
     setErrorMessage('');
@@ -109,6 +119,7 @@ export default function ElderlyRequestsScreen({
         const bookedOffer = confirmingOffer;
         setConfirmingOffer(null);
         setProfileModalVisible(false);
+        setDetailModalVisible(false);
         setSuccessOffer(bookedOffer);
         fetchOffers();
       } else {
@@ -140,9 +151,13 @@ export default function ElderlyRequestsScreen({
           },
         ]}
       >
-        {/* Card Header */}
+        {/* Card Header: Clickable Profile Avatar & Name */}
         <View style={styles.cardHeader}>
-          <View style={styles.volunteerInfo}>
+          <TouchableOpacity
+            style={styles.volunteerInfo}
+            activeOpacity={0.75}
+            onPress={() => handleOpenProfile(item)}
+          >
             <View
               style={[
                 styles.avatarCircle,
@@ -152,6 +167,11 @@ export default function ElderlyRequestsScreen({
               <Text style={styles.avatarInitial}>
                 {(item.volunteerName || 'V').charAt(0).toUpperCase()}
               </Text>
+              {isVerified && (
+                <View style={styles.avatarVerifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                </View>
+              )}
             </View>
 
             <View style={styles.volunteerDetails}>
@@ -166,16 +186,16 @@ export default function ElderlyRequestsScreen({
                 </Text>
                 {isVerified && (
                   <View style={styles.verifiedMiniBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                    <Ionicons name="shield-checkmark" size={14} color="#10B981" />
                   </View>
                 )}
               </View>
 
               <Text style={styles.volunteerSubtext}>
-                {item.volunteerId?.educationalInstitution || 'Community Volunteer'}
+                {item.volunteerId?.educationalInstitution || 'Community Volunteer'} · Tap for profile
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Slots badge */}
           <View style={styles.slotsPill}>
@@ -186,12 +206,14 @@ export default function ElderlyRequestsScreen({
           </View>
         </View>
 
-        {/* Date & Time Bar */}
-        <View
+        {/* Date, Time & Location Bar */}
+        <TouchableOpacity
           style={[
             styles.dateTimeBar,
             { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' },
           ]}
+          activeOpacity={0.8}
+          onPress={() => handleOpenDetails(item)}
         >
           <View style={styles.metaCol}>
             <Ionicons name="calendar" size={15} color="#3B82F6" />
@@ -222,18 +244,18 @@ export default function ElderlyRequestsScreen({
           <View style={styles.metaDivider} />
 
           <View style={styles.metaCol}>
-            <Ionicons name="location" size={15} color="#10B981" />
+            <Ionicons name="location" size={15} color="#DC2626" />
             <Text
               numberOfLines={1}
               style={[
                 styles.metaText,
-                { color: isDark ? '#CBD5E1' : '#334155' },
+                { color: isDark ? '#CBD5E1' : '#334155', fontWeight: '700' },
               ]}
             >
               {item.serviceArea}
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Services Badges */}
         <View style={styles.servicesRow}>
@@ -270,8 +292,34 @@ export default function ElderlyRequestsScreen({
           </Text>
         )}
 
-        {/* Actions Button Group */}
+        {/* Actions Button Group: View Details & Map | View Profile | Accept Visit */}
         <View style={styles.cardActionsRow}>
+          <TouchableOpacity
+            style={[
+              styles.viewDetailsCardBtn,
+              {
+                borderColor: isDark ? '#3B82F6' : '#BFDBFE',
+                backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF',
+              },
+            ]}
+            onPress={() => handleOpenDetails(item)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name="map-outline"
+              size={16}
+              color={isDark ? '#93C5FD' : '#1D4ED8'}
+            />
+            <Text
+              style={[
+                styles.viewDetailsCardBtnText,
+                { color: isDark ? '#93C5FD' : '#1D4ED8' },
+              ]}
+            >
+              View Details
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.viewProfileBtn,
@@ -285,7 +333,7 @@ export default function ElderlyRequestsScreen({
           >
             <Ionicons
               name="person-circle-outline"
-              size={18}
+              size={16}
               color={isDark ? '#CBD5E1' : '#475569'}
             />
             <Text
@@ -294,7 +342,7 @@ export default function ElderlyRequestsScreen({
                 { color: isDark ? '#CBD5E1' : '#475569' },
               ]}
             >
-              View Profile
+              Profile
             </Text>
           </TouchableOpacity>
 
@@ -303,8 +351,8 @@ export default function ElderlyRequestsScreen({
             onPress={() => handlePromptAccept(item)}
             activeOpacity={0.85}
           >
-            <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" />
-            <Text style={styles.acceptCardBtnText}>Accept Visit</Text>
+            <Ionicons name="checkmark-circle-outline" size={17} color="#FFFFFF" />
+            <Text style={styles.acceptCardBtnText}>Accept</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -497,7 +545,23 @@ export default function ElderlyRequestsScreen({
         />
       )}
 
-      {/* 1. Volunteer Profile Inspection Modal */}
+      {/* 1. Full Volunteer Offer Details & Location Interactive Map Modal */}
+      <VolunteerOfferDetailModal
+        visible={detailModalVisible}
+        offer={selectedDetailOffer}
+        onClose={() => setDetailModalVisible(false)}
+        onViewProfile={(offer) => {
+          setDetailModalVisible(false);
+          handleOpenProfile(offer);
+        }}
+        onAccept={(offer) => {
+          setDetailModalVisible(false);
+          handlePromptAccept(offer);
+        }}
+        isAccepting={isAccepting}
+      />
+
+      {/* 2. Volunteer Profile Inspection Modal */}
       <VolunteerProfileDetailModal
         visible={profileModalVisible}
         onClose={() => setProfileModalVisible(false)}
@@ -949,10 +1013,31 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 18,
   },
+  avatarVerifiedBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+  },
   cardActionsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
     marginTop: 4,
+  },
+  viewDetailsCardBtn: {
+    flex: 1.3,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    gap: 5,
+  },
+  viewDetailsCardBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   viewProfileBtn: {
     flex: 1,
@@ -962,21 +1047,21 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
-    gap: 6,
+    gap: 5,
   },
   viewProfileBtnText: {
     fontSize: 13,
     fontWeight: '600',
   },
   acceptCardBtn: {
-    flex: 1.3,
+    flex: 1.1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#2563EB',
     paddingVertical: 10,
     borderRadius: 12,
-    gap: 6,
+    gap: 5,
     shadowColor: '#2563EB',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
