@@ -284,6 +284,60 @@ export const getCreateCompanionshipScreenStyles = (scale = 1.0) =>
       transform: [{ scale: 1.05 }],
     },
 
+    // Step 4 & 5: Address & Notes Inputs
+    inputGroup: {
+      marginBottom: Math.round(18 * scale),
+    },
+    inputLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 6,
+    },
+    inputLabel: {
+      fontSize: Math.round(15 * scale),
+      fontWeight: '800',
+      color: '#1A365D',
+    },
+    inputOptionalBadge: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '600',
+      color: '#64748B',
+      backgroundColor: '#F1F5F9',
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    inputHint: {
+      fontSize: Math.round(12 * scale),
+      color: '#64748B',
+      marginBottom: 8,
+      lineHeight: 16,
+    },
+    textInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#F8FAFC',
+      borderWidth: 1.5,
+      borderColor: '#CBD5E1',
+      borderRadius: 14,
+      paddingHorizontal: 12,
+    },
+    inputIcon: {
+      marginRight: 8,
+    },
+    textInput: {
+      flex: 1,
+      fontSize: Math.round(14 * scale),
+      color: '#0F172A',
+      paddingVertical: Math.round(12 * scale),
+    },
+    multilineTextInput: {
+      minHeight: Math.round(76 * scale),
+      textAlignVertical: 'top',
+      paddingTop: Math.round(10 * scale),
+    },
+
     // Sticky Bottom Action Bar
     bottomBar: {
       paddingHorizontal: 20,

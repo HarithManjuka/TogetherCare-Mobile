@@ -122,10 +122,10 @@ export default function ElderlyDashboardHome({
 
   const handleQuickAction = (featureName) => {
     if (featureName === 'Request Help' || featureName === 'Companionship') {
-      if (onNavigateTab) {
-        onNavigateTab('requests');
-      } else if (onRequestHelp) {
+      if (onRequestHelp) {
         onRequestHelp();
+      } else if (onNavigateTab) {
+        onNavigateTab('requests');
       }
       return;
     }
@@ -446,7 +446,7 @@ export default function ElderlyDashboardHome({
               </Text>
               <TouchableOpacity
                 style={styles.emptyActionBtn}
-                onPress={() => handleQuickAction('Request Help')}
+                onPress={() => onNavigateTab ? onNavigateTab('requests') : handleQuickAction('Request Help')}
               >
                 <Text style={styles.emptyActionBtnText}>Browse Volunteer Offers</Text>
               </TouchableOpacity>
