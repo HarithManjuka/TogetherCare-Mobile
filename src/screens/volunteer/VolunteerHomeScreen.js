@@ -14,7 +14,10 @@ import CaregiverChatScreen from '../caregiver/CaregiverChatScreen';
 import * as volunteerService from '../../services/volunteerService';
 import * as notificationService from '../../services/notificationService';
 import * as messageService from '../../services/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
+
+const LAST_SEEN_VOLUNTEER_REQUESTS_KEY = '@last_seen_volunteer_requests_time';
 
 export default function VolunteerHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'messages' | 'history' | 'profile'
@@ -33,22 +36,48 @@ export default function VolunteerHomeScreen() {
     }
   }, [activeChatUser, currentTab]);
 
+  // Immediately clear badge count to 0 whenever volunteer visits the request page
+  useEffect(() => {
+    if (currentTab === 'request') {
+      const now = new Date().toISOString();
+      AsyncStorage.setItem(LAST_SEEN_VOLUNTEER_REQUESTS_KEY, now).catch(() => {});
+      setRequestCount(0);
+    }
+  }, [currentTab]);
+
   // Dynamically update available & direct request badge count + notification & message status
   useEffect(() => {
+    if (currentTab === 'request') {
+      setRequestCount(0);
+      return;
+    }
+
     Promise.allSettled([
       volunteerService.getAvailableRequests(),
       volunteerService.getDirectRequests(),
       notificationService.getUnreadCount ? notificationService.getUnreadCount() : Promise.resolve({ count: 0 }),
+      AsyncStorage.getItem(LAST_SEEN_VOLUNTEER_REQUESTS_KEY),
     ])
-      .then(([availRes, directRes, notifRes]) => {
-        let totalReqs = 0;
+      .then(([availRes, directRes, notifRes, lastSeenRes]) => {
+        let allReqs = [];
         if (availRes.status === 'fulfilled' && availRes.value?.success) {
-          totalReqs += (availRes.value.count || availRes.value.data?.length || 0);
+          allReqs = allReqs.concat(availRes.value.data || []);
         }
         if (directRes.status === 'fulfilled' && directRes.value?.success) {
-          totalReqs += (directRes.value.count || directRes.value.data?.length || 0);
+          allReqs = allReqs.concat(directRes.value.data || []);
         }
-        setRequestCount(totalReqs);
+
+        const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
+        if (!lastSeenTime) {
+          setRequestCount(allReqs.length);
+        } else {
+          const lastSeenDate = new Date(lastSeenTime);
+          const unseenReqs = allReqs.filter((r) => {
+            if (!r.createdAt) return false;
+            return new Date(r.createdAt) > lastSeenDate;
+          });
+          setRequestCount(unseenReqs.length);
+        }
 
         if (notifRes.status === 'fulfilled' && notifRes.value?.count > 0) {
           setHasUnreadNotifications(true);
