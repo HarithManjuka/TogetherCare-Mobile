@@ -1,16 +1,17 @@
-# .coderabbit.yaml
-version: "2"
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 language: "en-US"
 reviews:
-  profile: "chill" # Options: chill, assertive
-  request_tools:
-    - "github-checks"
+  profile: "chill"
+  high_level_summary: true
+  review_status: true
   auto_review:
     enabled: true
-    # Specify branches CodeRabbit should auto-review PRs for
-    target_branches:
-      - "dev"
+    drafts: false
+    base_branches:
       - "main"
+      - "dev"
+      - "feature/.*"
+      - ".*"
   path_instructions:
     - path: "src/screens/elderly/**"
       instructions: "Enforce high contrast UI standards, readable font sizes, and accessible touch targets >= 48dp."

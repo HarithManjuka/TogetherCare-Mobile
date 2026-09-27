@@ -11,12 +11,15 @@ import {
   ActivityIndicator,
   Platform,
   Switch,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import client from '../../api/client';
+import * as caregiverService from '../../services/caregiverService';
 import LogoutModal from '../../components/common/LogoutModal';
 import AvatarActionModal from '../../components/common/AvatarActionModal';
 import EditProfileModal from '../../components/common/EditProfileModal';
@@ -38,6 +41,13 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVerifyEmailModal, setShowVerifyEmailModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Caregiver certifications state (Sprint 1)
+  const [showAddCertModal, setShowAddCertModal] = useState(false);
+  const [certTitle, setCertTitle] = useState('');
+  const [certOrg, setCertOrg] = useState('');
+  const [certNum, setCertNum] = useState('');
+  const [certLoading, setCertLoading] = useState(false);
 
   // Volunteer specific preferences state
   const [isAvailable, setIsAvailable] = useState(true);
@@ -110,8 +120,64 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
     }
   };
 
+  // Certification Handlers (Sprint 1)
+  const handleAddCertification = async () => {
+    if (!certTitle.trim() || !certOrg.trim()) {
+      Alert.alert('Required Fields', 'Please enter certification title and issuing organization.');
+      return;
+    }
+
+    try {
+      setCertLoading(true);
+      const res = await caregiverService.addCertification({
+        title: certTitle.trim(),
+        issuingOrganization: certOrg.trim(),
+        certificateNumber: certNum.trim(),
+      });
+
+      if (res?.success) {
+        Alert.alert('Success', 'Certification added to your professional profile!');
+        setCertTitle('');
+        setCertOrg('');
+        setCertNum('');
+        setShowAddCertModal(false);
+        refreshProfile();
+      } else {
+        Alert.alert('Error', res?.message || 'Failed to add certification');
+      }
+    } catch (err) {
+      console.error('Add Cert Error:', err);
+      Alert.alert('Error', 'Server error while adding certification');
+    } finally {
+      setCertLoading(false);
+    }
+  };
+
+  const handleDeleteCertification = (certId, title) => {
+    Alert.alert(
+      'Remove Certification',
+      `Are you sure you want to remove "${title}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await caregiverService.deleteCertification(certId);
+              refreshProfile();
+            } catch (err) {
+              console.error('Delete Cert Error:', err);
+              Alert.alert('Error', 'Could not remove certification.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const isVolunteer = user?.role === 'volunteer';
-  const isEmailVerified = user?.isEmailVerified || user?.accountStatus === 'active';
+  const isEmailVerified = Boolean(user?.isEmailVerified);
   const volunteerBadgeStatus = user?.verificationBadgeStatus || 'unverified';
 
   const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase() || 'TC';
@@ -128,7 +194,12 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+      <AppHeader
+        showLeftAction={!!onBack}
+        onLeftActionPress={onBack}
+      />
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
 
 
@@ -477,6 +548,97 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         </View>
       )}
 
+      {/* Professional Certifications & Credentials (Sprint 1) */}
+      {user?.role === 'caregiver' && (
+        <View style={styles.card}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={styles.cardSectionTitle}>Certifications & Credentials</Text>
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+              onPress={() => setShowAddCertModal(true)}
+            >
+              <Ionicons name="add-circle" size={18} color="#1E40AF" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E40AF' }}>Add New</Text>
+            </TouchableOpacity>
+          </View>
+
+          {(!user?.certifications || user.certifications.length === 0) ? (
+            <View style={{ paddingVertical: 14, alignItems: 'center' }}>
+              <Ionicons name="ribbon-outline" size={32} color="#94A3B8" />
+              <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 6 }}>
+                No professional certifications added yet.
+              </Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#EFF6FF',
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 6,
+                  marginTop: 10,
+                  borderWidth: 1,
+                  borderColor: '#BFDBFE',
+                }}
+                onPress={() => setShowAddCertModal(true)}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1E40AF' }}>
+                  + Add Professional Certificate
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            user.certifications.map((cert) => (
+              <View
+                key={cert._id}
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 8,
+                  padding: 12,
+                  marginBottom: 8,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#0F172A' }}>{cert.title}</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>{cert.issuingOrganization}</Text>
+                    {cert.certificateNumber ? (
+                      <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>ID: {cert.certificateNumber}</Text>
+                    ) : null}
+                  </View>
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <View
+                      style={{
+                        backgroundColor: cert.verificationStatus === 'verified' ? '#DCFCE7' : '#FEF3C7',
+                        paddingHorizontal: 8,
+                        paddingVertical: 2,
+                        borderRadius: 8,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 'bold',
+                          color: cert.verificationStatus === 'verified' ? '#16A34A' : '#D97706',
+                        }}
+                      >
+                        {cert.verificationStatus ? cert.verificationStatus.toUpperCase() : 'PENDING'}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteCertification(cert._id, cert.title)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="trash-outline" size={16} color="#DC2626" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            ))
+          )}
+        </View>
+      )}
+
       {/* Logout Action Button */}
       <TouchableOpacity style={styles.logoutButton} activeOpacity={0.8} onPress={() => setShowLogoutModal(true)}>
         <Ionicons name="log-out-outline" size={20} color="#DC2626" style={{ marginRight: 8 }} />
@@ -519,8 +681,79 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
           setShowVerifyEmailModal(false);
         }}
       />
+
+      {/* Add Certification Modal (Sprint 1) */}
+      <Modal
+        visible={showAddCertModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowAddCertModal(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.certModalCard}>
+            <View style={styles.certModalHeader}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Ionicons name="ribbon" size={22} color="#1E40AF" />
+                <Text style={styles.certModalTitle}>Add Certification</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowAddCertModal(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="close" size={22} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.certFieldLabel}>Certification Title *</Text>
+            <TextInput
+              style={styles.certTextInput}
+              placeholder="e.g. Certified Nursing Assistant (CNA), First Aid"
+              placeholderTextColor="#94A3B8"
+              value={certTitle}
+              onChangeText={setCertTitle}
+            />
+
+            <Text style={styles.certFieldLabel}>Issuing Organization *</Text>
+            <TextInput
+              style={styles.certTextInput}
+              placeholder="e.g. Red Cross, Ministry of Health"
+              placeholderTextColor="#94A3B8"
+              value={certOrg}
+              onChangeText={setCertOrg}
+            />
+
+            <Text style={styles.certFieldLabel}>Certificate ID / Number</Text>
+            <TextInput
+              style={styles.certTextInput}
+              placeholder="e.g. SL-CNA-2024-8891 (Optional)"
+              placeholderTextColor="#94A3B8"
+              value={certNum}
+              onChangeText={setCertNum}
+            />
+
+            <View style={styles.certModalActions}>
+              <TouchableOpacity
+                style={styles.certCancelBtn}
+                onPress={() => setShowAddCertModal(false)}
+                disabled={certLoading}
+              >
+                <Text style={styles.certCancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.certSaveBtn, certLoading && { opacity: 0.7 }]}
+                onPress={handleAddCertification}
+                disabled={certLoading}
+              >
+                {certLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.certSaveBtnText}>Save Certificate</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
-  );
+  </View>
+);
 }
 
 // Reusable Sub-Row Component
@@ -912,5 +1145,83 @@ export const getProfileScreenStyles = (scale = 1.0) =>
       fontWeight: '800',
       color: '#1E40AF',
       letterSpacing: 0.5,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: Math.round(20 * scale),
+    },
+    certModalCard: {
+      backgroundColor: '#FFFFFF',
+      borderRadius: 16,
+      padding: Math.round(20 * scale),
+      width: '100%',
+      maxWidth: 420,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 10,
+      elevation: 5,
+    },
+    certModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    certModalTitle: {
+      fontSize: Math.round(17 * scale),
+      fontWeight: '800',
+      color: '#0F172A',
+    },
+    certFieldLabel: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '700',
+      color: '#475569',
+      marginBottom: 6,
+      marginTop: 8,
+    },
+    certTextInput: {
+      backgroundColor: '#F8FAFC',
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      fontSize: Math.round(13 * scale),
+      color: '#0F172A',
+    },
+    certModalActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 20,
+    },
+    certCancelBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: '#CBD5E1',
+      alignItems: 'center',
+      backgroundColor: '#F8FAFC',
+    },
+    certCancelBtnText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '700',
+      color: '#64748B',
+    },
+    certSaveBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      backgroundColor: '#1E40AF',
+    },
+    certSaveBtnText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '700',
+      color: '#FFFFFF',
     },
   });

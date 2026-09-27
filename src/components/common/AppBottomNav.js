@@ -5,23 +5,69 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
+ * Role-based default tab configurations for TogetherCare
+ */
+export const ROLE_TABS = {
+  admin: [
+    { key: 'dashboard', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
+    { key: 'users', label: 'Users', icon: 'people', iconOutline: 'people-outline' },
+    { key: 'alerts', label: 'Alerts', icon: 'shield-checkmark', iconOutline: 'shield-checkmark-outline' },
+    { key: 'settings', label: 'Settings', icon: 'settings', iconOutline: 'settings-outline' },
+  ],
+  elderly: [
+    { key: 'home', label: 'Home', icon: 'home', iconOutline: 'home-outline' },
+    { key: 'requests', label: 'Requests', icon: 'heart', iconOutline: 'heart-outline' },
+    { key: 'schedule', label: 'Schedule', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Msg', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
+    { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
+  ],
+  volunteer: [
+    { key: 'home', label: 'Home', icon: 'grid', iconOutline: 'grid-outline' },
+    { key: 'request', label: 'Request', icon: 'clipboard', iconOutline: 'clipboard-outline' },
+    { key: 'schedule', label: 'Schedule', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
+    { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
+  ],
+  caregiver: [
+    { key: 'home', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
+    { key: 'assignments', label: 'Tasks', icon: 'briefcase', iconOutline: 'briefcase-outline' },
+    { key: 'requests', label: 'Visits', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
+    { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
+  ],
+  family_member: [
+    { key: 'home', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
+    { key: 'dependents', label: 'Dependents', icon: 'people', iconOutline: 'people-outline' },
+    { key: 'requests', label: 'Visits', icon: 'calendar', iconOutline: 'calendar-outline' },
+    { key: 'messages', label: 'Chat', icon: 'chatbubbles', iconOutline: 'chatbubbles-outline' },
+    { key: 'profile', label: 'Profile', icon: 'person', iconOutline: 'person-outline' },
+  ],
+};
+
+/**
  * Unified Production-Grade Bottom Navigation Component for TogetherCare
  * Standardizes navigation bar styling across Admin, Volunteer, Elderly & Caregiver roles.
  *
  * Props:
- * - tabs: Array of tab objects:
- *     [{ key: 'home', label: 'Home', icon: 'home', iconOutline: 'home-outline', badge?: number }]
+ * - role?: string ('admin' | 'elderly' | 'volunteer' | 'caregiver' | 'family_member')
+ * - tabs?: Array of tab objects (overrides role defaults if provided)
  * - activeTab: string (current active tab key)
- * - onTabPress: function(tabKey: string)
- * - activeColor?: string (optional active theme color, defaults to '#1E40AF')
- * - activePillColor?: string (optional active pill background, defaults to '#DBEAFE')
- * - inactiveColor?: string (optional inactive color, defaults to '#64748B')
+ * - onTabPress / onSelectTab: function(tabKey: string)
+ * - requestBadgeCount?: number
+ * - msgBadgeCount?: number
+ * - activeColor?: string (defaults to '#1E40AF')
+ * - activePillColor?: string (defaults to '#DBEAFE')
+ * - inactiveColor?: string (defaults to '#64748B')
  * - scale?: number (theme font/icon scale factor)
  */
 export default function AppBottomNav({
-  tabs = [],
+  role,
+  tabs,
   activeTab,
   onTabPress,
+  onSelectTab,
+  requestBadgeCount,
+  msgBadgeCount,
   activeColor = '#1E40AF',
   activePillColor = '#DBEAFE',
   inactiveColor = '#64748B',
@@ -30,10 +76,27 @@ export default function AppBottomNav({
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 8);
 
+  const rawTabs = tabs && tabs.length > 0 ? tabs : (role && ROLE_TABS[role]) ? ROLE_TABS[role] : [];
+
+  const finalTabs = rawTabs.map((tab) => {
+    if ((tab.key === 'requests' || tab.key === 'request') && requestBadgeCount !== undefined) {
+      return { ...tab, badge: requestBadgeCount };
+    }
+    if (
+      (tab.key === 'messages' || tab.key === 'msg' || tab.key === 'chat') &&
+      msgBadgeCount !== undefined
+    ) {
+      return { ...tab, badge: msgBadgeCount };
+    }
+    return tab;
+  });
+
+  const handlePress = onTabPress || onSelectTab || (() => {});
+
   return (
     <View style={[styles.navContainer, { paddingBottom: bottomPadding }]}>
       <View style={styles.navBar}>
-        {tabs.map((tab) => {
+        {finalTabs.map((tab) => {
           const tabKey = tab.key || tab.id;
           const isActive = activeTab === tabKey;
           const iconName = isActive
@@ -46,7 +109,7 @@ export default function AppBottomNav({
               key={tabKey}
               style={styles.tabButton}
               activeOpacity={0.7}
-              onPress={() => onTabPress(tabKey)}
+              onPress={() => handlePress(tabKey)}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={`${tab.label} tab`}
@@ -62,7 +125,7 @@ export default function AppBottomNav({
                 {badgeCount && badgeCount > 0 ? (
                   <View style={styles.badge}>
                     <Text style={styles.badgeText}>
-                      {badgeCount > 9 ? '9+' : badgeCount}
+                      {badgeCount > 99 ? '99+' : badgeCount}
                     </Text>
                   </View>
                 ) : null}
@@ -127,22 +190,29 @@ const styles = StyleSheet.create({
   badge: {
     position: 'absolute',
     top: -4,
-    right: -2,
+    right: 4,
     backgroundColor: '#EF4444',
     borderRadius: 9,
-    minWidth: 16,
-    height: 16,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
     borderWidth: 1.5,
     borderColor: '#FFFFFF',
     zIndex: 10,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.35,
+    shadowRadius: 2,
+    elevation: 4,
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 12,
   },
   tabLabel: {
     fontWeight: '600',

@@ -103,6 +103,7 @@ export default function CalendarDatePickerModal({
     }
 
     onConfirm(dateString);
+    if (onClose) onClose();
   };
 
   // Generate years list (e.g. 1910 to currentYear)
