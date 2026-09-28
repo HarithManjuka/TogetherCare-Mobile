@@ -28,6 +28,7 @@ export default function ElderlyDashboardHome({
   onOpenProfile,
   onOpenNotifications,
   hasUnreadNotifications = false,
+  unreadNotificationCount = 0,
 }) {
   const {
     user,
@@ -162,6 +163,7 @@ export default function ElderlyDashboardHome({
         onNotificationPress={onOpenNotifications || (() => handleActionPress('Notifications'))}
         onNavigateTab={onNavigateTab}
         hasUnreadNotifications={hasUnreadNotifications}
+        unreadNotificationsCount={unreadNotificationCount}
       />
 
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
