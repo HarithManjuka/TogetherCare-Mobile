@@ -25,6 +25,8 @@ export default function NotificationsModal({ visible, onClose, onNotificationAct
       const res = await notificationService.getNotifications();
       if (res?.success) {
         setNotifications(res.data || []);
+        // Automatically mark all as read so badge count resets to 0
+        notificationService.markAllAsRead().catch(() => {});
       }
     } catch (err) {
       console.error('Fetch Notifications Error:', err);
@@ -66,7 +68,8 @@ export default function NotificationsModal({ visible, onClose, onNotificationAct
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'sos_alert':
-        return { name: 'warning', color: '#DC2626', bg: '#FEE2E2' };
+      case 'visit_cancelled':
+        return { name: 'close-circle', color: '#DC2626', bg: '#FEE2E2' };
       case 'volunteer_matched':
       case 'visit_approved':
         return { name: 'checkmark-circle', color: '#16A34A', bg: '#DCFCE7' };

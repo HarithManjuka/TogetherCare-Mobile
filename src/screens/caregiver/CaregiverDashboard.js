@@ -19,8 +19,13 @@ import FeedbackScreen from './FeedbackScreen';
 import ProfileScreen from '../auth/ProfileScreen';
 import AppBottomNav from '../../components/common/AppBottomNav';
 import AppHeader from '../../components/common/AppHeader';
+import NotificationsModal from '../../components/common/NotificationsModal';
+import * as notificationService from '../../services/notificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from '../../api/client';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
+
+const LAST_SEEN_CAREGIVER_NOTIFICATIONS_KEY = '@last_seen_caregiver_notifications_time';
 
 export default function CaregiverDashboard() {
   const { user } = useAuth();
@@ -30,6 +35,9 @@ export default function CaregiverDashboard() {
   const [activeRequestId, setActiveRequestId] = useState(null);
   const [selectedVolunteerId, setSelectedVolunteerId] = useState(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
 
   // Selected chat partner for CaregiverChatScreen (US-403)
   const [chatPartner, setChatPartner] = useState(null);
@@ -49,6 +57,47 @@ export default function CaregiverDashboard() {
       refreshUnreadMsgs();
     }
   }, [currentScreen]);
+
+  // Fetch notifications and unread badge count
+  useEffect(() => {
+    Promise.allSettled([
+      notificationService.getNotifications ? notificationService.getNotifications() : notificationService.getUnreadCount(),
+      AsyncStorage.getItem(LAST_SEEN_CAREGIVER_NOTIFICATIONS_KEY),
+    ])
+      .then(([notifRes, lastSeenNotifRes]) => {
+        if (notifRes.status === 'fulfilled') {
+          const notifs = notifRes.value?.data || [];
+          const lastSeenNotifTime = lastSeenNotifRes.status === 'fulfilled' ? lastSeenNotifRes.value : null;
+          let count = 0;
+
+          if (Array.isArray(notifs) && notifs.length > 0) {
+            if (!lastSeenNotifTime) {
+              count = notifs.filter((n) => !n.isRead).length;
+            } else {
+              const lastSeenDate = new Date(lastSeenNotifTime);
+              count = notifs.filter((n) => !n.isRead && n.createdAt && new Date(n.createdAt) > lastSeenDate).length;
+            }
+          } else {
+            count = notifRes.value?.unreadCount ?? notifRes.value?.count ?? 0;
+          }
+
+          setUnreadNotificationCount(count);
+          setHasUnreadNotifications(count > 0);
+        } else {
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }
+      })
+      .catch(() => {});
+  }, [currentScreen, notificationsVisible, refreshTrigger]);
+
+  const handleOpenNotifications = () => {
+    const now = new Date().toISOString();
+    AsyncStorage.setItem(LAST_SEEN_CAREGIVER_NOTIFICATIONS_KEY, now).catch(() => {});
+    setUnreadNotificationCount(0);
+    setHasUnreadNotifications(false);
+    setNotificationsVisible(true);
+  };
 
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
@@ -334,6 +383,9 @@ export default function CaregiverDashboard() {
         <AppHeader
           onProfilePress={() => setCurrentScreen('profile')}
           onNavigateTab={handleSelectTab}
+          onNotificationPress={handleOpenNotifications}
+          hasUnreadNotifications={hasUnreadNotifications}
+          unreadNotificationsCount={unreadNotificationCount}
         />
       )}
       <View style={styles.screenArea}>{renderScreen()}</View>
@@ -342,6 +394,20 @@ export default function CaregiverDashboard() {
         activeTab={getActiveTab()}
         onTabPress={handleSelectTab}
         msgBadgeCount={msgBadgeCount}
+      />
+      <NotificationsModal
+        visible={notificationsVisible}
+        onClose={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }}
+        onNotificationAction={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+          setCurrentScreen('upcoming-visits');
+        }}
       />
     </View>
   );

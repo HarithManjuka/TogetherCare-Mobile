@@ -17,11 +17,13 @@ import { useElderlyHome } from '../../hooks/useElderlyHome';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
 const LAST_SEEN_OFFERS_KEY = '@last_seen_offers_time';
+const LAST_SEEN_NOTIFICATIONS_KEY = '@last_seen_elderly_notifications_time';
 
 export default function ElderlyHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'requests' | 'schedule' | 'messages' | 'settings'
   const [requestCount, setRequestCount] = useState(0);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [showCreateScreen, setShowCreateScreen] = useState(false);
   const [showProfileScreen, setShowProfileScreen] = useState(false);
@@ -52,16 +54,16 @@ export default function ElderlyHomeScreen() {
   useEffect(() => {
     if (currentTab === 'requests') {
       setRequestCount(0);
-      return;
     }
 
     Promise.allSettled([
       volunteerOfferService.getAllOffers(),
-      notificationService.getUnreadCount ? notificationService.getUnreadCount() : Promise.resolve({ count: 0 }),
+      notificationService.getNotifications ? notificationService.getNotifications() : notificationService.getUnreadCount(),
       AsyncStorage.getItem(LAST_SEEN_OFFERS_KEY),
+      AsyncStorage.getItem(LAST_SEEN_NOTIFICATIONS_KEY),
     ])
-      .then(([offersRes, notifRes, lastSeenRes]) => {
-        if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
+      .then(([offersRes, notifRes, lastSeenRes, lastSeenNotifRes]) => {
+        if (currentTab !== 'requests' && offersRes.status === 'fulfilled' && offersRes.value?.success) {
           const offers = offersRes.value.data || [];
           const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
 
@@ -76,9 +78,27 @@ export default function ElderlyHomeScreen() {
             setRequestCount(unseenOffers.length);
           }
         }
-        if (notifRes.status === 'fulfilled' && notifRes.value?.count > 0) {
-          setHasUnreadNotifications(true);
+
+        if (notifRes.status === 'fulfilled') {
+          const notifs = notifRes.value?.data || [];
+          const lastSeenNotifTime = lastSeenNotifRes.status === 'fulfilled' ? lastSeenNotifRes.value : null;
+          let count = 0;
+
+          if (Array.isArray(notifs) && notifs.length > 0) {
+            if (!lastSeenNotifTime) {
+              count = notifs.filter((n) => !n.isRead).length;
+            } else {
+              const lastSeenDate = new Date(lastSeenNotifTime);
+              count = notifs.filter((n) => !n.isRead && n.createdAt && new Date(n.createdAt) > lastSeenDate).length;
+            }
+          } else {
+            count = notifRes.value?.unreadCount ?? notifRes.value?.count ?? 0;
+          }
+
+          setUnreadNotificationCount(count);
+          setHasUnreadNotifications(count > 0);
         } else {
+          setUnreadNotificationCount(0);
           setHasUnreadNotifications(false);
         }
       })
@@ -138,6 +158,14 @@ export default function ElderlyHomeScreen() {
     );
   }
 
+  const handleOpenNotifications = () => {
+    const now = new Date().toISOString();
+    AsyncStorage.setItem(LAST_SEEN_NOTIFICATIONS_KEY, now).catch(() => {});
+    setUnreadNotificationCount(0);
+    setHasUnreadNotifications(false);
+    setNotificationsVisible(true);
+  };
+
   const renderActiveScreen = () => {
     switch (currentTab) {
       case 'requests':
@@ -184,8 +212,9 @@ export default function ElderlyHomeScreen() {
             onNavigateTab={setCurrentTab}
             onRequestHelp={() => setShowCreateScreen(true)}
             onOpenProfile={() => setCurrentTab('profile')}
-            onOpenNotifications={() => setNotificationsVisible(true)}
+            onOpenNotifications={handleOpenNotifications}
             hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
     }
@@ -207,9 +236,15 @@ export default function ElderlyHomeScreen() {
 
       <NotificationsModal
         visible={notificationsVisible}
-        onClose={() => setNotificationsVisible(false)}
+        onClose={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }}
         onNotificationAction={() => {
           setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
           setCurrentTab('requests');
         }}
       />

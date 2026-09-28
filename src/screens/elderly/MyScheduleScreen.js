@@ -43,6 +43,8 @@ export default function MyScheduleScreen({ onBack, onRequestNew }) {
     formatScheduleDate,
     renderActivityIcon,
     renderCommIcon,
+    handleStartVisit,
+    handleCompleteVisit,
     handleCancelRequest,
     handleDeleteRequest,
     counts,
@@ -325,6 +327,41 @@ export default function MyScheduleScreen({ onBack, onRequestNew }) {
                       </TouchableOpacity>
                     </View>
                   )}
+
+                  {(item.status === 'accepted' || item.status === 'scheduled') && (
+                    <View style={styles.actionButtonsGroup}>
+                      <TouchableOpacity
+                        style={styles.startVisitBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleStartVisit(item)}
+                      >
+                        <Ionicons name="play" size={14} color="#1D4ED8" />
+                        <Text style={styles.startVisitBtnText}>Start Visit</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.cancelBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleCancelRequest(item)}
+                      >
+                        <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
+                        <Text style={styles.cancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {(item.status === 'ongoing' || item.status === 'in_progress' || item.status === 'arrived') && (
+                    <View style={styles.actionButtonsGroup}>
+                      <TouchableOpacity
+                        style={styles.completeVisitBtn}
+                        activeOpacity={0.8}
+                        onPress={() => handleCompleteVisit(item)}
+                      >
+                        <Ionicons name="checkmark-circle" size={14} color="#047857" />
+                        <Text style={styles.completeVisitBtnText}>Mark Completed</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
               </View>
             );
@@ -435,6 +472,52 @@ export default function MyScheduleScreen({ onBack, onRequestNew }) {
                     >
                       <Ionicons name="trash-outline" size={16} color="#DC2626" />
                       <Text style={[styles.deleteBtnText, { fontSize: 14 }]}>Delete Request</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Modal Start/Cancel Actions for Upcoming Visits */}
+                {(selectedSchedule.status === 'accepted' || selectedSchedule.status === 'scheduled') && (
+                  <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}>
+                    <TouchableOpacity
+                      style={[styles.startVisitBtn, { flex: 1, paddingVertical: 12 }]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const target = selectedSchedule;
+                        handleStartVisit(target);
+                      }}
+                    >
+                      <Ionicons name="play" size={16} color="#1D4ED8" />
+                      <Text style={[styles.startVisitBtnText, { fontSize: 14 }]}>Start Visit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.cancelBtn, { flex: 1, paddingVertical: 12 }]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const target = selectedSchedule;
+                        handleCancelRequest(target);
+                      }}
+                    >
+                      <Ionicons name="close-circle-outline" size={16} color="#DC2626" />
+                      <Text style={[styles.cancelBtnText, { fontSize: 14 }]}>Cancel Visit</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Modal Complete Action for Ongoing Visits */}
+                {(selectedSchedule.status === 'ongoing' || selectedSchedule.status === 'in_progress' || selectedSchedule.status === 'arrived') && (
+                  <View style={{ marginTop: 18 }}>
+                    <TouchableOpacity
+                      style={[styles.completeVisitBtn, { paddingVertical: 14 }]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const target = selectedSchedule;
+                        handleCompleteVisit(target);
+                      }}
+                    >
+                      <Ionicons name="checkmark-circle" size={18} color="#047857" style={{ marginRight: 6 }} />
+                      <Text style={[styles.completeVisitBtnText, { fontSize: 15 }]}>Mark Visit as Completed</Text>
                     </TouchableOpacity>
                   </View>
                 )}

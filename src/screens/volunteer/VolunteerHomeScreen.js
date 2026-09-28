@@ -18,11 +18,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
 const LAST_SEEN_VOLUNTEER_REQUESTS_KEY = '@last_seen_volunteer_requests_time';
+const LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY = '@last_seen_volunteer_notifications_time';
 
 export default function VolunteerHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'messages' | 'history' | 'profile'
   const [requestCount, setRequestCount] = useState(0);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
 
@@ -45,43 +47,71 @@ export default function VolunteerHomeScreen() {
     }
   }, [currentTab]);
 
+  const handleOpenNotifications = () => {
+    const now = new Date().toISOString();
+    AsyncStorage.setItem(LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY, now).catch(() => {});
+    setUnreadNotificationCount(0);
+    setHasUnreadNotifications(false);
+    setNotificationsVisible(true);
+  };
+
   // Dynamically update available & direct request badge count + notification & message status
   useEffect(() => {
-    if (currentTab === 'request') {
+    const isRequestTab = currentTab === 'request';
+    if (isRequestTab) {
       setRequestCount(0);
-      return;
     }
 
     Promise.allSettled([
-      volunteerService.getAvailableRequests(),
-      volunteerService.getDirectRequests(),
-      notificationService.getUnreadCount ? notificationService.getUnreadCount() : Promise.resolve({ count: 0 }),
+      isRequestTab ? Promise.resolve({ success: true, data: [] }) : volunteerService.getAvailableRequests(),
+      isRequestTab ? Promise.resolve({ success: true, data: [] }) : volunteerService.getDirectRequests(),
+      notificationService.getNotifications ? notificationService.getNotifications() : notificationService.getUnreadCount(),
       AsyncStorage.getItem(LAST_SEEN_VOLUNTEER_REQUESTS_KEY),
+      AsyncStorage.getItem(LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY),
     ])
-      .then(([availRes, directRes, notifRes, lastSeenRes]) => {
-        let allReqs = [];
-        if (availRes.status === 'fulfilled' && availRes.value?.success) {
-          allReqs = allReqs.concat(availRes.value.data || []);
-        }
-        if (directRes.status === 'fulfilled' && directRes.value?.success) {
-          allReqs = allReqs.concat(directRes.value.data || []);
+      .then(([availRes, directRes, notifRes, lastSeenRes, lastSeenNotifRes]) => {
+        if (!isRequestTab) {
+          let allReqs = [];
+          if (availRes.status === 'fulfilled' && availRes.value?.success) {
+            allReqs = allReqs.concat(availRes.value.data || []);
+          }
+          if (directRes.status === 'fulfilled' && directRes.value?.success) {
+            allReqs = allReqs.concat(directRes.value.data || []);
+          }
+
+          const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
+          if (!lastSeenTime) {
+            setRequestCount(allReqs.length);
+          } else {
+            const lastSeenDate = new Date(lastSeenTime);
+            const unseenReqs = allReqs.filter((r) => {
+              if (!r.createdAt) return false;
+              return new Date(r.createdAt) > lastSeenDate;
+            });
+            setRequestCount(unseenReqs.length);
+          }
         }
 
-        const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
-        if (!lastSeenTime) {
-          setRequestCount(allReqs.length);
-        } else {
-          const lastSeenDate = new Date(lastSeenTime);
-          const unseenReqs = allReqs.filter((r) => {
-            if (!r.createdAt) return false;
-            return new Date(r.createdAt) > lastSeenDate;
-          });
-          setRequestCount(unseenReqs.length);
-        }
+        if (notifRes.status === 'fulfilled') {
+          const notifs = notifRes.value?.data || [];
+          const lastSeenNotifTime = lastSeenNotifRes.status === 'fulfilled' ? lastSeenNotifRes.value : null;
+          let count = 0;
 
-        if (notifRes.status === 'fulfilled' && notifRes.value?.count > 0) {
-          setHasUnreadNotifications(true);
+          if (Array.isArray(notifs) && notifs.length > 0) {
+            if (!lastSeenNotifTime) {
+              count = notifs.filter((n) => !n.isRead).length;
+            } else {
+              const lastSeenDate = new Date(lastSeenNotifTime);
+              count = notifs.filter((n) => !n.isRead && n.createdAt && new Date(n.createdAt) > lastSeenDate).length;
+            }
+          } else {
+            count = notifRes.value?.unreadCount ?? notifRes.value?.count ?? 0;
+          }
+
+          setUnreadNotificationCount(count);
+          setHasUnreadNotifications(count > 0);
         } else {
+          setUnreadNotificationCount(0);
           setHasUnreadNotifications(false);
         }
       })
@@ -143,8 +173,9 @@ export default function VolunteerHomeScreen() {
         <AppHeader
           onProfilePress={() => setCurrentTab('profile')}
           onNavigateTab={setCurrentTab}
-          onNotificationPress={() => setNotificationsVisible(true)}
+          onNotificationPress={handleOpenNotifications}
           hasUnreadNotifications={hasUnreadNotifications}
+          unreadNotificationsCount={unreadNotificationCount}
         />
       )}
       <View style={styles.screenArea}>
@@ -159,9 +190,15 @@ export default function VolunteerHomeScreen() {
       />
       <NotificationsModal
         visible={notificationsVisible}
-        onClose={() => setNotificationsVisible(false)}
+        onClose={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }}
         onNotificationAction={() => {
           setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
           setCurrentTab('request');
         }}
       />

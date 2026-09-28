@@ -230,6 +230,74 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     }
   };
 
+  // Start / Move to Ongoing Handler
+  const handleStartVisit = (scheduleItem) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
+    const performStart = async () => {
+      try {
+        await updateStatusMutation.mutateAsync({ id: requestId, status: 'ongoing' });
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+          window.alert('Visit Started 🚀\n\nThis visit is now ongoing.');
+        } else {
+          Alert.alert('Visit Started 🚀', 'This visit is now ongoing.');
+        }
+        setSelectedSchedule(null);
+        setActiveTab('ongoing');
+      } catch (err) {
+        Alert.alert('Error', err.message || 'Failed to update visit status.');
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Start this companionship visit now?')) {
+        performStart();
+      }
+    } else {
+      Alert.alert(
+        'Start Visit',
+        'Are you ready to start this companionship visit with the volunteer?',
+        [
+          { text: 'Not Yet', style: 'cancel' },
+          { text: 'Yes, Start Visit', onPress: performStart },
+        ]
+      );
+    }
+  };
+
+  // Complete Visit Handler
+  const handleCompleteVisit = (scheduleItem) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
+    const performComplete = async () => {
+      try {
+        await updateStatusMutation.mutateAsync({ id: requestId, status: 'completed' });
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+          window.alert('Visit Completed! 🎉\n\nThank you for confirming your completed companionship visit.');
+        } else {
+          Alert.alert('Visit Completed! 🎉', 'Thank you for confirming your completed companionship visit.');
+        }
+        setSelectedSchedule(null);
+        setActiveTab('completed');
+      } catch (err) {
+        Alert.alert('Error', err.message || 'Failed to complete visit.');
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Mark this companionship visit as completed?')) {
+        performComplete();
+      }
+    } else {
+      Alert.alert(
+        'Complete Visit',
+        'Are you sure you want to mark this companionship visit as completed?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Yes, Mark Completed', onPress: performComplete },
+        ]
+      );
+    }
+  };
+
   return {
     schedule,
     schedules: schedule,
@@ -255,6 +323,8 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     formatScheduleDate,
     renderActivityIcon,
     renderCommIcon,
+    handleStartVisit,
+    handleCompleteVisit,
     handleCancelRequest,
     handleDeleteRequest,
     counts: {
