@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 import * as activityService from '../services/activityService';
 import * as companionshipService from '../services/companionshipService';
 
@@ -16,7 +17,20 @@ const FALLBACK_ACTIVITIES = [
   { name: 'Reading', icon: 'book-open-page-variant-outline', iconFamily: 'MaterialCommunityIcons' },
 ];
 
+const formatProfileAddress = (addr) => {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  const parts = [
+    addr.streetAddress,
+    addr.city,
+    addr.district,
+    addr.province,
+  ].filter(Boolean);
+  return parts.join(', ');
+};
+
 export function useCreateCompanionship({ onClose, onSuccess, editingRequest = null }) {
+  const { user } = useAuth();
   const [activities, setActivities] = useState(FALLBACK_ACTIVITIES);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(
@@ -47,6 +61,16 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
   const [communicationMethod, setCommunicationMethod] = useState(
     editingRequest?.communicationMethod || 'chat'
   );
+
+  // Location / Address: Default from profile, editable without changing profile
+  const [location, setLocation] = useState(
+    editingRequest?.location !== undefined
+      ? editingRequest.location
+      : formatProfileAddress(user?.address)
+  );
+
+  // Optional Note
+  const [notes, setNotes] = useState(editingRequest?.notes || '');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -177,7 +201,8 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
         endTime: activeToTime.replace(/\s+/g, ' '),
         timeSlot: `${activeFromTime} - ${activeToTime}`,
         communicationMethod: communicationMethod || 'chat',
-        notes: `Companionship for ${activeActivity}, communicate via ${communicationMethod || 'chat'}`,
+        location: (location || '').trim(),
+        notes: (notes || '').trim(),
       };
 
       console.log('Submitting companionship payload:', payload);
@@ -239,6 +264,10 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
     setToTime,
     communicationMethod,
     setCommunicationMethod,
+    location,
+    setLocation,
+    notes,
+    setNotes,
     submitting,
     handleSelectDateOption,
     handleCustomDateConfirm,

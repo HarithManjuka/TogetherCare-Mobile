@@ -30,9 +30,12 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
 
   const categories = [
     { id: 'all', label: 'All Requests' },
+    { id: 'Companionship', label: '🤝 Companionship' },
     { id: 'Grocery', label: '🛒 Grocery' },
     { id: 'Medicine', label: '💊 Pharmacy' },
-    { id: 'Companionship', label: '🤝 Companionship' },
+    { id: 'Walk', label: '🚶 Walk' },
+    { id: 'Reading', label: '📖 Reading' },
+    { id: 'Chat', label: '💬 Chat' },
   ];
 
   const fetchRequests = useCallback(async () => {
@@ -298,6 +301,13 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
                   🕒 {req.date} at {req.time}
                 </Text>
 
+                {req.notes ? (
+                  <View style={styles.notesBox}>
+                    <Text style={styles.notesLabel}>📝 Note from Elder:</Text>
+                    <Text style={styles.notesText}>{req.notes}</Text>
+                  </View>
+                ) : null}
+
                 {req.items && req.items.length > 0 ? (
                   <View style={styles.itemsBox}>
                     <Text style={styles.itemsHeader}>Requested items / activities:</Text>
@@ -543,6 +553,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#334155',
     marginBottom: 10,
+  },
+  notesBox: {
+    backgroundColor: '#FEF9C3',
+    borderColor: '#FEF08A',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#854D0E',
+    marginBottom: 3,
+  },
+  notesText: {
+    fontSize: 12,
+    color: '#713F12',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
   itemsBox: {
     backgroundColor: '#F8FAFC',
