@@ -17,6 +17,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as volunteerService from '../../services/volunteerService';
 import { showAppAlert } from '../../utils/alert';
+import {
+  getVisitLiveStatus,
+  getVisitTimeWindow,
+  validateStartVisit,
+} from '../../utils/scheduleTimeHelper';
 
 export default function VolunteerScheduleScreen({ onNavigateTab }) {
   const [schedule, setSchedule] = useState([]);
@@ -87,6 +92,13 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
 
   const handleStartTrip = (visit) => {
     const id = visit._id || visit.id;
+    const validation = validateStartVisit(visit);
+
+    if (!validation.allowed) {
+      showAppAlert('⏰ Scheduled Time Not Reached', validation.reason);
+      return;
+    }
+
     showAppAlert(
       '📍 Share Live Location?',
       `Would you like to start your trip now? This will share your live arrival directions with ${visit.elderName}'s family member until you arrive.`,
@@ -221,11 +233,17 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
         ) : (
           schedule.map((visit) => {
             const visitKey = visit._id || visit.id;
-            const isMatched = visit.status === 'matched';
-            const isConfirmed = visit.status === 'confirmed';
-            const isOngoing = visit.status === 'ongoing';
-            const isArrived = visit.status === 'arrived';
+            const rawStatus = (visit.status || 'confirmed').toLowerCase();
+            const liveStatus = getVisitLiveStatus(visit);
+            const isMatched = rawStatus === 'matched';
+            const isArrived = rawStatus === 'arrived';
+            const isCompleted = rawStatus === 'completed' || (liveStatus === 'completed' && ['ongoing', 'arrived', 'in_progress'].includes(rawStatus));
+            const isOngoing = (rawStatus === 'ongoing' || liveStatus === 'ongoing') && !isCompleted;
+            const isConfirmed = !isMatched && !isOngoing && !isArrived && !isCompleted;
             const isActionLoading = actionLoadingId === visitKey;
+
+            const timeWindow = getVisitTimeWindow(visit);
+            const canStart = timeWindow.isEarlyStartAllowed;
 
             return (
               <View
@@ -246,6 +264,8 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                       styles.statusBadge,
                       isMatched
                         ? styles.matchedBadge
+                        : isCompleted
+                        ? styles.completedBadge
                         : isOngoing
                         ? styles.ongoingBadge
                         : isArrived
@@ -258,6 +278,8 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                         styles.statusBadgeText,
                         isMatched
                           ? styles.matchedBadgeText
+                          : isCompleted
+                          ? styles.completedBadgeText
                           : isOngoing
                           ? styles.ongoingBadgeText
                           : isArrived
@@ -267,11 +289,13 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                     >
                       {isMatched
                         ? 'REQUESTED'
+                        : isCompleted
+                        ? 'COMPLETED'
                         : isOngoing
                         ? 'ON THE WAY'
                         : isArrived
                         ? 'ARRIVED'
-                        : 'CONFIRMED'}
+                        : 'UPCOMING'}
                     </Text>
                   </View>
                 </View>
@@ -335,9 +359,15 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                     </>
                   ) : isConfirmed ? (
                     <TouchableOpacity
-                      style={[styles.actionBtn, styles.startTripBtn, isActionLoading && { opacity: 0.7 }]}
-                      onPress={() => handleStartTrip(visit)}
-                      disabled={isActionLoading}
+                      style={[
+                        styles.actionBtn,
+                        styles.startTripBtn,
+                        !canStart && { backgroundColor: '#94A3B8', opacity: 0.65 },
+                        isActionLoading && { opacity: 0.7 },
+                      ]}
+                      onPress={canStart && !isActionLoading ? () => handleStartTrip(visit) : undefined}
+                      disabled={!canStart || isActionLoading}
+                      pointerEvents={canStart && !isActionLoading ? 'auto' : 'none'}
                     >
                       {isActionLoading ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
@@ -349,21 +379,38 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                       )}
                     </TouchableOpacity>
                   ) : isOngoing ? (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
-                      onPress={() => handleMarkArrived(visit)}
-                      disabled={isActionLoading}
-                    >
-                      {isActionLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.arrivedBtnText}>Mark Arrived</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  ) : (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
+                        onPress={() => handleMarkArrived(visit)}
+                        disabled={isActionLoading}
+                      >
+                        {isActionLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.arrivedBtnText}>Arrived</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.completeBtn, isActionLoading && { opacity: 0.7 }]}
+                        onPress={() => handleCompleteVisit(visit)}
+                        disabled={isActionLoading}
+                      >
+                        {isActionLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.completeBtnText}>Complete</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </>
+                  ) : isArrived ? (
                     <TouchableOpacity
                       style={[styles.actionBtn, styles.completeBtn, isActionLoading && { opacity: 0.7 }]}
                       onPress={() => handleCompleteVisit(visit)}
@@ -378,7 +425,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                         </>
                       )}
                     </TouchableOpacity>
-                  )}
+                  ) : null}
                 </View>
               </View>
             );
@@ -497,6 +544,9 @@ const styles = StyleSheet.create({
   arrivedBadge: {
     backgroundColor: '#FEF3C7',
   },
+  completedBadge: {
+    backgroundColor: '#DCFCE7',
+  },
   statusBadgeText: {
     fontSize: 11,
     fontWeight: '800',
@@ -506,6 +556,9 @@ const styles = StyleSheet.create({
   },
   arrivedBadgeText: {
     color: '#D97706',
+  },
+  completedBadgeText: {
+    color: '#16A34A',
   },
   serviceTitle: {
     fontSize: 16,

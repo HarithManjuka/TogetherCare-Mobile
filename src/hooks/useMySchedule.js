@@ -4,12 +4,21 @@ import { Alert, Platform } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 import * as companionshipService from '../services/companionshipService';
+import {
+  getVisitTimeWindow,
+  getVisitLiveStatus,
+  validateStartVisit,
+} from '../utils/scheduleTimeHelper';
 
 export const SCHEDULE_QUERY_KEY = ['mySchedule'];
 
 export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const currentUserId = user?._id || user?.id;
+
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
@@ -53,7 +62,7 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     },
   });
 
-  // Helper to categorize schedules
+  // Helper to categorize schedules according to PickMe/Uber live status
   const categorized = useMemo(() => {
     const requested = [];
     const upcoming = [];
@@ -63,23 +72,31 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     const schedulesList = Array.isArray(schedule) ? schedule : [];
 
     schedulesList.forEach((item) => {
-      const status = (item.status || 'pending').toLowerCase();
+      if (!item) return;
 
-      if (status === 'pending') {
+      // Filter: only show requests belonging to the logged-in elder
+      const itemElderId = item.elderly?._id || item.elderly || item.elderlyId?._id || item.elderlyId;
+      if (currentUserId && itemElderId && itemElderId.toString() !== currentUserId.toString()) {
+        return;
+      }
+
+      const rawStatus = (item.status || '').toLowerCase();
+      const liveStatus = getVisitLiveStatus(item);
+
+      // In Requested tab: strictly active pending/searching requests submitted by this elder
+      if (liveStatus === 'pending' && rawStatus !== 'expired' && rawStatus !== 'cancelled') {
         requested.push(item);
-      } else if (status === 'completed' || status === 'cancelled') {
+      } else if (liveStatus === 'completed' || liveStatus === 'cancelled' || liveStatus === 'expired' || rawStatus === 'expired') {
         completed.push(item);
-      } else if (status === 'ongoing' || status === 'in_progress' || status === 'arrived') {
+      } else if (liveStatus === 'ongoing' || liveStatus === 'in_progress' || liveStatus === 'arrived') {
         ongoing.push(item);
-      } else if (status === 'accepted' || status === 'scheduled') {
+      } else if (liveStatus === 'upcoming' || liveStatus === 'accepted' || liveStatus === 'scheduled' || liveStatus === 'confirmed') {
         upcoming.push(item);
-      } else {
-        requested.push(item);
       }
     });
 
     return { requested, upcoming, ongoing, completed };
-  }, [schedule]);
+  }, [schedule, currentUserId]);
 
   // Current list based on active tab
   const currentList = useMemo(() => {
@@ -233,6 +250,12 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
   // Start / Move to Ongoing Handler
   const handleStartVisit = (scheduleItem) => {
     const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
+    const validation = validateStartVisit(scheduleItem);
+
+    if (!validation.allowed) {
+      return;
+    }
+
     const performStart = async () => {
       try {
         await updateStatusMutation.mutateAsync({ id: requestId, status: 'ongoing' });
@@ -244,7 +267,7 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
         setSelectedSchedule(null);
         setActiveTab('ongoing');
       } catch (err) {
-        Alert.alert('Error', err.message || 'Failed to update visit status.');
+        Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to update visit status.');
       }
     };
 
