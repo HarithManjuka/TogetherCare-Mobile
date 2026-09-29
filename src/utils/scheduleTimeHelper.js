@@ -162,7 +162,7 @@ export const getVisitLiveStatus = (item) => {
   // If request is still unaccepted (pending / searching) and its time window has passed -> outdated / expired
   if (rawStatus === 'pending' || rawStatus === 'searching') {
     if (isAfter) {
-      return 'cancelled';
+      return 'expired';
     }
     return 'pending';
   }
@@ -212,4 +212,64 @@ export const validateStartVisit = (item) => {
     allowed: true,
     windowInfo,
   };
+};
+
+/**
+ * Checks client-side if a candidate schedule overlaps with any active schedule in a list.
+ * @param {Object} candidate - { scheduledDate / date, startTime, endTime, timeSlot }
+ * @param {Array} activeList - List of existing schedule/request objects
+ * @param {string} [excludeId] - ID of schedule being updated
+ * @returns {{ hasConflict: boolean, conflictingSchedule?: Object, message?: string }}
+ */
+export const checkClientScheduleOverlap = (candidate, activeList = [], excludeId = null) => {
+  if (!candidate || !Array.isArray(activeList) || activeList.length === 0) {
+    return { hasConflict: false };
+  }
+
+  const candidateWindow = getVisitTimeWindow(candidate);
+  const now = new Date();
+  const excludeIdStr = excludeId ? String(excludeId) : null;
+
+  for (const existing of activeList) {
+    if (!existing) continue;
+
+    if (excludeIdStr && existing._id && String(existing._id) === excludeIdStr) {
+      continue;
+    }
+
+    const liveStatus = getVisitLiveStatus(existing);
+    if (['cancelled', 'completed', 'expired', 'outdated', 'rejected'].includes(liveStatus)) {
+      continue;
+    }
+
+    const existingWindow = getVisitTimeWindow(existing);
+
+    // If existing request is unaccepted and in the past, skip
+    if (['pending', 'searching'].includes(liveStatus) && now >= existingWindow.endDateTime) {
+      continue;
+    }
+
+    // Compare date strings
+    if (candidateWindow.dateStr === existingWindow.dateStr) {
+      const startA = candidateWindow.startDateTime.getTime();
+      const endA = candidateWindow.endDateTime.getTime();
+      const startB = existingWindow.startDateTime.getTime();
+      const endB = existingWindow.endDateTime.getTime();
+
+      // Check overlap: (startA < endB && startB < endA)
+      if (startA < endB && startB < endA) {
+        const activityTitle = existing.activityType || existing.serviceType || 'Visit';
+        const existingTime = existing.timeSlot || `${existingWindow.startStr} - ${existingWindow.endStr}`;
+        const existingStatusLabel = liveStatus === 'pending' ? 'pending request' : 'scheduled visit';
+
+        return {
+          hasConflict: true,
+          conflictingSchedule: existing,
+          message: `Schedule conflict: You already have a ${existingStatusLabel} for "${activityTitle}" on ${candidateWindow.dateStr} at ${existingTime} that overlaps with this time.`,
+        };
+      }
+    }
+  }
+
+  return { hasConflict: false };
 };
