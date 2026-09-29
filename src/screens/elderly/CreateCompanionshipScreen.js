@@ -17,6 +17,7 @@ import { useTheme } from '../../context/ThemeContext';
 import FutureDatePickerModal from '../../components/common/FutureDatePickerModal';
 import TimePickerModal from '../../components/common/TimePickerModal';
 import { getCreateCompanionshipScreenStyles } from '../../styles/CreateCompanionshipScreen.styles';
+import { getLocalDateString } from '../../utils/scheduleTimeHelper';
 
 export default function CreateCompanionshipScreen({
   onBack,
@@ -81,7 +82,7 @@ export default function CreateCompanionshipScreen({
 
   // Check if a time slot option has already passed for today
   const isTimeSlotInPast = (timeStr) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
     if (selectedDate !== todayStr) return false;
 
     const match = timeStr.replace(/\s+/g, '').match(/(\d{1,2}):(\d{2})(AM|PM)/i);

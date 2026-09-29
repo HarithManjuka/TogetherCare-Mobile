@@ -181,6 +181,10 @@ export default function ElderlyHomeScreen() {
           <MyScheduleScreen
             onBack={() => setCurrentTab('home')}
             onRequestNew={() => setShowCreateScreen(true)}
+            onStartChat={(volunteerUser) => {
+              setActiveChatUser(volunteerUser);
+              setCurrentTab('messages');
+            }}
           />
         );
       case 'messages':
