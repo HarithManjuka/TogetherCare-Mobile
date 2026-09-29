@@ -225,22 +225,17 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
         );
       } else {
         notifyUser(
-          'Request Failed',
-          res?.message || 'Unable to process companionship request.',
-          () => {
-            if (onClose) onClose();
-          }
+          'Scheduling Conflict',
+          res?.message || 'Unable to process companionship request.'
         );
       }
     } catch (err) {
       console.error('Error submitting companionship request:', err);
-      notifyUser(
-        'Request Failed',
-        err.message || 'Failed to submit companionship request.',
-        () => {
-          if (onClose) onClose();
-        }
-      );
+      const errMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to submit companionship request.';
+      notifyUser('Scheduling Conflict', errMsg);
     } finally {
       setSubmitting(false);
     }
