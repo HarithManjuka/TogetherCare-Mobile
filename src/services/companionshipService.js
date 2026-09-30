@@ -64,4 +64,14 @@ export const updateStatus = async (id, status) => {
   return response.data;
 };
 
+/**
+ * Rate a completed companionship visit and/or volunteer
+ * @param {string} id
+ * @param {Object} ratingData - { visitRating, visitReview, volunteerRating, volunteerReview }
+ */
+export const rateVisit = async (id, ratingData) => {
+  const response = await client.post(`/companionship/${id}/rate`, ratingData);
+  return response.data;
+};
+
 

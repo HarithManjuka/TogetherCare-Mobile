@@ -37,7 +37,8 @@ export default function VolunteerOfferDetailModal({
     volunteer.verificationBadgeStatus === 'verified';
   const serviceArea = offer.serviceArea || 'Local Community Area';
   const volunteerPhone = volunteer.phone || '';
-  const rating = volunteer.rating ? volunteer.rating.toFixed(1) : '4.9';
+  const hasRating = volunteer.rating !== undefined && volunteer.rating !== null && Number(volunteer.rating) > 0;
+  const rating = hasRating ? Number(volunteer.rating).toFixed(1) : null;
   const profilePic = volunteer.profilePicture;
 
   // Approximate lat/lng hash based on location or ID
@@ -178,12 +179,12 @@ export default function VolunteerOfferDetailModal({
                 </View>
 
                 <Text style={styles.volunteerCardSub}>
-                  {volunteer.educationalInstitution || 'Community Volunteer'} · ⭐ {rating}
+                  {volunteer.educationalInstitution || 'Community Volunteer'}{rating ? ` · ⭐ ${rating}` : ' · New Volunteer'}
                 </Text>
 
                 <View style={styles.profileHintRow}>
-                  <Ionicons name="person-circle-outline" size={14} color="#2563EB" />
-                  <Text style={styles.profileHintText}>Tap to view full volunteer profile</Text>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <Text style={styles.profileHintText}>View Volunteer Profile & Reviews</Text>
                 </View>
               </View>
 

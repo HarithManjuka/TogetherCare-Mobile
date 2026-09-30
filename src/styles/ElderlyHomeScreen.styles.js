@@ -171,6 +171,32 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
       color: COLORS.textPrimary,
       textAlign: 'center',
     },
+    gridCardSOS: {
+      borderColor: '#FECACA',
+      backgroundColor: '#FEF2F2',
+    },
+    gridCardSOSActive: {
+      backgroundColor: '#DC2626',
+      borderColor: '#B91C1C',
+    },
+    gridIconSOS: {
+      backgroundColor: '#FEE2E2',
+    },
+    gridIconSOSActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    },
+    gridCardSOSText: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '800',
+      color: '#DC2626',
+      textAlign: 'center',
+    },
+    gridCardSOSTextActive: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '900',
+      color: '#FFFFFF',
+      textAlign: 'center',
+    },
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',

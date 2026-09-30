@@ -11,35 +11,49 @@ import {
   RefreshControl,
   ActivityIndicator,
   TouchableOpacity,
+  Image,
+  Modal,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as volunteerService from '../../services/volunteerService';
+import * as reviewService from '../../services/reviewService';
 
-export default function VolunteerHistoryScreen() {
+export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
+  const [activeSegment, setActiveSegment] = useState('reviews'); // 'reviews' | 'logs'
   const [history, setHistory] = useState([]);
+  const [reviewsData, setReviewsData] = useState({ totalReviews: 0, averageRating: 0, reviews: [] });
   const [stats, setStats] = useState({
     totalCompletedVisits: 0,
     totalHours: '0.0',
-    averageRating: 5.0,
+    averageRating: 0,
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Modals for inspecting elder and visit details
+  const [selectedElder, setSelectedElder] = useState(null);
+  const [selectedVisit, setSelectedVisit] = useState(null);
+
   const fetchHistoryAndStats = useCallback(async () => {
     try {
-      const [histRes, statsRes] = await Promise.allSettled([
+      const [histRes, statsRes, reviewsRes] = await Promise.allSettled([
         volunteerService.getMyHistory(),
         volunteerService.getMyStats(),
+        reviewService.getMyReviews(),
       ]);
 
       if (histRes.status === 'fulfilled' && histRes.value?.success) {
         setHistory(histRes.value.data || []);
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
-        setStats(statsRes.value.data || { totalCompletedVisits: 0, totalHours: '0.0', averageRating: 5.0 });
+        setStats(statsRes.value.data || { totalCompletedVisits: 0, totalHours: '0.0', averageRating: 0 });
+      }
+      if (reviewsRes.status === 'fulfilled' && reviewsRes.value?.success) {
+        setReviewsData(reviewsRes.value.data || { totalReviews: 0, averageRating: 0, reviews: [] });
       }
     } catch (error) {
-      console.error('Fetch history error:', error);
+      console.error('Fetch history & reviews error:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -55,11 +69,38 @@ export default function VolunteerHistoryScreen() {
     fetchHistoryAndStats();
   };
 
+  const handleCallElder = (phone) => {
+    if (phone) {
+      Linking.openURL(`tel:${phone}`).catch(() => {});
+    }
+  };
+
+  const handleEmailElder = (email) => {
+    if (email) {
+      Linking.openURL(`mailto:${email}`).catch(() => {});
+    }
+  };
+
+  const reviewsList = reviewsData?.reviews || [];
+  const displayRating = (reviewsData?.averageRating || stats.averageRating) > 0
+    ? (reviewsData?.averageRating || stats.averageRating).toFixed(1)
+    : 'New';
+
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Volunteer Impact & History</Text>
-        <Text style={styles.headerSub}>View completed support trips, total hours, and community feedback</Text>
+        <View style={styles.headerRow}>
+          {onBack && (
+            <TouchableOpacity onPress={onBack} style={styles.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Ionicons name="arrow-back" size={22} color="#0F172A" />
+            </TouchableOpacity>
+          )}
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Volunteer Impact & Ratings</Text>
+            <Text style={styles.headerSub}>Community feedback, elder reviews, and completed trips</Text>
+          </View>
+        </View>
       </View>
 
       <ScrollView
@@ -73,65 +114,410 @@ export default function VolunteerHistoryScreen() {
         {/* Live Metrics Banner */}
         <View style={styles.metricsRow}>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>{stats.totalCompletedVisits}</Text>
+            <Text style={styles.metricVal}>{stats.totalCompletedVisits || history.length}</Text>
             <Text style={styles.metricLbl}>Completed Visits</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>{stats.totalHours}</Text>
+            <Text style={styles.metricVal}>{stats.totalHours || '0.0'}</Text>
             <Text style={styles.metricLbl}>Total Hours</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>{stats.averageRating} ⭐</Text>
-            <Text style={styles.metricLbl}>Rating</Text>
+            <Text style={styles.metricVal}>{displayRating} ⭐</Text>
+            <Text style={styles.metricLbl}>Overall Rating</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Completed Service Logs ({history.length})</Text>
+        {/* Sub-tabs Segmented Control */}
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeSegment === 'reviews' && styles.segmentBtnActive]}
+            activeOpacity={0.8}
+            onPress={() => setActiveSegment('reviews')}
+          >
+            <Ionicons
+              name="star"
+              size={15}
+              color={activeSegment === 'reviews' ? '#1E40AF' : '#64748B'}
+            />
+            <Text style={[styles.segmentBtnText, activeSegment === 'reviews' && styles.segmentBtnTextActive]}>
+              Ratings & Reviews ({reviewsList.length})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeSegment === 'logs' && styles.segmentBtnActive]}
+            activeOpacity={0.8}
+            onPress={() => setActiveSegment('logs')}
+          >
+            <Ionicons
+              name="document-text-outline"
+              size={15}
+              color={activeSegment === 'logs' ? '#1E40AF' : '#64748B'}
+            />
+            <Text style={[styles.segmentBtnText, activeSegment === 'logs' && styles.segmentBtnTextActive]}>
+              Service Logs ({history.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {loading ? (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#1E40AF" />
-            <Text style={styles.loadingText}>Loading your completed service history...</Text>
+            <Text style={styles.loadingText}>Loading your volunteer profile feedback...</Text>
           </View>
-        ) : history.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Ionicons name="ribbon-outline" size={44} color="#94A3B8" />
-            <Text style={styles.emptyTitle}>No Completed Visits Yet</Text>
-            <Text style={styles.emptySub}>
-              Once you complete your scheduled volunteer visits, your impact records and feedback reviews will show up here.
-            </Text>
-          </View>
+        ) : activeSegment === 'reviews' ? (
+          /* SECTION 1: Ratings & Reviews with Elder Contact & Visit Details */
+          reviewsList.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="chatbox-ellipses-outline" size={44} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Community Reviews Yet</Text>
+              <Text style={styles.emptySub}>
+                When seniors complete a companionship visit with you, their ratings, reviews, and appreciative comments will appear here.
+              </Text>
+            </View>
+          ) : (
+            reviewsList.map((rev, idx) => {
+              const reviewer = rev.reviewer || {};
+              const elderName = reviewer.name || `${reviewer.firstName || 'Elder'} ${reviewer.lastName || ''}`.trim();
+              const elderPic = reviewer.profilePicture;
+              const isVerified = reviewer.verificationBadgeStatus === 'approved' || reviewer.verificationBadgeStatus === 'verified' || reviewer.isEmailVerified;
+              const visit = rev.visitDetails || {};
+
+              return (
+                <View key={rev._id || `rev-${idx}`} style={styles.reviewItemCard}>
+                  {/* Card Header: Clickable Elder Profile Header */}
+                  <TouchableOpacity
+                    style={styles.elderHeaderRow}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedElder(reviewer)}
+                  >
+                    <View style={styles.elderAvatarWrap}>
+                      {elderPic ? (
+                        <Image source={{ uri: elderPic }} style={styles.elderAvatarImg} />
+                      ) : (
+                        <View style={styles.elderAvatarFallback}>
+                          <Text style={styles.elderInitialText}>
+                            {elderName.charAt(0).toUpperCase() || 'E'}
+                          </Text>
+                        </View>
+                      )}
+                      {isVerified && (
+                        <View style={styles.verifiedMiniBadge}>
+                          <Ionicons name="checkmark-circle" size={13} color="#10B981" />
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={styles.elderNameText}>{elderName}</Text>
+                        {isVerified && (
+                          <View style={styles.verifiedTag}>
+                            <Text style={styles.verifiedTagText}>VERIFIED</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={styles.elderSubText}>
+                        Rated on {new Date(rev.createdAt || Date.now()).toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
+                      </Text>
+                    </View>
+
+                    <View style={styles.viewProfilePill}>
+                      <Text style={styles.viewProfilePillText}>Elder Profile</Text>
+                      <Ionicons name="chevron-forward" size={13} color="#2563EB" />
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Rating Stars & Comment */}
+                  <View style={styles.ratingStarsBox}>
+                    <View style={styles.starsRow}>
+                      {[1, 2, 3, 4, 5].map((s) => (
+                        <Ionicons
+                          key={s}
+                          name={s <= Math.round(rev.rating || 5) ? 'star' : 'star-outline'}
+                          size={16}
+                          color="#F59E0B"
+                        />
+                      ))}
+                      <Text style={styles.scoreNumber}>{(rev.rating || 5).toFixed(1)}</Text>
+                    </View>
+
+                    {Boolean(rev.comment) && (
+                      <Text style={styles.reviewComment}>"{rev.comment}"</Text>
+                    )}
+
+                    {Boolean(rev.visitReview) && rev.visitReview !== rev.comment && (
+                      <View style={styles.visitReviewTagBox}>
+                        <Text style={styles.visitReviewTagLabel}>Visit Feedback:</Text>
+                        <Text style={styles.visitReviewTagText}>"{rev.visitReview}"</Text>
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Card Action Buttons (Direct Chat & Visit Details) */}
+                  <View style={styles.cardActionsRow}>
+                    {onStartChat && (
+                      <TouchableOpacity
+                        style={styles.chatElderBtn}
+                        activeOpacity={0.8}
+                        onPress={() => onStartChat(reviewer)}
+                      >
+                        <Ionicons name="chatbubble-ellipses" size={15} color="#FFFFFF" />
+                        <Text style={styles.chatElderBtnText}>Message Senior</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {Boolean(visit.activityType || rev.activityType) && (
+                      <TouchableOpacity
+                        style={styles.visitDetailsBtn}
+                        activeOpacity={0.8}
+                        onPress={() => setSelectedVisit({ ...visit, activityType: visit.activityType || rev.activityType, elderName })}
+                      >
+                        <Ionicons name="information-circle-outline" size={15} color="#1E40AF" />
+                        <Text style={styles.visitDetailsBtnText}>Visit Details</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              );
+            })
+          )
         ) : (
-          history.map((log) => {
-            const logKey = log._id || log.id;
-            return (
-              <View key={logKey} style={styles.historyCard}>
-                <View style={styles.cardHeader}>
-                  <Text style={styles.serviceName}>{log.service}</Text>
-                  <Text style={styles.dateText}>{log.date}</Text>
-                </View>
-                <Text style={styles.elderText}>For: {log.elderName}</Text>
+          /* SECTION 2: Standard Completed Service History Logs */
+          history.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Ionicons name="ribbon-outline" size={44} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Service Logs Yet</Text>
+              <Text style={styles.emptySub}>
+                Your completed support trips and logs will appear here once you finish visits.
+              </Text>
+            </View>
+          ) : (
+            history.map((log) => {
+              const logKey = log._id || log.id;
+              return (
+                <View key={logKey} style={styles.historyCard}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.serviceName}>{log.service || 'Companionship'}</Text>
+                    <Text style={styles.dateText}>{log.date || 'Completed'}</Text>
+                  </View>
+                  <Text style={styles.elderText}>Senior: {log.elderName || 'Senior Member'}</Text>
 
-                <View style={styles.ratingRow}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons
-                      key={star}
-                      name={star <= (log.rating || 5) ? 'star' : 'star-outline'}
-                      size={14}
-                      color="#F59E0B"
-                    />
-                  ))}
-                  <Text style={styles.ratingNumber}>{(log.rating || 5).toFixed(1)}</Text>
-                </View>
+                  <View style={styles.ratingRow}>
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Ionicons
+                        key={star}
+                        name={star <= (log.rating || 5) ? 'star' : 'star-outline'}
+                        size={14}
+                        color="#F59E0B"
+                      />
+                    ))}
+                    <Text style={styles.ratingNumber}>{(log.rating || 5).toFixed(1)}</Text>
+                  </View>
 
-                {log.feedback ? (
-                  <Text style={styles.feedbackText}>"{log.feedback}"</Text>
-                ) : null}
-              </View>
-            );
-          })
+                  {log.feedback ? (
+                    <Text style={styles.feedbackText}>"{log.feedback}"</Text>
+                  ) : null}
+                </View>
+              );
+            })
+          )
         )}
       </ScrollView>
+
+      {/* MODAL 1: Elder Profile Modal (Only visible to the volunteer for their reviews) */}
+      <Modal
+        visible={!!selectedElder}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedElder(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContentSheet}>
+            {selectedElder && (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={styles.modalSheetTitle}>Elder Profile</Text>
+                  <TouchableOpacity onPress={() => setSelectedElder(null)} style={styles.modalCloseBtn}>
+                    <Ionicons name="close" size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.elderModalAvatarSection}>
+                  <View style={styles.elderAvatarLargeWrap}>
+                    {selectedElder.profilePicture ? (
+                      <Image source={{ uri: selectedElder.profilePicture }} style={styles.elderAvatarLarge} />
+                    ) : (
+                      <View style={styles.elderAvatarLargeFallback}>
+                        <Ionicons name="person" size={40} color="#2563EB" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.elderModalName}>
+                    {selectedElder.name || `${selectedElder.firstName || ''} ${selectedElder.lastName || ''}`.trim()}
+                  </Text>
+                  <View style={styles.verifiedTagLarge}>
+                    <Ionicons name="shield-checkmark" size={14} color="#059669" />
+                    <Text style={styles.verifiedTagLargeText}>Verified Senior Companion</Text>
+                  </View>
+                </View>
+
+                {/* Elder Details List */}
+                <View style={styles.elderDetailsList}>
+                  {selectedElder.phone ? (
+                    <View style={styles.elderInfoRow}>
+                      <Ionicons name="call-outline" size={18} color="#2563EB" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.infoRowLabel}>Phone Number</Text>
+                        <Text style={styles.infoRowValue}>{selectedElder.phone}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.actionIconBtn}
+                        onPress={() => handleCallElder(selectedElder.phone)}
+                      >
+                        <Ionicons name="call" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {selectedElder.email ? (
+                    <View style={styles.elderInfoRow}>
+                      <Ionicons name="mail-outline" size={18} color="#6366F1" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.infoRowLabel}>Email</Text>
+                        <Text style={styles.infoRowValue}>{selectedElder.email}</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={[styles.actionIconBtn, { backgroundColor: '#6366F1' }]}
+                        onPress={() => handleEmailElder(selectedElder.email)}
+                      >
+                        <Ionicons name="mail" size={16} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {selectedElder.address ? (
+                    <View style={styles.elderInfoRow}>
+                      <Ionicons name="location-outline" size={18} color="#10B981" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.infoRowLabel}>Residential Location</Text>
+                        <Text style={styles.infoRowValue}>{selectedElder.address}</Text>
+                      </View>
+                    </View>
+                  ) : null}
+
+                  {selectedElder.age ? (
+                    <View style={styles.elderInfoRow}>
+                      <Ionicons name="calendar-outline" size={18} color="#F59E0B" />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.infoRowLabel}>Age</Text>
+                        <Text style={styles.infoRowValue}>{selectedElder.age} years old</Text>
+                      </View>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Bottom Action: Message in chat */}
+                {onStartChat && (
+                  <TouchableOpacity
+                    style={styles.modalPrimaryActionBtn}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      const target = selectedElder;
+                      setSelectedElder(null);
+                      onStartChat(target);
+                    }}
+                  >
+                    <Ionicons name="chatbubbles" size={18} color="#FFFFFF" />
+                    <Text style={styles.modalPrimaryActionBtnText}>Start In-App Chat</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* MODAL 2: Related Visit Details Modal */}
+      <Modal
+        visible={!!selectedVisit}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedVisit(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalContentSheet}>
+            {selectedVisit && (
+              <>
+                <View style={styles.modalHeaderRow}>
+                  <Text style={styles.modalSheetTitle}>Related Visit Details</Text>
+                  <TouchableOpacity onPress={() => setSelectedVisit(null)} style={styles.modalCloseBtn}>
+                    <Ionicons name="close" size={22} color="#64748B" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.visitDetailsCard}>
+                  <View style={styles.visitDetailRow}>
+                    <Text style={styles.visitDetailLabel}>Activity / Service:</Text>
+                    <Text style={styles.visitDetailValue}>{selectedVisit.activityType || selectedVisit.serviceType || 'Companionship Visit'}</Text>
+                  </View>
+
+                  <View style={styles.visitDetailRow}>
+                    <Text style={styles.visitDetailLabel}>Senior Companion:</Text>
+                    <Text style={styles.visitDetailValue}>{selectedVisit.elderName || 'Senior Member'}</Text>
+                  </View>
+
+                  <View style={styles.visitDetailRow}>
+                    <Text style={styles.visitDetailLabel}>Scheduled Date:</Text>
+                    <Text style={styles.visitDetailValue}>
+                      {selectedVisit.scheduledDate
+                        ? new Date(selectedVisit.scheduledDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                        : (selectedVisit.date || 'Completed')}
+                    </Text>
+                  </View>
+
+                  <View style={styles.visitDetailRow}>
+                    <Text style={styles.visitDetailLabel}>Time Window:</Text>
+                    <Text style={styles.visitDetailValue}>{selectedVisit.timeSlot || selectedVisit.time || '10:00 AM - 12:00 PM'}</Text>
+                  </View>
+
+                  {selectedVisit.location ? (
+                    <View style={styles.visitDetailRow}>
+                      <Text style={styles.visitDetailLabel}>Location:</Text>
+                      <Text style={styles.visitDetailValue}>{selectedVisit.location}</Text>
+                    </View>
+                  ) : null}
+
+                  {selectedVisit.notes ? (
+                    <View style={styles.visitDetailRow}>
+                      <Text style={styles.visitDetailLabel}>Senior Notes:</Text>
+                      <Text style={styles.visitDetailValue}>{selectedVisit.notes}</Text>
+                    </View>
+                  ) : null}
+
+                  <View style={styles.visitDetailRow}>
+                    <Text style={styles.visitDetailLabel}>Visit Status:</Text>
+                    <Text style={[styles.visitDetailValue, { color: '#059669', fontWeight: '800', textTransform: 'capitalize' }]}>
+                      {selectedVisit.status || 'Completed'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.modalPrimaryActionBtn, { backgroundColor: '#1E293B', marginTop: 16 }]}
+                  onPress={() => setSelectedVisit(null)}
+                >
+                  <Text style={styles.modalPrimaryActionBtnText}>Close Visit Info</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -148,6 +534,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  backBtn: {
+    padding: 6,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
   },
   headerTitle: {
     fontSize: 20,
@@ -169,7 +565,7 @@ const styles = StyleSheet.create({
   metricsRow: {
     flexDirection: 'row',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   metricBox: {
     flex: 1,
@@ -179,7 +575,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    elevation: 1,
+    elevation: 2,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
   },
   metricVal: {
     fontSize: 18,
@@ -193,11 +593,39 @@ const styles = StyleSheet.create({
     marginTop: 2,
     textAlign: 'center',
   },
-  sectionTitle: {
-    fontSize: 15,
+  segmentedControl: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderRadius: 9,
+    gap: 6,
+  },
+  segmentBtnActive: {
+    backgroundColor: '#FFFFFF',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  segmentBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  segmentBtnTextActive: {
+    color: '#1E40AF',
     fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 12,
   },
   loadingBox: {
     paddingVertical: 40,
@@ -230,6 +658,170 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 18,
   },
+  reviewItemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    elevation: 2,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    gap: 12,
+  },
+  elderHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  elderAvatarWrap: {
+    position: 'relative',
+  },
+  elderAvatarImg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+  },
+  elderAvatarFallback: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  elderInitialText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  verifiedMiniBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+  },
+  elderNameText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  verifiedTag: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
+  },
+  verifiedTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#059669',
+  },
+  elderSubText: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+  },
+  viewProfilePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
+    gap: 2,
+  },
+  viewProfilePillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#2563EB',
+  },
+  ratingStarsBox: {
+    gap: 6,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  scoreNumber: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#D97706',
+    marginLeft: 6,
+  },
+  reviewComment: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#1E293B',
+    fontStyle: 'italic',
+  },
+  visitReviewTagBox: {
+    backgroundColor: '#FEF3C7',
+    padding: 8,
+    borderRadius: 8,
+    marginTop: 4,
+    gap: 2,
+  },
+  visitReviewTagLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  visitReviewTagText: {
+    fontSize: 12,
+    color: '#78350F',
+    fontStyle: 'italic',
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 10,
+  },
+  chatElderBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2563EB',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  chatElderBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  visitDetailsBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    paddingVertical: 10,
+    borderRadius: 10,
+    gap: 6,
+  },
+  visitDetailsBtnText: {
+    color: '#1E40AF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
   historyCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 14,
@@ -238,10 +830,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     elevation: 1,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -279,5 +867,154 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     color: '#475569',
     lineHeight: 18,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  modalContentSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+    maxHeight: '85%',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 12,
+  },
+  modalSheetTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  elderModalAvatarSection: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  elderAvatarLargeWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    overflow: 'hidden',
+    borderWidth: 2.5,
+    borderColor: '#3B82F6',
+    marginBottom: 10,
+  },
+  elderAvatarLarge: {
+    width: '100%',
+    height: '100%',
+  },
+  elderAvatarLargeFallback: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  elderModalName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  verifiedTagLarge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginTop: 4,
+  },
+  verifiedTagLargeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  elderDetailsList: {
+    gap: 12,
+    marginBottom: 18,
+  },
+  elderInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  infoRowLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+    textTransform: 'uppercase',
+  },
+  infoRowValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  actionIconBtn: {
+    backgroundColor: '#2563EB',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalPrimaryActionBtn: {
+    backgroundColor: '#2563EB',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 14,
+    gap: 8,
+    elevation: 3,
+  },
+  modalPrimaryActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  visitDetailsCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 10,
+  },
+  visitDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  visitDetailLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  visitDetailValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    maxWidth: '60%',
+    textAlign: 'right',
   },
 });

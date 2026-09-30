@@ -1,5 +1,4 @@
-// src/components/elderly/VolunteerProfileDetailModal.js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -9,9 +8,11 @@ import {
   ScrollView,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../context/ThemeContext';
+import { getUserReviews } from '../../services/reviewService';
 
 const getInterestIcon = (interest) => {
   const lower = (interest || '').toLowerCase();
@@ -37,15 +38,41 @@ export default function VolunteerProfileDetailModal({
   isAccepting = false,
 }) {
   const { colors, isDark } = useTheme();
+  const [reviewsData, setReviewsData] = useState({ totalReviews: 0, averageRating: 0, reviews: [] });
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  const volunteer = offer?.volunteerId || offer?.volunteer || (offer?.firstName ? offer : {});
+  const volunteerId = volunteer._id || volunteer.id;
+
+  useEffect(() => {
+    if (visible && volunteerId) {
+      setLoadingReviews(true);
+      getUserReviews(volunteerId)
+        .then((res) => {
+          if (res && res.success && res.data) {
+            setReviewsData(res.data);
+          }
+        })
+        .catch((err) => console.log('Error loading volunteer reviews:', err.message))
+        .finally(() => setLoadingReviews(false));
+    }
+  }, [visible, volunteerId]);
 
   if (!offer) return null;
 
-  const volunteer = offer.volunteerId || {};
-  const fullName = offer.volunteerName || `${volunteer.firstName || 'Volunteer'} ${volunteer.lastName || ''}`.trim();
-  const isVerified = volunteer.verificationBadgeStatus === 'approved' || volunteer.verificationBadgeStatus === 'verified';
+  const fullName = offer.volunteerName || (volunteer.firstName ? `${volunteer.firstName} ${volunteer.lastName || ''}`.trim() : 'Community Volunteer');
+  const isVerified = volunteer.verificationBadgeStatus === 'approved' || volunteer.verificationBadgeStatus === 'verified' || volunteer.isEmailVerified;
   const age = volunteer.age || offer.volunteerAge || (volunteer.dateOfBirth ? Math.floor((new Date() - new Date(volunteer.dateOfBirth)) / (365.25 * 24 * 60 * 60 * 1000)) : null);
   const institution = volunteer.educationalInstitution || volunteer.institution || 'University Community Volunteer';
-  const rating = volunteer.rating ? volunteer.rating.toFixed(1) : '4.9';
+  
+  // Dynamic database rating metrics (No hardcoding)
+  const hasLiveReviews = Boolean(reviewsData && typeof reviewsData.totalReviews === 'number' && reviewsData.totalReviews > 0);
+  const dbRating = hasLiveReviews
+    ? reviewsData.averageRating
+    : (volunteer.rating !== undefined && volunteer.rating !== null && Number(volunteer.rating) > 0 ? Number(volunteer.rating) : null);
+  const rating = dbRating !== null ? Number(dbRating).toFixed(1) : null;
+  const reviewCount = hasLiveReviews ? reviewsData.totalReviews : (volunteer.totalReviews ?? volunteer.ratingCount ?? volunteer.reviewCount ?? 0);
+  
   const profilePic = volunteer.profilePicture;
   const bio = volunteer.bio || 'Compassionate and dedicated youth volunteer looking to spend meaningful time with seniors in the community.';
 
@@ -149,10 +176,17 @@ export default function VolunteerProfileDetailModal({
                   </View>
                 )}
 
-                <View style={styles.ratingPill}>
-                  <Ionicons name="star" size={14} color="#F59E0B" />
-                  <Text style={styles.ratingPillText}>{rating} (Top Rated)</Text>
-                </View>
+                {rating ? (
+                  <View style={styles.ratingPill}>
+                    <Ionicons name="star" size={14} color="#F59E0B" />
+                    <Text style={styles.ratingPillText}>{rating} ⭐ ({reviewCount})</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.verifiedPill, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="sparkles" size={13} color="#D97706" />
+                    <Text style={[styles.verifiedPillText, { color: '#B45309' }]}>New Volunteer</Text>
+                  </View>
+                )}
 
                 {age ? (
                   <View style={[styles.verifiedPill, { backgroundColor: '#F3E8FF' }]}>
@@ -376,6 +410,124 @@ export default function VolunteerProfileDetailModal({
                 {offer.slotsLeft || 1} out of {offer.capacity || 1} slots open for this session
               </Text>
             </View>
+
+            {/* Ratings & Reviews Section */}
+            <View style={styles.detailSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text
+                  style={[
+                    styles.sectionTitle,
+                    { color: isDark ? '#E2E8F0' : '#1E293B' },
+                  ]}
+                >
+                  Ratings & Reviews
+                </Text>
+                <View style={styles.reviewScoreBadge}>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <Text style={styles.reviewScoreBadgeText}>
+                    {rating ? `${rating} (${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'})` : 'No reviews yet'}
+                  </Text>
+                </View>
+              </View>
+
+              {loadingReviews ? (
+                <View style={styles.reviewLoadingContainer}>
+                  <ActivityIndicator size="small" color="#2563EB" />
+                  <Text style={[styles.loadingText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                    Loading community reviews...
+                  </Text>
+                </View>
+              ) : reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
+                <View style={styles.reviewsListContainer}>
+                  {reviewsData.reviews.map((rev, idx) => {
+                    const reviewer = rev.reviewer || rev.reviewerId || rev.elder || rev.user || {};
+                    const elderName =
+                      (reviewer.firstName ? `${reviewer.firstName} ${reviewer.lastName || ''}`.trim() : '') ||
+                      reviewer.name ||
+                      rev.reviewerName ||
+                      rev.elderName ||
+                      'Senior Companion';
+                    const elderPic = reviewer.profilePicture;
+                    const initial = elderName.charAt(0).toUpperCase() || 'S';
+
+                    return (
+                      <View
+                        key={rev._id || idx}
+                        style={[
+                          styles.reviewCard,
+                          {
+                            backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
+                            borderColor: isDark ? '#334155' : '#E2E8F0',
+                          },
+                        ]}
+                      >
+                        <View style={styles.reviewCardHeader}>
+                          <View style={styles.reviewerInfo}>
+                            <View style={styles.reviewerAvatarSmall}>
+                              {elderPic ? (
+                                <Image source={{ uri: elderPic }} style={styles.reviewerAvatarImg} />
+                              ) : (
+                                <Text style={styles.reviewerInitialText}>{initial}</Text>
+                              )}
+                            </View>
+                            <Text
+                              style={[
+                                styles.reviewerName,
+                                { color: isDark ? '#F1F5F9' : '#1E293B' },
+                              ]}
+                            >
+                              {elderName}
+                            </Text>
+                          </View>
+                          <View style={styles.reviewStarRow}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Ionicons
+                                key={s}
+                                name={s <= Math.round(rev.rating || 5) ? 'star' : 'star-outline'}
+                                size={13}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </View>
+                        </View>
+                        {Boolean(rev.comment || rev.feedback) && (
+                          <Text
+                            style={[
+                              styles.reviewCommentText,
+                              { color: isDark ? '#CBD5E1' : '#475569' },
+                            ]}
+                          >
+                            "{rev.comment || rev.feedback}"
+                          </Text>
+                        )}
+                        <Text style={[styles.reviewDateText, { color: isDark ? '#64748B' : '#94A3B8' }]}>
+                          {new Date(rev.createdAt || Date.now()).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View
+                  style={[
+                    styles.emptyReviewsBox,
+                    {
+                      backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
+                      borderColor: isDark ? '#334155' : '#E2E8F0',
+                    },
+                  ]}
+                >
+                  <Ionicons name="chatbox-ellipses-outline" size={24} color={isDark ? '#64748B' : '#94A3B8'} />
+                  <Text style={[styles.emptyReviewsText, { color: isDark ? '#94A3B8' : '#64748B' }]}>
+                    No reviews yet. Be the first to rate after a completed visit!
+                  </Text>
+                </View>
+              )}
+            </View>
           </ScrollView>
 
           {/* Action Footer */}
@@ -391,6 +543,7 @@ export default function VolunteerProfileDetailModal({
             <TouchableOpacity
               style={[
                 styles.closeFooterBtn,
+                !onAccept && { flex: 1, backgroundColor: '#2563EB', borderColor: '#2563EB' },
                 { borderColor: isDark ? '#475569' : '#CBD5E1' },
               ]}
               onPress={onClose}
@@ -399,26 +552,28 @@ export default function VolunteerProfileDetailModal({
               <Text
                 style={[
                   styles.closeFooterBtnText,
-                  { color: isDark ? '#94A3B8' : '#64748B' },
+                  !onAccept ? { color: '#FFFFFF', fontWeight: '700' } : { color: isDark ? '#94A3B8' : '#64748B' },
                 ]}
               >
-                Back
+                {onAccept ? 'Back' : 'Close Profile'}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.acceptBtn,
-                { opacity: isAccepting ? 0.7 : 1 },
-              ]}
-              onPress={() => onAccept(offer)}
-              disabled={isAccepting}
-            >
-              <Ionicons name="calendar" size={18} color="#FFFFFF" />
-              <Text style={styles.acceptBtnText}>
-                {isAccepting ? 'Confirming...' : 'Accept & Schedule'}
-              </Text>
-            </TouchableOpacity>
+            {Boolean(onAccept) && (
+              <TouchableOpacity
+                style={[
+                  styles.acceptBtn,
+                  { opacity: isAccepting ? 0.7 : 1 },
+                ]}
+                onPress={() => onAccept(offer)}
+                disabled={isAccepting}
+              >
+                <Ionicons name="calendar" size={18} color="#FFFFFF" />
+                <Text style={styles.acceptBtnText}>
+                  {isAccepting ? 'Confirming...' : 'Accept & Schedule'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -711,5 +866,98 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  reviewScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  reviewScoreBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  reviewLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+  },
+  reviewsListContainer: {
+    gap: 10,
+    marginTop: 4,
+  },
+  reviewCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 6,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reviewerAvatarSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  reviewerAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  reviewerInitialText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  reviewerName: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reviewStarRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewCommentText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
+  },
+  reviewDateText: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  emptyReviewsBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 6,
+  },
+  emptyReviewsText: {
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

@@ -158,12 +158,28 @@ export default function VolunteerHomeScreen() {
           />
         );
       case 'history':
-        return <VolunteerHistoryScreen onBack={() => setCurrentTab('home')} />;
+        return (
+          <VolunteerHistoryScreen
+            onBack={() => setCurrentTab('home')}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        );
       case 'profile':
         return <VolunteerProfileScreen />;
       case 'home':
       default:
-        return <VolunteerDashboardHome onNavigateTab={setCurrentTab} />;
+        return (
+          <VolunteerDashboardHome
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        );
     }
   };
 

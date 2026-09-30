@@ -12,6 +12,14 @@ export const getUserReviews = async (userId) => {
 };
 
 /**
+ * Fetch all reviews and ratings received by the logged-in volunteer (includes elder profile & visit details)
+ */
+export const getMyReviews = async () => {
+  const response = await client.get('/reviews/my-reviews');
+  return response.data;
+};
+
+/**
  * Create a new review and rating
  * @param {Object} reviewData { recipientId, rating, comment, activityType }
  */
