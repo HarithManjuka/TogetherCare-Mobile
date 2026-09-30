@@ -45,7 +45,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const [stats, setStats] = useState({
     hoursThisMonth: 0,
     peopleHelped: 0,
-    averageRating: 5.0,
+    averageRating: 0,
     totalCompletedVisits: 0,
   });
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
@@ -180,7 +180,7 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         setRequestsList(reqsRes.value.data || []);
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
-        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 5.0 });
+        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 0 });
       }
       if (directRes.status === 'fulfilled' && directRes.value?.success) {
         setDirectRequests(directRes.value.data || []);
@@ -441,13 +441,17 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
           </View>
 
           {/* Card 3: your rating */}
-          <View style={styles.metricCard}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.75}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <View style={styles.ratingValueRow}>
-              <Text style={styles.metricValue}>{stats.averageRating}</Text>
+              <Text style={styles.metricValue}>{stats.averageRating > 0 ? stats.averageRating : 'New'}</Text>
               <Text style={styles.starIcon}>★</Text>
             </View>
             <Text style={styles.metricLabel}>your rating</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Messages & Coordination Quick Access Card */}

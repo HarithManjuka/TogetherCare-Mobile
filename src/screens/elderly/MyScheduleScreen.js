@@ -17,6 +17,8 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMySchedule } from '../../hooks/useMySchedule';
 import { useTheme } from '../../context/ThemeContext';
 import CreateCompanionshipScreen from './CreateCompanionshipScreen';
+import RateVisitModal from '../../components/elderly/RateVisitModal';
+import VolunteerProfileDetailModal from '../../components/elderly/VolunteerProfileDetailModal';
 import { getMyScheduleScreenStyles } from '../../styles/MyScheduleScreen.styles';
 import { getVisitLiveStatus, getVisitTimeWindow } from '../../utils/scheduleTimeHelper';
 
@@ -36,6 +38,8 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
   const [videoMuted, setVideoMuted] = useState(false);
   const [videoCamOff, setVideoCamOff] = useState(false);
   const [videoCallSeconds, setVideoCallSeconds] = useState(0);
+  const [ratingSchedule, setRatingSchedule] = useState(null);
+  const [viewingVolunteerProfile, setViewingVolunteerProfile] = useState(null);
 
   // Video call duration timer
   useEffect(() => {
@@ -78,6 +82,7 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
     handleCompleteVisit,
     handleCancelRequest,
     handleDeleteRequest,
+    updateLocalScheduleRating,
     counts,
   } = useMySchedule();
 
@@ -556,10 +561,31 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
                       <TouchableOpacity
                         style={styles.completeVisitBtn}
                         activeOpacity={0.8}
-                        onPress={() => handleCompleteVisit(item)}
+                        onPress={() => handleCompleteVisit(item, (completedItem) => setRatingSchedule(completedItem))}
                       >
                         <Ionicons name="checkmark-circle" size={14} color="#047857" />
                         <Text style={styles.completeVisitBtnText}>Mark Completed</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {liveStatus === 'completed' && (
+                    <View style={styles.actionButtonsGroup}>
+                      <TouchableOpacity
+                        style={item.visitRating || item.volunteerRating ? styles.ratedBtn : styles.rateVisitBtn}
+                        activeOpacity={0.8}
+                        onPress={() => setRatingSchedule(item)}
+                      >
+                        <Ionicons
+                          name={item.visitRating || item.volunteerRating ? "star" : "star-outline"}
+                          size={14}
+                          color={item.visitRating || item.volunteerRating ? "#F59E0B" : "#B45309"}
+                        />
+                        <Text style={item.visitRating || item.volunteerRating ? styles.ratedBtnText : styles.rateVisitBtnText}>
+                          {item.visitRating || item.volunteerRating
+                            ? `Rated (${item.volunteerRating || item.visitRating}★)`
+                            : 'Rate Visit'}
+                        </Text>
                       </TouchableOpacity>
                     </View>
                   )}
@@ -614,11 +640,45 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
 
                 <View style={styles.modalRow}>
                   <Text style={styles.modalLabel}>Companion / Volunteer</Text>
-                  <Text style={styles.modalValue}>
-                    {selectedSchedule.volunteer
-                      ? `${selectedSchedule.volunteer.firstName || ''} ${selectedSchedule.volunteer.lastName || ''}`.trim()
-                      : selectedSchedule.companionName || 'Awaiting volunteer acceptance'}
-                  </Text>
+                  {selectedSchedule.volunteer || selectedSchedule.volunteerId ? (
+                    <TouchableOpacity
+                      style={styles.volunteerProfileCard}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const vol = selectedSchedule.volunteer || selectedSchedule.volunteerId;
+                        setViewingVolunteerProfile({
+                          volunteerId: vol,
+                          volunteer: vol,
+                          volunteerName: selectedSchedule.companionName || `${vol.firstName || 'Volunteer'} ${vol.lastName || ''}`.trim(),
+                        });
+                      }}
+                    >
+                      <View style={styles.volunteerCardLeft}>
+                        <View style={styles.volunteerAvatarMini}>
+                          <Ionicons name="person" size={20} color="#2563EB" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.volunteerCardName}>
+                            {selectedSchedule.companionName ||
+                              (selectedSchedule.volunteer
+                                ? `${selectedSchedule.volunteer.firstName || ''} ${selectedSchedule.volunteer.lastName || ''}`.trim()
+                                : 'Community Volunteer')}
+                          </Text>
+                          <Text style={styles.volunteerCardSub}>
+                            ⭐ {selectedSchedule.volunteer?.rating ? selectedSchedule.volunteer.rating.toFixed(1) : '5.0'} • Verified Companion
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.viewProfileLinkBtn}>
+                        <Text style={styles.viewProfileLinkText}>Reviews</Text>
+                        <Ionicons name="chevron-forward" size={14} color="#FFFFFF" />
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={styles.modalValue}>
+                      {selectedSchedule.companionName || 'Awaiting volunteer acceptance'}
+                    </Text>
+                  )}
                 </View>
 
                 {selectedSchedule.volunteer?.phone ? (
@@ -634,6 +694,58 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
                     {getCommMethodDetails(selectedSchedule.communicationMethod).label}
                   </Text>
                 </View>
+
+                {/* Submitted Ratings & Reviews Box (if already rated) */}
+                {Boolean(selectedSchedule.visitRating || selectedSchedule.volunteerRating) && (
+                  <View style={styles.ratingSummarySection}>
+                    <View style={styles.ratingSummaryHeader}>
+                      <Text style={styles.ratingSummaryTitle}>Your Submitted Ratings</Text>
+                      <Ionicons name="checkmark-circle" size={16} color="#059669" />
+                    </View>
+
+                    {Boolean(selectedSchedule.visitRating) && (
+                      <View style={styles.ratingItemRow}>
+                        <Text style={styles.ratingItemLabel}>Visit Rating:</Text>
+                        <View style={styles.ratingStarsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                              key={s}
+                              name={s <= selectedSchedule.visitRating ? 'star' : 'star-outline'}
+                              size={14}
+                              color="#F59E0B"
+                            />
+                          ))}
+                        </View>
+                        {Boolean(selectedSchedule.visitReview) && (
+                          <Text style={styles.ratingFeedbackText}>
+                            "{selectedSchedule.visitReview}"
+                          </Text>
+                        )}
+                      </View>
+                    )}
+
+                    {Boolean(selectedSchedule.volunteerRating) && (
+                      <View style={styles.ratingItemRow}>
+                        <Text style={styles.ratingItemLabel}>Volunteer Rating:</Text>
+                        <View style={styles.ratingStarsRow}>
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Ionicons
+                              key={s}
+                              name={s <= selectedSchedule.volunteerRating ? 'star' : 'star-outline'}
+                              size={14}
+                              color="#F59E0B"
+                            />
+                          ))}
+                        </View>
+                        {Boolean(selectedSchedule.volunteerReview) && (
+                          <Text style={styles.ratingFeedbackText}>
+                            "{selectedSchedule.volunteerReview}"
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                )}
 
                 {/* Quick Direct Communication Bar in Details Modal */}
                 {selectedSchedule.volunteer && (selectedSchedule.status === 'accepted' || selectedSchedule.status === 'scheduled' || selectedSchedule.status === 'upcoming' || selectedSchedule.status === 'ongoing' || selectedSchedule.status === 'in_progress' || selectedSchedule.status === 'arrived') && (() => {
@@ -763,11 +875,46 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
                       activeOpacity={0.8}
                       onPress={() => {
                         const target = selectedSchedule;
-                        handleCompleteVisit(target);
+                        handleCompleteVisit(target, (completedItem) => setRatingSchedule(completedItem));
                       }}
                     >
                       <Ionicons name="checkmark-circle" size={18} color="#047857" style={{ marginRight: 6 }} />
                       <Text style={[styles.completeVisitBtnText, { fontSize: 15 }]}>Mark Visit as Completed</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Modal Rate Action for Completed Visits */}
+                {(selectedSchedule.status === 'completed' || selectedSchedule.status === 'expired') && (
+                  <View style={{ marginTop: 18 }}>
+                    <TouchableOpacity
+                      style={[
+                        selectedSchedule.visitRating || selectedSchedule.volunteerRating ? styles.ratedBtn : styles.rateVisitBtn,
+                        { paddingVertical: 13 },
+                      ]}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        const target = selectedSchedule;
+                        setSelectedSchedule(null);
+                        setRatingSchedule(target);
+                      }}
+                    >
+                      <Ionicons
+                        name="star"
+                        size={18}
+                        color={selectedSchedule.visitRating || selectedSchedule.volunteerRating ? "#F59E0B" : "#B45309"}
+                        style={{ marginRight: 6 }}
+                      />
+                      <Text
+                        style={[
+                          selectedSchedule.visitRating || selectedSchedule.volunteerRating ? styles.ratedBtnText : styles.rateVisitBtnText,
+                          { fontSize: 15 },
+                        ]}
+                      >
+                        {selectedSchedule.visitRating || selectedSchedule.volunteerRating
+                          ? 'View & Edit Rating / Review'
+                          : 'Rate Visit & Volunteer'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -938,6 +1085,27 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* Rate Visit & Volunteer Modal */}
+      <RateVisitModal
+        visible={!!ratingSchedule}
+        schedule={ratingSchedule}
+        onClose={() => setRatingSchedule(null)}
+        onSuccess={(updatedSchedule) => {
+          setRatingSchedule(null);
+          if (updatedSchedule) {
+            updateLocalScheduleRating(updatedSchedule);
+          }
+          onRefresh();
+        }}
+      />
+
+      {/* Volunteer Profile & Reviews Modal */}
+      <VolunteerProfileDetailModal
+        visible={!!viewingVolunteerProfile}
+        offer={viewingVolunteerProfile}
+        onClose={() => setViewingVolunteerProfile(null)}
+      />
     </SafeAreaView>
   );
 }

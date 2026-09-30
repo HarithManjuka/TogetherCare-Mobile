@@ -288,18 +288,22 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
   };
 
   // Complete Visit Handler
-  const handleCompleteVisit = (scheduleItem) => {
+  const handleCompleteVisit = (scheduleItem, onCompleted) => {
     const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
     const performComplete = async () => {
       try {
         await updateStatusMutation.mutateAsync({ id: requestId, status: 'completed' });
-        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
-          window.alert('Visit Completed! 🎉\n\nThank you for confirming your completed companionship visit.');
-        } else {
-          Alert.alert('Visit Completed! 🎉', 'Thank you for confirming your completed companionship visit.');
-        }
         setSelectedSchedule(null);
         setActiveTab('completed');
+        if (onCompleted) {
+          onCompleted(scheduleItem);
+        } else {
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+            window.alert('Visit Completed! 🎉\n\nThank you for confirming your completed companionship visit.');
+          } else {
+            Alert.alert('Visit Completed! 🎉', 'Thank you for confirming your completed companionship visit.');
+          }
+        }
       } catch (err) {
         Alert.alert('Error', err.message || 'Failed to complete visit.');
       }
@@ -319,6 +323,30 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
         ]
       );
     }
+  };
+
+  const updateLocalScheduleRating = (updatedItem) => {
+    if (!updatedItem) return;
+    const itemId = updatedItem._id || updatedItem.id;
+    queryClient.setQueryData(SCHEDULE_QUERY_KEY, (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((item) => {
+        const id = item._id || item.id;
+        if (id && id.toString() === itemId.toString()) {
+          return { ...item, ...updatedItem };
+        }
+        return item;
+      });
+    });
+    setSelectedSchedule((prev) => {
+      if (!prev) return null;
+      const prevId = prev._id || prev.id;
+      if (prevId && prevId.toString() === itemId.toString()) {
+        return { ...prev, ...updatedItem };
+      }
+      return prev;
+    });
+    queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
   };
 
   return {
@@ -350,6 +378,7 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     handleCompleteVisit,
     handleCancelRequest,
     handleDeleteRequest,
+    updateLocalScheduleRating,
     counts: {
       requested: categorized.requested.length,
       upcoming: categorized.upcoming.length,

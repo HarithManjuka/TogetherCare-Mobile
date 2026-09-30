@@ -246,36 +246,6 @@ export default function ElderlyDashboardHome({
 
           {/* Action Cards */}
           <View style={styles.actionsWrapper}>
-            {/* Dedicated Emergency SOS Button Card */}
-            <TouchableOpacity
-              style={[styles.sosButton, activeSOS && styles.sosButtonActive]}
-              activeOpacity={0.85}
-              onPress={() => setShowSOSModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="SOS Emergency Button"
-            >
-              <View style={styles.sosButtonContent}>
-                <View style={styles.sosIconCircle}>
-                  <Ionicons
-                    name={activeSOS ? 'radio' : 'warning'}
-                    size={isLarge ? 30 : 24}
-                    color="#FFFFFF"
-                  />
-                </View>
-                <View style={styles.sosTextGroup}>
-                  <Text style={styles.sosButtonText}>
-                    {activeSOS ? '🚨 EMERGENCY SOS ACTIVE' : 'SOS Emergency Help'}
-                  </Text>
-                  <Text style={styles.sosSubtext}>
-                    {activeSOS
-                      ? 'Tap to view hotlines or resolve active alert'
-                      : '1-tap urgent hotlines (1990 / 119) & Care Circle'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-
             {/* Main Hero Card: Request Help */}
             <TouchableOpacity
               style={styles.heroCard}
@@ -295,24 +265,32 @@ export default function ElderlyDashboardHome({
               <Text style={styles.heroSubtext}>Find a verified volunteer or caregiver</Text>
             </TouchableOpacity>
 
-            {/* Sub Action Grid (2 Columns) */}
+            {/* Sub Action Grid (2 Columns: SOS Emergency & My Care Circle) */}
             <View style={styles.gridRow}>
-              {/* My Schedules */}
+              {/* SOS Emergency Help */}
               <TouchableOpacity
-                style={styles.gridCard}
+                style={[styles.gridCard, styles.gridCardSOS, activeSOS && styles.gridCardSOSActive]}
                 activeOpacity={0.85}
-                onPress={() => handleQuickAction('My Schedules')}
+                onPress={() => setShowSOSModal(true)}
                 accessibilityRole="button"
-                accessibilityLabel="My Schedules"
+                accessibilityLabel="SOS Emergency Button"
               >
-                <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
+                <View
+                  style={[
+                    styles.gridIconContainer,
+                    styles.gridIconSOS,
+                    activeSOS && styles.gridIconSOSActive,
+                  ]}
+                >
                   <Ionicons
-                    name="calendar-outline"
-                    size={isLarge ? 38 : 32}
-                    color={COLORS.primary}
+                    name={activeSOS ? 'radio' : 'warning'}
+                    size={isLarge ? 36 : 30}
+                    color={activeSOS ? '#FFFFFF' : '#DC2626'}
                   />
                 </View>
-                <Text style={styles.gridCardText}>My Schedule</Text>
+                <Text style={activeSOS ? styles.gridCardSOSTextActive : styles.gridCardSOSText}>
+                  {activeSOS ? '🚨 SOS Active' : 'SOS Emergency'}
+                </Text>
               </TouchableOpacity>
 
               {/* My Care Circle */}
