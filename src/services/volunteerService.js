@@ -84,6 +84,15 @@ export const getMyHistory = async () => {
 };
 
 /**
+ * Add / log a completed volunteer service activity
+ * @param {Object} logData
+ */
+export const addHistoryLog = async (logData) => {
+  const response = await client.post('/volunteer-offers/my-history', logData);
+  return response.data;
+};
+
+/**
  * Fetch volunteer dashboard impact stats
  */
 export const getMyStats = async () => {

@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as volunteerService from '../../services/volunteerService';
@@ -23,17 +24,62 @@ import {
   validateStartVisit,
 } from '../../utils/scheduleTimeHelper';
 
-export default function VolunteerScheduleScreen({ onNavigateTab }) {
+export default function VolunteerScheduleScreen({ onNavigateTab, onStartChat }) {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
+  // Peer-to-Peer Communication State
+  const [commModalVisit, setCommModalVisit] = useState(null);
+  const [videoCallTarget, setVideoCallTarget] = useState(null);
+  const [videoMuted, setVideoMuted] = useState(false);
+  const [videoCamOff, setVideoCamOff] = useState(false);
+  const [videoCallSeconds, setVideoCallSeconds] = useState(0);
+
+  // Active Trip & Live Tracking State
+  const [activeTripVisit, setActiveTripVisit] = useState(null);
+
+  // Video call duration timer
+  useEffect(() => {
+    let interval = null;
+    if (videoCallTarget) {
+      setVideoCallSeconds(0);
+      interval = setInterval(() => {
+        setVideoCallSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setVideoCallSeconds(0);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [videoCallTarget]);
+
+  const formatCallTimer = (sec) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
   const fetchSchedule = useCallback(async () => {
     try {
       const res = await volunteerService.getMySchedule();
       if (res?.success) {
-        setSchedule(res.data || []);
+        const list = res.data || [];
+        setSchedule(list);
+        setActiveTripVisit((current) => {
+          if (!current) return null;
+          const currentId = current._id || current.id;
+          const updated = list.find((item) => (item._id || item.id) === currentId);
+          if (updated) {
+            if (updated.status === 'completed' || updated.status === 'cancelled') {
+              return null;
+            }
+            return { ...current, ...updated };
+          }
+          return current;
+        });
       }
     } catch (error) {
       console.error('Fetch schedule error:', error);
@@ -90,15 +136,8 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
     }
   };
 
-  const handleStartTrip = (visit) => {
+  const confirmAndStartTrip = (visit) => {
     const id = visit._id || visit.id;
-    const validation = validateStartVisit(visit);
-
-    if (!validation.allowed) {
-      showAppAlert('⏰ Scheduled Time Not Reached', validation.reason);
-      return;
-    }
-
     showAppAlert(
       '📍 Share Live Location?',
       `Would you like to start your trip now? This will share your live arrival directions with ${visit.elderName}'s family member until you arrive.`,
@@ -112,6 +151,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
               const res = await volunteerService.startTrip(id);
               if (res?.success) {
                 showAppAlert('🚗 Trip Started!', 'Live location sharing is now active. The family member can track your arrival.');
+                setActiveTripVisit(visit);
                 fetchSchedule();
               }
             } catch (err) {
@@ -125,6 +165,27 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
     );
   };
 
+  const handleStartTrip = (visit) => {
+    const validation = validateStartVisit(visit);
+
+    if (!validation.allowed) {
+      showAppAlert(
+        '⏰ Scheduled Time Window',
+        `${validation.reason}\n\nWould you like to start the trip now for early dispatch / demonstration?`,
+        [
+          { text: 'Wait for Schedule', style: 'cancel' },
+          {
+            text: 'Yes, Start Early',
+            onPress: () => confirmAndStartTrip(visit),
+          },
+        ]
+      );
+      return;
+    }
+
+    confirmAndStartTrip(visit);
+  };
+
   const handleMarkArrived = async (visit) => {
     const id = visit._id || visit.id;
     try {
@@ -132,6 +193,9 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
       const res = await volunteerService.updateTaskStatus(id, 'arrived');
       if (res?.success) {
         showAppAlert('📍 Marked as Arrived', 'The elder and caregiver have been notified that you have reached the location.');
+        if (activeTripVisit && ((activeTripVisit._id || activeTripVisit.id) === id)) {
+          setActiveTripVisit((prev) => (prev ? { ...prev, status: 'arrived' } : null));
+        }
         fetchSchedule();
       }
     } catch (err) {
@@ -155,7 +219,21 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
               setActionLoadingId(id);
               const res = await volunteerService.updateTaskStatus(id, 'completed');
               if (res?.success) {
-                showAppAlert('🎉 Great Job!', 'Visit completed and your volunteer hours have been logged successfully!');
+                showAppAlert(
+                  '🎉 Great Job!',
+                  'Visit completed and your volunteer hours have been logged successfully!',
+                  [
+                    { text: 'Stay Here', onPress: () => fetchSchedule() },
+                    {
+                      text: 'View in History',
+                      onPress: () => {
+                        fetchSchedule();
+                        if (onNavigateTab) onNavigateTab('history');
+                      },
+                    },
+                  ]
+                );
+                setActiveTripVisit(null);
                 fetchSchedule();
               }
             } catch (err) {
@@ -169,13 +247,52 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
     );
   };
 
+  const handleOpenPeerConnect = (visit) => {
+    setCommModalVisit(visit);
+  };
+
   const handleCallElder = (phone) => {
     if (!phone) {
       showAppAlert('No Phone', 'No phone number is registered for this resident.');
       return;
     }
-    Linking.openURL(`tel:${phone}`).catch(() => {
+    const cleanPhone = phone.replace(/[^0-9+]/g, '');
+    Linking.openURL(`tel:${cleanPhone}`).catch(() => {
       showAppAlert('Error', 'Unable to open telephone dialer.');
+    });
+  };
+
+  const handleChatElder = (visit) => {
+    setCommModalVisit(null);
+    if (!visit) return;
+    const elderUserId = visit.elderlyId || visit.elderId || visit._id || visit.id;
+    if (onStartChat) {
+      onStartChat({
+        _id: elderUserId,
+        id: elderUserId,
+        firstName: visit.elderName || 'Resident',
+        lastName: '',
+        name: visit.elderName || 'Resident',
+        phone: visit.elderPhone || '',
+        role: 'elderly',
+      });
+    } else if (onNavigateTab) {
+      onNavigateTab('messages');
+    } else if (visit.elderPhone) {
+      const cleanPhone = visit.elderPhone.replace(/[^0-9+]/g, '');
+      Linking.openURL(`sms:${cleanPhone}`).catch(() => {
+        showAppAlert('Notice', 'Unable to launch messaging.');
+      });
+    }
+  };
+
+  const handleStartVideoCall = (visit) => {
+    setCommModalVisit(null);
+    if (!visit) return;
+    setVideoCallTarget({
+      name: visit.elderName || 'Elderly Resident',
+      phone: visit.elderPhone || '',
+      activity: visit.serviceType || 'Companionship Session',
     });
   };
 
@@ -199,8 +316,20 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>My Volunteer Schedule</Text>
-        <Text style={styles.headerSub}>Manage your upcoming confirmed support visits and time slots</Text>
+        <View style={styles.headerTitleRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>My Volunteer Schedule</Text>
+            <Text style={styles.headerSub}>Manage your upcoming confirmed support visits and time slots</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.historyShortcutBtn}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time-outline" size={15} color="#1E40AF" />
+            <Text style={styles.historyShortcutBtnText}>History</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -311,17 +440,30 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                   <Text style={styles.notesText}>Note: {visit.notes}</Text>
                 ) : null}
 
+                {/* Ongoing Live Trip Indicator on Card */}
+                {isOngoing && (
+                  <TouchableOpacity
+                    style={styles.liveTripBanner}
+                    activeOpacity={0.8}
+                    onPress={() => setActiveTripVisit(visit)}
+                  >
+                    <View style={styles.pulseLiveDot} />
+                    <Text style={styles.liveTripBannerText}>
+                      Live Trip Active — Location Shared with Family
+                    </Text>
+                    <Ionicons name="chevron-forward" size={14} color="#16A34A" />
+                  </TouchableOpacity>
+                )}
+
                 {/* Interactive Workflow Actions */}
                 <View style={styles.actionsRow}>
-                  {visit.elderPhone ? (
-                    <TouchableOpacity
-                      style={styles.callBtn}
-                      onPress={() => handleCallElder(visit.elderPhone)}
-                    >
-                      <Ionicons name="call" size={15} color="#1E40AF" />
-                      <Text style={styles.callBtnText}>Call</Text>
-                    </TouchableOpacity>
-                  ) : null}
+                  <TouchableOpacity
+                    style={styles.callBtn}
+                    onPress={() => handleOpenPeerConnect(visit)}
+                  >
+                    <Ionicons name="chatbubbles-outline" size={15} color="#1E40AF" />
+                    <Text style={styles.callBtnText}>Call / Chat</Text>
+                  </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.mapBtn}
@@ -362,24 +504,33 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
                       style={[
                         styles.actionBtn,
                         styles.startTripBtn,
-                        !canStart && { backgroundColor: '#94A3B8', opacity: 0.65 },
+                        !canStart && styles.startTripBtnEarlyNotice,
                         isActionLoading && { opacity: 0.7 },
                       ]}
-                      onPress={canStart && !isActionLoading ? () => handleStartTrip(visit) : undefined}
-                      disabled={!canStart || isActionLoading}
-                      pointerEvents={canStart && !isActionLoading ? 'auto' : 'none'}
+                      onPress={!isActionLoading ? () => handleStartTrip(visit) : undefined}
+                      disabled={isActionLoading}
                     >
                       {isActionLoading ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <>
                           <Ionicons name="navigate-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.startTripBtnText}>Start Trip & Share</Text>
+                          <Text style={styles.startTripBtnText}>
+                            {canStart ? 'Start Trip & Share' : 'Start Trip & Share (Early)'}
+                          </Text>
                         </>
                       )}
                     </TouchableOpacity>
                   ) : isOngoing ? (
                     <>
+                      <TouchableOpacity
+                        style={[styles.actionBtn, styles.viewTripBtn]}
+                        onPress={() => setActiveTripVisit(visit)}
+                      >
+                        <Ionicons name="navigate-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.viewTripBtnText}>Active Trip</Text>
+                      </TouchableOpacity>
+
                       <TouchableOpacity
                         style={[styles.actionBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
                         onPress={() => handleMarkArrived(visit)}
@@ -432,6 +583,308 @@ export default function VolunteerScheduleScreen({ onNavigateTab }) {
           })
         )}
       </ScrollView>
+
+      {/* 1. Peer-to-Peer Communication Switcher Modal */}
+      <Modal
+        visible={!!commModalVisit}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCommModalVisit(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.peerModalContent}>
+            <View style={styles.peerModalHeader}>
+              <View style={styles.peerAvatar}>
+                <Ionicons name="person" size={24} color="#1E40AF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.peerModalTitle}>
+                  {commModalVisit?.elderName || 'Elderly Resident'}
+                </Text>
+                <Text style={styles.peerModalSub}>
+                  {commModalVisit?.serviceType || 'Companionship'} · Peer Communication
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setCommModalVisit(null)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.peerOptionsList}>
+              {/* Option A: Phone Call */}
+              <TouchableOpacity
+                style={styles.peerOptionItem}
+                activeOpacity={0.8}
+                onPress={() => {
+                  const phone = commModalVisit?.elderPhone;
+                  setCommModalVisit(null);
+                  handleCallElder(phone);
+                }}
+              >
+                <View style={[styles.peerOptionIconBox, { backgroundColor: '#EFF6FF' }]}>
+                  <Ionicons name="call" size={22} color="#0284C7" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.peerOptionLabel}>Direct Phone Call</Text>
+                  <Text style={styles.peerOptionDesc}>
+                    {commModalVisit?.elderPhone ? `Dial ${commModalVisit.elderPhone}` : 'Cellular voice call to resident'}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+
+              {/* Option B: In-App Direct Chat */}
+              <TouchableOpacity
+                style={styles.peerOptionItem}
+                activeOpacity={0.8}
+                onPress={() => handleChatElder(commModalVisit)}
+              >
+                <View style={[styles.peerOptionIconBox, { backgroundColor: '#ECFDF5' }]}>
+                  <Ionicons name="chatbubbles" size={22} color="#10B981" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.peerOptionLabel}>In-App Direct Chat</Text>
+                  <Text style={styles.peerOptionDesc}>
+                    Real-time text & voice messaging in TogetherCare
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+
+              {/* Option C: Live Video / Audio Session */}
+              <TouchableOpacity
+                style={styles.peerOptionItem}
+                activeOpacity={0.8}
+                onPress={() => handleStartVideoCall(commModalVisit)}
+              >
+                <View style={[styles.peerOptionIconBox, { backgroundColor: '#F5F3FF' }]}>
+                  <Ionicons name="videocam" size={22} color="#8B5CF6" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.peerOptionLabel}>Live Video / Audio Session</Text>
+                  <Text style={styles.peerOptionDesc}>
+                    Face-to-face peer video interaction
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 2. Active Trip & Live Tracking Modal */}
+      <Modal
+        visible={!!activeTripVisit}
+        animationType="slide"
+        onRequestClose={() => setActiveTripVisit(null)}
+      >
+        <SafeAreaView style={styles.activeTripSafeArea}>
+          <StatusBar barStyle="light-content" backgroundColor="#1E293B" />
+          <View style={styles.activeTripHeader}>
+            <View style={styles.activeTripTitleCol}>
+              <View style={styles.activeTripLivePill}>
+                <View style={styles.pulseLiveDotGreen} />
+                <Text style={styles.activeTripLivePillText}>LIVE GPS SHARING ACTIVE</Text>
+              </View>
+              <Text style={styles.activeTripMainTitle}>Active Volunteer Trip</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => setActiveTripVisit(null)}
+                style={styles.activeTripMinimizeBtn}
+              >
+                <Ionicons name="chevron-down" size={18} color="#FFFFFF" />
+                <Text style={styles.activeTripMinimizeText}>Minimize</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setActiveTripVisit(null);
+                  fetchSchedule();
+                }}
+                style={[styles.activeTripMinimizeBtn, { backgroundColor: '#334155', paddingHorizontal: 10 }]}
+              >
+                <Ionicons name="close" size={18} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <ScrollView style={styles.activeTripScroll} contentContainerStyle={{ padding: 18, paddingBottom: 40 }}>
+            {/* Live GPS Broadcast Indicator Card */}
+            <View style={styles.gpsBroadcastCard}>
+              <Ionicons name="radio" size={26} color="#10B981" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.gpsBroadcastTitle}>Broadcasting Arrival Directions</Text>
+                <Text style={styles.gpsBroadcastSub}>
+                  Live location stream is active with {activeTripVisit?.elderName}'s family member until you arrive.
+                </Text>
+              </View>
+            </View>
+
+            {/* Destination Info Card */}
+            <View style={styles.tripDestCard}>
+              <Text style={styles.tripSectionHeading}>VISIT DESTINATION</Text>
+              <Text style={styles.tripElderName}>{activeTripVisit?.elderName}</Text>
+              <Text style={styles.tripServiceType}>{activeTripVisit?.serviceType}</Text>
+
+              <View style={styles.tripDestAddressRow}>
+                <Ionicons name="location" size={18} color="#DC2626" style={{ marginTop: 2 }} />
+                <Text style={styles.tripDestAddressText}>{activeTripVisit?.location}</Text>
+              </View>
+
+              {activeTripVisit?.notes ? (
+                <View style={styles.tripNotesBox}>
+                  <Text style={styles.tripNotesLabel}>Care Notes:</Text>
+                  <Text style={styles.tripNotesText}>{activeTripVisit?.notes}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Navigation & Peer Contact Buttons */}
+            <View style={styles.tripActionGrid}>
+              <TouchableOpacity
+                style={styles.navGoogleBtn}
+                activeOpacity={0.8}
+                onPress={() => handleOpenMaps(activeTripVisit?.location)}
+              >
+                <Ionicons name="map" size={18} color="#FFFFFF" />
+                <Text style={styles.navGoogleBtnText}>Turn-by-Turn GPS Map</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.navCallBtn}
+                activeOpacity={0.8}
+                onPress={() => handleOpenPeerConnect(activeTripVisit)}
+              >
+                <Ionicons name="chatbubbles" size={18} color="#1E40AF" />
+                <Text style={styles.navCallBtnText}>Peer Connect / Call</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Workflow Progress Actions */}
+            <View style={styles.tripProgressionCard}>
+              <Text style={styles.tripSectionHeading}>TRIP PROGRESSION</Text>
+              <Text style={styles.tripProgressionSub}>
+                Update your status as you arrive at the resident's home and when the session is complete.
+              </Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.tripProgressActionBtn,
+                  styles.tripArrivedActionBtn,
+                  actionLoadingId && { opacity: 0.7 },
+                ]}
+                disabled={!!actionLoadingId}
+                onPress={() => handleMarkArrived(activeTripVisit)}
+              >
+                <Ionicons name="checkmark-done-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.tripProgressActionText}>I Have Arrived at Location</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.tripProgressActionBtn,
+                  styles.tripCompleteActionBtn,
+                  actionLoadingId && { opacity: 0.7 },
+                ]}
+                disabled={!!actionLoadingId}
+                onPress={() => handleCompleteVisit(activeTripVisit)}
+              >
+                <Ionicons name="checkmark-circle" size={20} color="#FFFFFF" />
+                <Text style={styles.tripProgressActionText}>Complete Visit & Log Hours</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* 3. Live Video / Audio Session Screen Modal */}
+      <Modal
+        visible={!!videoCallTarget}
+        animationType="slide"
+        onRequestClose={() => setVideoCallTarget(null)}
+      >
+        <SafeAreaView style={styles.videoBackdrop}>
+          <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+
+          {/* Top Info Header */}
+          <View style={styles.videoTopHeader}>
+            <View style={styles.videoHeaderBadge}>
+              <Text style={styles.videoHeaderBadgeText}>
+                {videoCallTarget?.activity || 'TogetherCare Live Session'}
+              </Text>
+            </View>
+            <Text style={styles.videoCallStatus}>
+              {videoCallSeconds > 0 ? `In call   ${formatCallTimer(videoCallSeconds)}` : 'Connecting...'}
+            </Text>
+          </View>
+
+          {/* Center Avatar & Name */}
+          <View style={styles.videoCenterContent}>
+            <View style={styles.videoAvatarOuter}>
+              <Ionicons name="person" size={54} color="#60A5FA" />
+            </View>
+            <Text style={styles.videoCallerName}>{videoCallTarget?.name || 'Elderly Resident'}</Text>
+            <View style={styles.videoRoleBadge}>
+              <Text style={styles.videoRoleBadgeText}>Elderly Dependent</Text>
+            </View>
+            {videoCallTarget?.phone ? (
+              <Text style={{ color: '#94A3B8', fontSize: 13, fontWeight: '600', marginTop: 4 }}>
+                {videoCallTarget.phone}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* Bottom Call Controls */}
+          <View style={styles.videoControlsContainer}>
+            {/* Audio Mute Button */}
+            <TouchableOpacity
+              style={[
+                styles.videoControlBtn,
+                videoMuted && { backgroundColor: '#EF4444' },
+              ]}
+              activeOpacity={0.8}
+              onPress={() => setVideoMuted((prev) => !prev)}
+            >
+              <Ionicons
+                name={videoMuted ? 'mic-off' : 'mic'}
+                size={24}
+                color="#FFFFFF"
+              />
+              <Text style={styles.videoControlLabel}>{videoMuted ? 'Muted' : 'Mute'}</Text>
+            </TouchableOpacity>
+
+            {/* End Call Button */}
+            <TouchableOpacity
+              style={styles.videoEndBtn}
+              activeOpacity={0.8}
+              onPress={() => setVideoCallTarget(null)}
+            >
+              <Ionicons name="call" size={30} color="#FFFFFF" style={{ transform: [{ rotate: '135deg' }] }} />
+            </TouchableOpacity>
+
+            {/* Video Camera Toggle */}
+            <TouchableOpacity
+              style={[
+                styles.videoControlBtn,
+                videoCamOff && { backgroundColor: '#EF4444' },
+              ]}
+              activeOpacity={0.8}
+              onPress={() => setVideoCamOff((prev) => !prev)}
+            >
+              <Ionicons
+                name={videoCamOff ? 'videocam-off' : 'videocam'}
+                size={24}
+                color="#FFFFFF"
+              />
+              <Text style={styles.videoControlLabel}>{videoCamOff ? 'Cam Off' : 'Camera'}</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -449,10 +902,31 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
+  },
+  historyShortcutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    gap: 4,
+  },
+  historyShortcutBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E40AF',
   },
   headerSub: {
     fontSize: 13,
@@ -694,9 +1168,446 @@ const styles = StyleSheet.create({
   startTripBtn: {
     backgroundColor: '#2563EB',
   },
+  startTripBtnEarlyNotice: {
+    backgroundColor: '#3B82F6',
+  },
   startTripBtnText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  viewTripBtn: {
+    backgroundColor: '#0284C7',
+    marginRight: 4,
+  },
+  viewTripBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  liveTripBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingVertical: 7,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    gap: 8,
+  },
+  liveTripBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#065F46',
+  },
+  pulseLiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  pulseLiveDotGreen: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+    marginRight: 5,
+  },
+
+  // Peer-to-Peer Communication Switcher Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  peerModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+  },
+  peerModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  peerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+  },
+  peerModalTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  peerModalSub: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+  },
+  peerOptionsList: {
+    marginTop: 14,
+    gap: 10,
+  },
+  peerOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  peerOptionIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  peerOptionLabel: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  peerOptionDesc: {
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 2,
+  },
+
+  // Active Trip & Live Tracking Modal
+  activeTripSafeArea: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  activeTripHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 12,
+    paddingBottom: 14,
+    backgroundColor: '#1E293B',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  activeTripTitleCol: {
+    gap: 4,
+  },
+  activeTripLivePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#10B981',
+  },
+  activeTripLivePillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#10B981',
+    letterSpacing: 0.5,
+  },
+  activeTripMainTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#F8FAFC',
+  },
+  activeTripMinimizeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#334155',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    gap: 4,
+  },
+  activeTripMinimizeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  activeTripScroll: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  gpsBroadcastCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    gap: 12,
+    marginBottom: 16,
+  },
+  gpsBroadcastTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  gpsBroadcastSub: {
+    fontSize: 12,
+    color: '#047857',
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  tripDestCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 16,
+  },
+  tripSectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  tripElderName: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  tripServiceType: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1E40AF',
+    marginTop: 2,
+  },
+  tripDestAddressRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 12,
+    gap: 8,
+  },
+  tripDestAddressText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    lineHeight: 18,
+  },
+  tripNotesBox: {
+    backgroundColor: '#FEF3C7',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  tripNotesLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#92400E',
+    marginBottom: 2,
+  },
+  tripNotesText: {
+    fontSize: 12,
+    color: '#78350F',
+    lineHeight: 16,
+  },
+  tripActionGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  navGoogleBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1E40AF',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 6,
+    elevation: 2,
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+  },
+  navGoogleBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  navCallBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 6,
+  },
+  navCallBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  tripProgressionCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 12,
+  },
+  tripProgressionSub: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  tripProgressActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  tripArrivedActionBtn: {
+    backgroundColor: '#D97706',
+  },
+  tripCompleteActionBtn: {
+    backgroundColor: '#16A34A',
+  },
+  tripProgressActionText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // Live Video / Audio Session Screen
+  videoBackdrop: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+    justifyContent: 'space-between',
+    paddingVertical: 24,
+  },
+  videoTopHeader: {
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'android' ? 20 : 10,
+    gap: 8,
+  },
+  videoHeaderBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  videoHeaderBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  videoCallStatus: {
+    color: '#10B981',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  videoCenterContent: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  videoAvatarOuter: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(59, 130, 246, 0.15)',
+    borderWidth: 3,
+    borderColor: '#3B82F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoCallerName: {
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  videoRoleBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  videoRoleBadgeText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  videoControlsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 28,
+    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
+  },
+  videoControlBtn: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  videoControlLabel: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  videoEndBtn: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
 });

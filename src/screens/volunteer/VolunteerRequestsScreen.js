@@ -1,5 +1,5 @@
 // src/screens/volunteer/VolunteerRequestsScreen.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
@@ -23,6 +24,7 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
   const [requests, setRequests] = useState([]);
   const [directRequests, setDirectRequests] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submittingId, setSubmittingId] = useState(null);
@@ -37,6 +39,21 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
     { id: 'Reading', label: '📖 Reading' },
     { id: 'Chat', label: '💬 Chat' },
   ];
+
+  const displayedRequests = useMemo(() => {
+    if (!searchQuery.trim()) return requests;
+    const q = searchQuery.trim().toLowerCase();
+    return requests.filter((r) => {
+      return (
+        (r.elderName && r.elderName.toLowerCase().includes(q)) ||
+        (r.address && r.address.toLowerCase().includes(q)) ||
+        (r.type && r.type.toLowerCase().includes(q)) ||
+        (r.serviceType && r.serviceType.toLowerCase().includes(q)) ||
+        (r.notes && r.notes.toLowerCase().includes(q)) ||
+        (Array.isArray(r.items) && r.items.some((it) => it.toLowerCase().includes(q)))
+      );
+    });
+  }, [requests, searchQuery]);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -154,8 +171,33 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Available Help Requests</Text>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>Available Help Requests</Text>
+          {displayedRequests.length > 0 && (
+            <View style={styles.countBadge}>
+              <Text style={styles.countBadgeText}>{displayedRequests.length}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.headerSub}>Browse nearby requests from elderly residents needing assistance</Text>
+
+        {/* Live Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <Ionicons name="search" size={17} color="#64748B" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by elder name, task, or area..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Category Filter Chips */}
@@ -258,12 +300,21 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
             <Text style={styles.emptySub}>
               There are currently no open requests matching this category. Please check back soon or switch categories!
             </Text>
-            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => setSelectedCategory('all')}>
+            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => { setSelectedCategory('all'); setSearchQuery(''); }}>
               <Text style={styles.resetFilterBtnText}>Show All Categories</Text>
             </TouchableOpacity>
           </View>
+        ) : displayedRequests.length === 0 && directRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="search-outline" size={42} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Matching Requests</Text>
+            <Text style={styles.emptySub}>No open requests found matching "{searchQuery}".</Text>
+            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => setSearchQuery('')}>
+              <Text style={styles.resetFilterBtnText}>Clear Search</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
-          requests.map((req) => {
+          displayedRequests.map((req) => {
             const reqKey = req._id || req.id;
             const isUrgent = req.badgeType === 'urgent' || req.badge === 'Urgent';
             const isProcessing = submittingId === reqKey;
@@ -380,15 +431,50 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
   },
+  countBadge: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3730A3',
+  },
   headerSub: {
     fontSize: 13,
     color: '#64748B',
     marginTop: 2,
+    marginBottom: 10,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 38,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    paddingVertical: 0,
   },
   filterRow: {
     backgroundColor: '#FFFFFF',

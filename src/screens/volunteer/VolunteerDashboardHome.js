@@ -427,18 +427,26 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {/* 3 Metric Cards Row (Matches Wireframe with Live Backend Data) */}
         <View style={styles.metricsRow}>
           {/* Card 1: Hours this month (Lavender) */}
-          <View style={[styles.metricCard, styles.metricCardPrimary]}>
+          <TouchableOpacity
+            style={[styles.metricCard, styles.metricCardPrimary]}
+            activeOpacity={0.8}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <Text style={[styles.metricValue, styles.metricValuePrimary]}>
               {stats.hoursThisMonth} hrs
             </Text>
-            <Text style={[styles.metricLabel, styles.metricLabelPrimary]}>this month</Text>
-          </View>
+            <Text style={[styles.metricLabel, styles.metricLabelPrimary]}>this month ➔</Text>
+          </TouchableOpacity>
 
           {/* Card 2: people helped */}
-          <View style={styles.metricCard}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.8}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <Text style={styles.metricValue}>{stats.peopleHelped}</Text>
-            <Text style={styles.metricLabel}>people</Text>
-          </View>
+            <Text style={styles.metricLabel}>people ➔</Text>
+          </TouchableOpacity>
 
           {/* Card 3: your rating */}
           <TouchableOpacity
@@ -802,6 +810,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
               </View>
               <Text style={styles.quickActionLabel}>Availability</Text>
               <Text style={styles.quickActionSub}>Set Hours</Text>
+            </TouchableOpacity>
+
+            {/* Quick Action 3: Volunteer History */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => onNavigateTab && onNavigateTab('history')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.quickActionIconBox}>
+                <Text style={styles.quickActionEmoji}>📜</Text>
+              </View>
+              <Text style={styles.quickActionLabel}>History</Text>
+              <Text style={styles.quickActionSub}>Past Visits</Text>
             </TouchableOpacity>
           </View>
         </View>
