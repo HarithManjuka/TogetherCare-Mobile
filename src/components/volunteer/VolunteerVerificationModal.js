@@ -18,8 +18,10 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { showAlert } from '../../utils/alert';
 import { submitVolunteerVerification } from '../../services/userService';
+import { downloadVerificationEvidence } from '../../services/evidenceDownloadService';
 
-const MAX_BYTES = 2 * 1024 * 1024; // 2MB
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024; // 4MB for high quality pictures
+const MAX_PDF_BYTES = 2 * 1024 * 1024; // 2MB for PDF document
 
 export default function VolunteerVerificationModal({ visible, onClose, user, onVerificationSuccess }) {
   const currentVerification = user?.volunteerVerification || { status: 'UNVERIFIED' };
@@ -69,130 +71,121 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
   const [pdfDoc, setPdfDoc] = useState(null);
 
   const [loading, setLoading] = useState(false);
+  const [fullscreenImage, setFullscreenImage] = useState(null);
 
-  // Take camera pictures sequentially
+  // Helper to safely launch camera and validate size (< 4MB)
+  const captureCameraPhoto = async (label) => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        quality: 0.85,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || !result.assets || !result.assets[0]) {
+        return null;
+      }
+
+      const file = result.assets[0];
+      const size = file.fileSize || file.size;
+      if (size && size > MAX_IMAGE_BYTES) {
+        showAlert(
+          'Error',
+          `${label} picture exceeds 4MB limit. Please retake.`,
+          [{ text: 'Close', style: 'cancel' }]
+        );
+        return 'EXCEEDED';
+      }
+
+      return file;
+    } catch {
+      showAlert('Error', `Failed to open camera for ${label}.`, [
+        { text: 'Close', style: 'cancel' },
+      ]);
+      return null;
+    }
+  };
+
+  // Retake a single slot picture
+  const handleRetakeSingle = async (slotName, label) => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      showAlert('Permission Required', 'Camera permission is needed to capture evidence.', [
+        { text: 'Close', style: 'cancel' },
+      ]);
+      return;
+    }
+
+    const photo = await captureCameraPhoto(label);
+    if (!photo || photo === 'EXCEEDED') return;
+
+    if (slotName === 'nicFront') setNicFront(photo);
+    if (slotName === 'nicBack') setNicBack(photo);
+    if (slotName === 'studentId') setStudentId(photo);
+    if (slotName === 'passportBio') setPassportBio(photo);
+  };
+
+  // Guided Camera Flow: Sequentially captures required pictures while preserving previously taken pictures
   const handleSequentialCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      showAlert('Permission Required', 'Camera permission is needed to capture evidence.');
+      showAlert('Permission Required', 'Camera permission is needed to capture evidence.', [
+        { text: 'Close', style: 'cancel' },
+      ]);
       return;
     }
 
     if (credentialType === 'NIC') {
-      showAlert('Step 1 of 2', 'Please take a clear picture of the NIC Frontside.', [
-        {
-          text: 'Open Camera',
-          onPress: async () => {
-            const frontResult = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-            if (!frontResult.canceled && frontResult.assets && frontResult.assets[0]) {
-              const file = frontResult.assets[0];
-              const size = file.fileSize || file.size;
-              if (size && size > MAX_BYTES) {
-                showAlert('Error', 'Frontside picture exceeds 2MB limit. Please retake.');
-                return;
-              }
-              setNicFront(file);
+      let currentFront = nicFront;
+      if (!currentFront) {
+        const frontResult = await captureCameraPhoto('NIC Frontside');
+        if (frontResult === 'EXCEEDED') return;
+        if (!frontResult) return;
+        setNicFront(frontResult);
+        currentFront = frontResult;
+      }
 
-              // Step 2
-              setTimeout(() => {
-                showAlert('Step 2 of 2', 'Now take a clear picture of the NIC Backside.', [
-                  {
-                    text: 'Open Camera',
-                    onPress: async () => {
-                      const backResult = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-                      if (!backResult.canceled && backResult.assets && backResult.assets[0]) {
-                        const backFile = backResult.assets[0];
-                        const backSize = backFile.fileSize || backFile.size;
-                        if (backSize && backSize > MAX_BYTES) {
-                          showAlert('Error', 'Backside picture exceeds 2MB limit. Please retake.');
-                          return;
-                        }
-                        setNicBack(backFile);
-                      }
-                    },
-                  },
-                ]);
-              }, 400);
-            }
-          },
-        },
-      ]);
+      // Automatically open camera for Step 2 if Backside is not yet taken
+      if (!nicBack) {
+        await new Promise((r) => setTimeout(r, 450));
+        const backResult = await captureCameraPhoto('NIC Backside');
+        if (backResult === 'EXCEEDED') return;
+        if (!backResult) return;
+        setNicBack(backResult);
+      }
     } else if (credentialType === 'Student ID') {
-      showAlert('Step 1 of 3', 'Please take a picture of your NIC Frontside.', [
-        {
-          text: 'Open Camera',
-          onPress: async () => {
-            const front = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-            if (!front.canceled && front.assets && front.assets[0]) {
-              const frontFile = front.assets[0];
-              const size = frontFile.fileSize || frontFile.size;
-              if (size && size > MAX_BYTES) {
-                showAlert('Error', 'Frontside picture exceeds 2MB limit. Please retake.');
-                return;
-              }
-              setNicFront(frontFile);
+      let currentFront = nicFront;
+      if (!currentFront) {
+        const front = await captureCameraPhoto('NIC Frontside');
+        if (front === 'EXCEEDED') return;
+        if (!front) return;
+        setNicFront(front);
+        currentFront = front;
+      }
 
-              setTimeout(() => {
-                showAlert('Step 2 of 3', 'Take a picture of your NIC Backside.', [
-                  {
-                    text: 'Open Camera',
-                    onPress: async () => {
-                      const back = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-                      if (!back.canceled && back.assets && back.assets[0]) {
-                        const backFile = back.assets[0];
-                        const backSize = backFile.fileSize || backFile.size;
-                        if (backSize && backSize > MAX_BYTES) {
-                          showAlert('Error', 'Backside picture exceeds 2MB limit. Please retake.');
-                          return;
-                        }
-                        setNicBack(backFile);
+      let currentBack = nicBack;
+      if (!currentBack) {
+        await new Promise((r) => setTimeout(r, 450));
+        const back = await captureCameraPhoto('NIC Backside');
+        if (back === 'EXCEEDED') return;
+        if (!back) return;
+        setNicBack(back);
+        currentBack = back;
+      }
 
-                        setTimeout(() => {
-                          showAlert('Step 3 of 3', 'Take a picture of your University ID Frontside.', [
-                            {
-                              text: 'Open Camera',
-                              onPress: async () => {
-                                const student = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-                                if (!student.canceled && student.assets && student.assets[0]) {
-                                  const studentFile = student.assets[0];
-                                  const studentSize = studentFile.fileSize || studentFile.size;
-                                  if (studentSize && studentSize > MAX_BYTES) {
-                                    showAlert('Error', 'University ID picture exceeds 2MB limit. Please retake.');
-                                    return;
-                                  }
-                                  setStudentId(studentFile);
-                                }
-                              },
-                            },
-                          ]);
-                        }, 400);
-                      }
-                    },
-                  },
-                ]);
-              }, 400);
-            }
-          },
-        },
-      ]);
+      if (!studentId) {
+        await new Promise((r) => setTimeout(r, 450));
+        const student = await captureCameraPhoto('University ID');
+        if (student === 'EXCEEDED') return;
+        if (!student) return;
+        setStudentId(student);
+      }
     } else if (credentialType === 'Passport') {
-      showAlert('Step 1 of 1', 'Please capture the Passport Biometric Data page.', [
-        {
-          text: 'Open Camera',
-          onPress: async () => {
-            const pass = await ImagePicker.launchCameraAsync({ quality: 0.8 });
-            if (!pass.canceled && pass.assets && pass.assets[0]) {
-              const passFile = pass.assets[0];
-              const size = passFile.fileSize || passFile.size;
-              if (size && size > MAX_BYTES) {
-                showAlert('Error', 'Picture exceeds 2MB limit. Please retake.');
-                return;
-              }
-              setPassportBio(passFile);
-            }
-          },
-        },
-      ]);
+      if (!passportBio) {
+        const pass = await captureCameraPhoto('Passport Biometric Data');
+        if (pass === 'EXCEEDED') return;
+        if (!pass) return;
+        setPassportBio(pass);
+      }
     }
   };
 
@@ -207,14 +200,41 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
       if (!result.canceled && result.assets && result.assets[0]) {
         const doc = result.assets[0];
         const docSize = doc.size || doc.fileSize;
-        if (docSize && docSize > MAX_BYTES) {
-          showAlert('Validation Error', 'The selected PDF exceeds the 2MB limit. Please choose a smaller file.');
+        if (docSize && docSize > MAX_PDF_BYTES) {
+          showAlert(
+            'Validation Error',
+            'The selected PDF exceeds the 2MB limit. Please choose a smaller file.',
+            [{ text: 'Close', style: 'cancel' }]
+          );
           return;
         }
         setPdfDoc(doc);
       }
     } catch {
-      showAlert('Error', 'Failed to pick document.');
+      showAlert('Error', 'Failed to pick document.', [{ text: 'Close', style: 'cancel' }]);
+    }
+  };
+
+  // Append file to FormData cleanly across Web (Blob/File) and Native (React Native file object)
+  const appendFileToFormData = async (formData, fieldName, asset, defaultFileName) => {
+    if (Platform.OS === 'web') {
+      if (asset.file) {
+        formData.append(fieldName, asset.file, asset.name || defaultFileName);
+      } else if (asset.uri) {
+        try {
+          const res = await fetch(asset.uri);
+          const blob = await res.blob();
+          formData.append(fieldName, blob, asset.name || defaultFileName);
+        } catch {
+          formData.append(fieldName, asset.uri);
+        }
+      }
+    } else {
+      formData.append(fieldName, {
+        uri: Platform.OS === 'android' ? (asset.fileCopyUri || asset.uri) : asset.uri.replace('file://', ''),
+        name: asset.name || defaultFileName,
+        type: asset.mimeType || (defaultFileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg'),
+      });
     }
   };
 
@@ -226,7 +246,11 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
     if (credentialType === 'Passport' && passportBio) hasImages = true;
 
     if (!hasImages && !pdfDoc) {
-      showAlert('Incomplete Evidence', 'Please complete the photo capture requirements or attach a valid PDF document.');
+      showAlert(
+        'Incomplete Evidence',
+        'Please complete the photo capture requirements or attach a valid PDF document.',
+        [{ text: 'Close', style: 'cancel' }]
+      );
       return;
     }
 
@@ -237,43 +261,28 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
     const categories = [];
 
     if (nicFront) {
-      formData.append('evidenceFiles', {
-        uri: Platform.OS === 'android' ? nicFront.uri : nicFront.uri.replace('file://', ''),
-        name: 'nic_front.jpg',
-        type: 'image/jpeg',
-      });
+      await appendFileToFormData(formData, 'evidenceFiles', nicFront, 'nic_front.jpg');
       categories.push('nic_front');
     }
     if (nicBack) {
-      formData.append('evidenceFiles', {
-        uri: Platform.OS === 'android' ? nicBack.uri : nicBack.uri.replace('file://', ''),
-        name: 'nic_back.jpg',
-        type: 'image/jpeg',
-      });
+      await appendFileToFormData(formData, 'evidenceFiles', nicBack, 'nic_back.jpg');
       categories.push('nic_back');
     }
     if (studentId) {
-      formData.append('evidenceFiles', {
-        uri: Platform.OS === 'android' ? studentId.uri : studentId.uri.replace('file://', ''),
-        name: 'student_id_front.jpg',
-        type: 'image/jpeg',
-      });
+      await appendFileToFormData(formData, 'evidenceFiles', studentId, 'student_id_front.jpg');
       categories.push('student_id_front');
     }
     if (passportBio) {
-      formData.append('evidenceFiles', {
-        uri: Platform.OS === 'android' ? passportBio.uri : passportBio.uri.replace('file://', ''),
-        name: 'passport_bio.jpg',
-        type: 'image/jpeg',
-      });
+      await appendFileToFormData(formData, 'evidenceFiles', passportBio, 'passport_bio.jpg');
       categories.push('passport_bio');
     }
     if (pdfDoc) {
-      formData.append('evidenceFiles', {
-        uri: Platform.OS === 'android' ? pdfDoc.uri : pdfDoc.uri.replace('file://', ''),
-        name: pdfDoc.name || 'verification_document.pdf',
-        type: 'application/pdf',
-      });
+      await appendFileToFormData(
+        formData,
+        'evidenceFiles',
+        pdfDoc,
+        pdfDoc.name || 'verification_document.pdf'
+      );
       categories.push('document_pdf');
     }
 
@@ -282,15 +291,56 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
     try {
       setLoading(true);
       const res = await submitVolunteerVerification(formData);
-      showAlert('Submitted', 'Evidence uploaded successfully. Status is now PENDING review.');
+      showAlert(
+        'Submitted',
+        'Evidence uploaded successfully. Status is now PENDING review.',
+        [{ text: 'OK' }]
+      );
       if (onVerificationSuccess) onVerificationSuccess(res.data.volunteerVerification);
       onClose();
     } catch (err) {
-      showAlert('Upload Failed', err?.response?.data?.message || 'Could not upload evidence.');
+      showAlert(
+        'Upload Failed',
+        err?.response?.data?.message || 'Could not upload evidence.',
+        [{ text: 'Close', style: 'cancel' }]
+      );
     } finally {
       setLoading(false);
     }
   };
+
+  // Volunteer download verification document helper (direct device download)
+  const handleDownloadEvidence = async (file, fileIndex) => {
+    const ext = file.fileType === 'pdf' ? 'pdf' : 'jpg';
+    const targetFileName =
+      file.originalName || `${file.documentCategory || 'evidence'}.${ext}`;
+
+    await downloadVerificationEvidence(
+      user?._id,
+      fileIndex,
+      targetFileName,
+      file.fileType
+    );
+  };
+
+  // Compute camera progress
+  const getCameraStatus = () => {
+    if (credentialType === 'NIC') {
+      const count = (nicFront ? 1 : 0) + (nicBack ? 1 : 0);
+      return { count, total: 2, complete: count === 2 };
+    }
+    if (credentialType === 'Student ID') {
+      const count = (nicFront ? 1 : 0) + (nicBack ? 1 : 0) + (studentId ? 1 : 0);
+      return { count, total: 3, complete: count === 3 };
+    }
+    if (credentialType === 'Passport') {
+      const count = passportBio ? 1 : 0;
+      return { count, total: 1, complete: count === 1 };
+    }
+    return { count: 0, total: 0, complete: false };
+  };
+
+  const cameraStatus = getCameraStatus();
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -325,9 +375,14 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
                   <Text style={styles.evidenceName} numberOfLines={1}>
                     {file.originalName || `${file.documentCategory}.${file.fileType === 'pdf' ? 'pdf' : 'jpg'}`}
                   </Text>
-                  <TouchableOpacity onPress={() => Linking.openURL(file.url)}>
-                    <Text style={styles.viewLink}>View</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    <TouchableOpacity onPress={() => Linking.openURL(file.url)}>
+                      <Text style={styles.viewLink}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => handleDownloadEvidence(file, idx)}>
+                      <Text style={[styles.viewLink, { color: '#16A34A' }]}>Download</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
             </View>
@@ -388,47 +443,126 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
                 </View>
               ) : null}
 
+              {/* Option 1: Guided Camera Capture */}
               <View style={styles.captureBox}>
-                <Text style={styles.captureTitle}>Option 1: Guided Camera Capture</Text>
+                <View style={styles.captureHeaderRow}>
+                  <Text style={styles.captureTitle}>Option 1: Guided Camera Capture</Text>
+                  {cameraStatus.total > 0 && cameraStatus.count > 0 && (
+                    <Text style={styles.progressBadge}>
+                      {cameraStatus.count} of {cameraStatus.total} captured
+                    </Text>
+                  )}
+                </View>
                 <Text style={styles.captureHint}>
-                  {credentialType === 'NIC' && 'Takes Frontside, then Backside photo of NIC.'}
-                  {credentialType === 'Student ID' && 'Takes NIC Frontside, Backside, and University ID.'}
-                  {credentialType === 'Passport' && 'Takes biometric data page photo.'}
+                  {credentialType === 'NIC' && 'Takes Frontside, then Backside photo of NIC (Max 4MB each).'}
+                  {credentialType === 'Student ID' && 'Takes NIC Frontside, Backside, and University ID (Max 4MB each).'}
+                  {credentialType === 'Passport' && 'Takes biometric data page photo (Max 4MB).'}
                 </Text>
+
                 <TouchableOpacity style={styles.cameraActionBtn} onPress={handleSequentialCamera}>
                   <Ionicons name="camera-outline" size={20} color="#FFFFFF" />
-                  <Text style={styles.cameraActionText}>Open Camera Flow</Text>
+                  <Text style={styles.cameraActionText}>
+                    {cameraStatus.complete
+                      ? 'Retake All Camera Photos'
+                      : cameraStatus.count > 0
+                      ? `Continue Camera Flow (${cameraStatus.count}/${cameraStatus.total})`
+                      : 'Open Camera Flow'}
+                  </Text>
                 </TouchableOpacity>
 
-                {/* Previews */}
+                {/* Captured Previews with View, Remove, and Retake options */}
                 <View style={styles.previewsRow}>
                   {nicFront && (
                     <View style={styles.previewCard}>
-                      <Image source={{ uri: nicFront.uri }} style={styles.thumb} />
+                      <TouchableOpacity onPress={() => setFullscreenImage(nicFront.uri)} activeOpacity={0.85}>
+                        <Image source={{ uri: nicFront.uri }} style={styles.thumb} />
+                        <View style={styles.enlargeBadge}>
+                          <Ionicons name="search" size={12} color="#FFFFFF" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeCardBtn}
+                        onPress={() => setNicFront(null)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" />
+                      </TouchableOpacity>
                       <Text style={styles.thumbLabel}>NIC Front</Text>
+                      <TouchableOpacity onPress={() => handleRetakeSingle('nicFront', 'NIC Frontside')} style={styles.retakeSlotBtn}>
+                        <Text style={styles.retakeSlotText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
+
                   {nicBack && (
                     <View style={styles.previewCard}>
-                      <Image source={{ uri: nicBack.uri }} style={styles.thumb} />
+                      <TouchableOpacity onPress={() => setFullscreenImage(nicBack.uri)} activeOpacity={0.85}>
+                        <Image source={{ uri: nicBack.uri }} style={styles.thumb} />
+                        <View style={styles.enlargeBadge}>
+                          <Ionicons name="search" size={12} color="#FFFFFF" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeCardBtn}
+                        onPress={() => setNicBack(null)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" />
+                      </TouchableOpacity>
                       <Text style={styles.thumbLabel}>NIC Back</Text>
+                      <TouchableOpacity onPress={() => handleRetakeSingle('nicBack', 'NIC Backside')} style={styles.retakeSlotBtn}>
+                        <Text style={styles.retakeSlotText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
+
                   {studentId && (
                     <View style={styles.previewCard}>
-                      <Image source={{ uri: studentId.uri }} style={styles.thumb} />
+                      <TouchableOpacity onPress={() => setFullscreenImage(studentId.uri)} activeOpacity={0.85}>
+                        <Image source={{ uri: studentId.uri }} style={styles.thumb} />
+                        <View style={styles.enlargeBadge}>
+                          <Ionicons name="search" size={12} color="#FFFFFF" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeCardBtn}
+                        onPress={() => setStudentId(null)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" />
+                      </TouchableOpacity>
                       <Text style={styles.thumbLabel}>Uni ID</Text>
+                      <TouchableOpacity onPress={() => handleRetakeSingle('studentId', 'University ID')} style={styles.retakeSlotBtn}>
+                        <Text style={styles.retakeSlotText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
+
                   {passportBio && (
                     <View style={styles.previewCard}>
-                      <Image source={{ uri: passportBio.uri }} style={styles.thumb} />
+                      <TouchableOpacity onPress={() => setFullscreenImage(passportBio.uri)} activeOpacity={0.85}>
+                        <Image source={{ uri: passportBio.uri }} style={styles.thumb} />
+                        <View style={styles.enlargeBadge}>
+                          <Ionicons name="search" size={12} color="#FFFFFF" />
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeCardBtn}
+                        onPress={() => setPassportBio(null)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Ionicons name="close-circle" size={18} color="#EF4444" />
+                      </TouchableOpacity>
                       <Text style={styles.thumbLabel}>Passport</Text>
+                      <TouchableOpacity onPress={() => handleRetakeSingle('passportBio', 'Passport Biometric Data')} style={styles.retakeSlotBtn}>
+                        <Text style={styles.retakeSlotText}>Retake</Text>
+                      </TouchableOpacity>
                     </View>
                   )}
                 </View>
               </View>
 
+              {/* Option 2: Device PDF Upload */}
               <View style={styles.captureBox}>
                 <Text style={styles.captureTitle}>Option 2: Device PDF Upload</Text>
                 <Text style={styles.captureHint}>Upload a single or multi-page PDF proof (Max 2MB).</Text>
@@ -438,7 +572,7 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
                     {pdfDoc ? pdfDoc.name : 'Select PDF Document from Storage'}
                   </Text>
                   {pdfDoc && (
-                    <TouchableOpacity onPress={() => setPdfDoc(null)}>
+                    <TouchableOpacity onPress={() => setPdfDoc(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                       <Ionicons name="close-circle" size={18} color="#94A3B8" />
                     </TouchableOpacity>
                   )}
@@ -459,6 +593,22 @@ export default function VolunteerVerificationModal({ visible, onClose, user, onV
             </>
           )}
         </ScrollView>
+
+        {/* Fullscreen Preview Modal for Volunteers */}
+        {fullscreenImage && (
+          <Modal visible={!!fullscreenImage} transparent animationType="fade" onRequestClose={() => setFullscreenImage(null)}>
+            <View style={styles.fullscreenBackdrop}>
+              <TouchableOpacity
+                style={styles.closeFullBtn}
+                onPress={() => setFullscreenImage(null)}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={28} color="#FFFFFF" />
+              </TouchableOpacity>
+              <Image source={{ uri: fullscreenImage }} style={styles.fullscreenImg} resizeMode="contain" />
+            </View>
+          </Modal>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -519,7 +669,22 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     marginBottom: 16,
   },
-  captureTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
+  captureHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  captureTitle: { fontSize: 15, fontWeight: '700', color: '#1E293B' },
+  progressBadge: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#0284C7',
+    backgroundColor: '#E0F2FE',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
   captureHint: { fontSize: 12, color: '#64748B', marginBottom: 12 },
   cameraActionBtn: {
     flexDirection: 'row',
@@ -531,10 +696,40 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cameraActionText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  previewsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 12 },
-  previewCard: { alignItems: 'center' },
-  thumb: { width: 80, height: 60, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1' },
-  thumbLabel: { fontSize: 11, color: '#475569', marginTop: 4 },
+  previewsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 14 },
+  previewCard: {
+    alignItems: 'center',
+    position: 'relative',
+    backgroundColor: '#F1F5F9',
+    padding: 6,
+    borderRadius: 8,
+  },
+  thumb: { width: 85, height: 65, borderRadius: 6, borderWidth: 1, borderColor: '#CBD5E1' },
+  enlargeBadge: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    borderRadius: 10,
+    padding: 3,
+  },
+  removeCardBtn: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    zIndex: 10,
+  },
+  thumbLabel: { fontSize: 11, color: '#334155', fontWeight: '600', marginTop: 4 },
+  retakeSlotBtn: {
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 4,
+  },
+  retakeSlotText: { fontSize: 10, color: '#0369A1', fontWeight: '600' },
   uploadDocBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -588,4 +783,20 @@ const styles = StyleSheet.create({
   rejectedTitle: { fontSize: 14, fontWeight: '700', color: '#991B1B' },
   rejectedReason: { fontSize: 13, color: '#B91C1C', marginTop: 2 },
   rejectedPrompt: { fontSize: 12, color: '#7F1D1D', marginTop: 6, fontWeight: '500' },
+  fullscreenBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.92)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullscreenImg: { width: '92%', height: '80%' },
+  closeFullBtn: {
+    position: 'absolute',
+    top: Platform.OS === 'android' ? 45 : 35,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    borderRadius: 20,
+  },
 });

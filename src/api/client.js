@@ -50,6 +50,10 @@ client.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // In Web environments with FormData, delete static Content-Type so browser sets boundary
+    if (Platform.OS === 'web' && config.data && typeof FormData !== 'undefined' && config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     return config;
   },
   (error) => Promise.reject(error)
