@@ -10,6 +10,7 @@ import {
   Linking,
   Platform,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
@@ -22,6 +23,33 @@ export default function ElderRequestDetailModal({
   isAccepting = false,
 }) {
   const [mapTab, setMapTab] = useState(Platform.OS === 'web' ? 'live' : 'route');
+  const [customTimeMode, setCustomTimeMode] = useState(false);
+  const [manualTime, setManualTime] = useState(request?.time || '10:00 AM');
+
+  React.useEffect(() => {
+    if (request?.time) {
+      setManualTime(request.time);
+    }
+  }, [request]);
+
+  const handleBumpMinutes = (deltaMins) => {
+    let currentMins = 600;
+    const match = manualTime.trim().match(/^(\d{1,2}):?(\d{2})?\s*(AM|PM)?$/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      let m = match[2] ? parseInt(match[2], 10) : 0;
+      const period = match[3] ? match[3].toUpperCase() : 'AM';
+      if (period === 'PM' && h !== 12) h += 12;
+      if (period === 'AM' && h === 12) h = 0;
+      currentMins = h * 60 + m;
+    }
+    currentMins = Math.max(0, Math.min(23 * 60 + 59, currentMins + deltaMins));
+    const h = Math.floor(currentMins / 60);
+    const m = currentMins % 60;
+    const period = h >= 12 ? 'PM' : 'AM';
+    const displayH = h % 12 === 0 ? 12 : h % 12;
+    setManualTime(`${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`);
+  };
 
   if (!request) return null;
 
@@ -127,6 +155,61 @@ export default function ElderRequestDetailModal({
                 <Ionicons name="hourglass-outline" size={16} color="#1E40AF" />
                 <Text style={styles.metaText}>{request.duration || '45 min'}</Text>
               </View>
+            </View>
+
+            {/* Volunteer Arrival Time / Manual Time Input */}
+            <View style={styles.customTimeSection}>
+              <View style={styles.customTimeHeader}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Ionicons name="time" size={15} color="#1E40AF" style={{ marginRight: 6 }} />
+                  <Text style={styles.customTimeTitle}>Your Arrival Time</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCustomTimeMode((prev) => !prev)}
+                  style={styles.customTimeToggleBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.customTimeToggleText}>
+                    {customTimeMode ? 'Use Elder Time' : '✏️ Set Time Manually'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {customTimeMode ? (
+                <View style={styles.customTimeInputBox}>
+                  <Text style={styles.customTimeHint}>
+                    Enter the exact time you plan to arrive:
+                  </Text>
+                  <View style={styles.timeInputRow}>
+                    <TextInput
+                      style={styles.timeTextInput}
+                      placeholder="e.g. 10:30 AM"
+                      placeholderTextColor="#94A3B8"
+                      value={manualTime}
+                      onChangeText={setManualTime}
+                      autoCapitalize="characters"
+                    />
+                    <TouchableOpacity
+                      style={styles.timeBumpBtn}
+                      onPress={() => handleBumpMinutes(-15)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.timeBumpText}>-15m</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.timeBumpBtn}
+                      onPress={() => handleBumpMinutes(+15)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.timeBumpText}>+15m</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.standardTimeHint}>
+                  Scheduled as requested: <Text style={{ fontWeight: '700', color: '#1E40AF' }}>{request.time || '10:00 AM'}</Text>
+                </Text>
+              )}
             </View>
 
             {/* LOCATION & MAP SECTION */}
@@ -314,7 +397,7 @@ export default function ElderRequestDetailModal({
             {onAccept ? (
               <TouchableOpacity
                 style={[styles.primaryBtn, isAccepting && { opacity: 0.7 }]}
-                onPress={() => onAccept(request)}
+                onPress={() => onAccept(request, customTimeMode && manualTime.trim() ? manualTime.trim() : null)}
                 disabled={isAccepting}
                 activeOpacity={0.8}
               >
@@ -323,7 +406,9 @@ export default function ElderRequestDetailModal({
                 ) : (
                   <>
                     <Ionicons name="hand-left-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
-                    <Text style={styles.primaryBtnText}>Accept Request</Text>
+                    <Text style={styles.primaryBtnText}>
+                      {customTimeMode && manualTime.trim() ? `Accept at ${manualTime.trim()}` : 'Accept Request'}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -336,6 +421,82 @@ export default function ElderRequestDetailModal({
 }
 
 const styles = StyleSheet.create({
+  customTimeSection: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginBottom: 16,
+  },
+  customTimeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  customTimeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  customTimeToggleBtn: {
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+  },
+  customTimeToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1E40AF',
+  },
+  customTimeInputBox: {
+    marginTop: 8,
+  },
+  customTimeHint: {
+    fontSize: 11,
+    color: '#64748B',
+    marginBottom: 6,
+  },
+  standardTimeHint: {
+    fontSize: 12,
+    color: '#475569',
+    marginTop: 2,
+  },
+  timeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeTextInput: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginRight: 6,
+  },
+  timeBumpBtn: {
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 8,
+    marginLeft: 4,
+  },
+  timeBumpText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#3730A3',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',

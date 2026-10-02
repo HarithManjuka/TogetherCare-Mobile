@@ -136,60 +136,6 @@ export default function VolunteerHomeScreen() {
     return () => subscription.remove();
   }, [activeChatUser, currentTab]);
 
-  const renderActiveScreen = () => {
-    switch (currentTab) {
-      case 'request':
-        return <VolunteerRequestsScreen onNavigateTab={setCurrentTab} />;
-      case 'schedule':
-        return (
-          <VolunteerScheduleScreen
-            onNavigateTab={setCurrentTab}
-            onStartChat={(elderUser) => {
-              setActiveChatUser(elderUser);
-              setCurrentTab('messages');
-            }}
-          />
-        );
-      case 'messages':
-        if (activeChatUser) {
-          return (
-            <CaregiverChatScreen
-              otherUser={activeChatUser}
-              onBack={() => setActiveChatUser(null)}
-            />
-          );
-        }
-        return (
-          <MessagesListScreen
-            onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
-            onBack={() => setCurrentTab('home')}
-          />
-        );
-      case 'history':
-        return (
-          <VolunteerHistoryScreen
-            onBack={() => setCurrentTab('home')}
-            onStartChat={(elderUser) => {
-              setActiveChatUser(elderUser);
-              setCurrentTab('messages');
-            }}
-          />
-        );
-      case 'profile':
-        return <VolunteerProfileScreen />;
-      case 'home':
-      default:
-        return (
-          <VolunteerDashboardHome
-            onNavigateTab={setCurrentTab}
-            onStartChat={(elderUser) => {
-              setActiveChatUser(elderUser);
-              setCurrentTab('messages');
-            }}
-          />
-        );
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -203,7 +149,67 @@ export default function VolunteerHomeScreen() {
         />
       )}
       <View style={styles.screenArea}>
-        {renderActiveScreen()}
+        <View style={[styles.tabContent, currentTab !== 'home' && styles.hiddenTab]}>
+          <VolunteerDashboardHome
+            isActive={currentTab === 'home'}
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'request' && styles.hiddenTab]}>
+          <VolunteerRequestsScreen
+            isActive={currentTab === 'request'}
+            onNavigateTab={setCurrentTab}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'schedule' && styles.hiddenTab]}>
+          <VolunteerScheduleScreen
+            isActive={currentTab === 'schedule'}
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'history' && styles.hiddenTab]}>
+          <VolunteerHistoryScreen
+            isActive={currentTab === 'history'}
+            onBack={() => setCurrentTab('home')}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        {currentTab === 'messages' && (
+          <View style={styles.tabContent}>
+            {activeChatUser ? (
+              <CaregiverChatScreen
+                otherUser={activeChatUser}
+                onBack={() => setActiveChatUser(null)}
+              />
+            ) : (
+              <MessagesListScreen
+                onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
+                onBack={() => setCurrentTab('home')}
+              />
+            )}
+          </View>
+        )}
+
+        {currentTab === 'profile' && (
+          <View style={styles.tabContent}>
+            <VolunteerProfileScreen />
+          </View>
+        )}
       </View>
       <AppBottomNav
         role="volunteer"
@@ -238,5 +244,11 @@ const styles = StyleSheet.create({
   screenArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  hiddenTab: {
+    display: 'none',
   },
 });

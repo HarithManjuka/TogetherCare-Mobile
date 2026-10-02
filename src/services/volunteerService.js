@@ -52,8 +52,11 @@ export const getAvailableRequests = async (category = 'all') => {
  * Accept / Claim a community help request
  * @param {string} requestId
  */
-export const acceptRequest = async (requestId) => {
-  const response = await client.post(`/volunteer-offers/requests/${requestId}/accept`);
+export const acceptRequest = async (requestId, payload) => {
+  const url = `/volunteer-offers/requests/${requestId}/accept`;
+  const response = payload && Object.keys(payload).length > 0
+    ? await client.post(url, payload)
+    : await client.post(url);
   return response.data;
 };
 

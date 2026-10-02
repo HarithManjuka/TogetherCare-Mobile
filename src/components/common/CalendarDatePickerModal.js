@@ -106,9 +106,17 @@ export default function CalendarDatePickerModal({
     if (onClose) onClose();
   };
 
-  // Generate years list (e.g. 1910 to currentYear)
+  // Generate years list (e.g. 1910 to currentYear, or future years if minDate is provided)
+  const minDateObj = minDate ? new Date(minDate) : null;
+  if (minDateObj) minDateObj.setHours(0, 0, 0, 0);
+
+  const maxDateObj = maxDate ? new Date(maxDate) : null;
+  if (maxDateObj) maxDateObj.setHours(23, 59, 59, 999);
+
+  const minYear = minDateObj ? minDateObj.getFullYear() : 1910;
+  const maxYear = maxDateObj ? maxDateObj.getFullYear() : (minDateObj ? currentYear + 5 : currentYear);
   const yearsList = [];
-  for (let y = currentYear; y >= 1910; y--) {
+  for (let y = maxYear; y >= minYear; y--) {
     yearsList.push(y);
   }
 
@@ -158,7 +166,8 @@ export default function CalendarDatePickerModal({
                 {viewMode === 'calendar' && (
                   <View style={styles.monthNav}>
                     <TouchableOpacity
-                      style={styles.navArrow}
+                      style={[styles.navArrow, minDateObj && new Date(selectedYear, selectedMonth, 0) < minDateObj && { opacity: 0.3 }]}
+                      disabled={Boolean(minDateObj && new Date(selectedYear, selectedMonth, 0) < minDateObj)}
                       onPress={() => {
                         if (selectedMonth === 0) {
                           setSelectedMonth(11);
@@ -193,7 +202,7 @@ export default function CalendarDatePickerModal({
               {/* Body: Year Grid vs Month Calendar */}
               {viewMode === 'year' ? (
                 <View style={{ height: 260 }}>
-                  <Text style={styles.selectPrompt}>Tap to select your birth year:</Text>
+                  <Text style={styles.selectPrompt}>Tap to select year:</Text>
                   <ScrollView style={styles.yearScroll} contentContainerStyle={styles.yearGrid}>
                     {yearsList.map((y) => (
                       <TouchableOpacity
@@ -243,21 +252,30 @@ export default function CalendarDatePickerModal({
                     {Array.from({ length: daysInMonth }).map((_, i) => {
                       const dayNum = i + 1;
                       const isSelected = selectedDay === dayNum;
+                      const cellDate = new Date(selectedYear, selectedMonth, dayNum);
+                      cellDate.setHours(0, 0, 0, 0);
+                      const isBeforeMin = minDateObj && cellDate < minDateObj;
+                      const isAfterMax = maxDateObj && cellDate > maxDateObj;
+                      const isDayDisabled = isBeforeMin || isAfterMax;
+
                       return (
                         <TouchableOpacity
                           key={dayNum}
+                          disabled={isDayDisabled}
                           style={[
                             styles.dayCell,
-                            isSelected && styles.dayCellActive,
+                            isSelected && !isDayDisabled && styles.dayCellActive,
                             isElderlyMode && { height: 38 },
+                            isDayDisabled && { opacity: 0.25, backgroundColor: '#F8FAFC' },
                           ]}
-                          onPress={() => setSelectedDay(dayNum)}
+                          onPress={() => !isDayDisabled && setSelectedDay(dayNum)}
                         >
                           <Text
                             style={[
                               styles.dayText,
                               { fontSize: dayTextSize },
-                              isSelected && styles.dayTextActive,
+                              isSelected && !isDayDisabled && styles.dayTextActive,
+                              isDayDisabled && { color: '#94A3B8', textDecorationLine: 'line-through' },
                             ]}
                           >
                             {dayNum}

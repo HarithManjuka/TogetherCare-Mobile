@@ -52,8 +52,8 @@ export default function AddHistoryLogModal({
       setDuration('2.0 hrs');
       setLocation(currentUser?.address?.city || 'Colombo 03');
       setNotes('');
-      setRating(5);
-      setFeedback('Thank you for your warm assistance and companionship!');
+      setRating(null);
+      setFeedback('');
       setErrorMessage('');
     }
   }, [visible, currentUser]);
@@ -72,8 +72,8 @@ export default function AddHistoryLogModal({
       time: duration,
       location: location.trim() || 'Colombo',
       notes: notes.trim() || `Completed ${serviceType} visit`,
-      rating: rating || 5,
-      feedback: feedback.trim() || 'Thank you so much for the dedicated help!',
+      rating: rating ? Number(rating) : null,
+      feedback: feedback.trim() ? feedback.trim() : '',
     };
 
     if (onSubmit) {
@@ -224,31 +224,33 @@ export default function AddHistoryLogModal({
               />
             </View>
 
-            {/* 6. Rating & Feedback */}
-            <Text style={styles.fieldLabel}>Elder Rating (1 - 5 Stars)</Text>
+            {/* 6. Rating & Feedback (Optional) */}
+            <Text style={styles.fieldLabel}>Senior Rating (Optional)</Text>
             <View style={styles.starPickerRow}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <TouchableOpacity
                   key={s}
-                  onPress={() => setRating(s)}
+                  onPress={() => setRating(rating === s ? null : s)}
                   activeOpacity={0.7}
                   style={{ padding: 4 }}
                 >
                   <Ionicons
-                    name={s <= rating ? 'star' : 'star-outline'}
+                    name={rating && s <= rating ? 'star' : 'star-outline'}
                     size={28}
                     color="#F59E0B"
                   />
                 </TouchableOpacity>
               ))}
-              <Text style={styles.starRatingText}>{rating}.0 / 5.0</Text>
+              <Text style={styles.starRatingText}>
+                {rating ? `${rating}.0 / 5.0` : 'Not rated yet'}
+              </Text>
             </View>
 
-            <Text style={styles.fieldLabel}>Senior Appreciative Comment / Feedback</Text>
+            <Text style={styles.fieldLabel}>Senior Comment / Feedback (Optional)</Text>
             <View style={[styles.inputContainer, styles.textAreaContainer]}>
               <TextInput
                 style={[styles.input, styles.textArea]}
-                placeholder="e.g. Wonderful conversation and companionship!"
+                placeholder="Optional comments received from the elder..."
                 placeholderTextColor="#94A3B8"
                 multiline
                 numberOfLines={2}

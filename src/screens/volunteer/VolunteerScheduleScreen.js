@@ -16,6 +16,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as volunteerService from '../../services/volunteerService';
 import { showAppAlert } from '../../utils/alert';
 import {
@@ -24,11 +25,32 @@ import {
   validateStartVisit,
 } from '../../utils/scheduleTimeHelper';
 
-export default function VolunteerScheduleScreen({ onNavigateTab, onStartChat }) {
+const CACHE_SCHEDULE_KEY = '@volunteer_cache_schedule';
+
+export default function VolunteerScheduleScreen({ isActive = true, onNavigateTab, onStartChat }) {
   const [schedule, setSchedule] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Restore cached schedule on mount
+  useEffect(() => {
+    const restoreCachedSchedule = async () => {
+      try {
+        const saved = await AsyncStorage.getItem(CACHE_SCHEDULE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSchedule(parsed);
+            setLoading(false);
+          }
+        }
+      } catch (e) {
+        // Ignore cache restore errors
+      }
+    };
+    restoreCachedSchedule();
+  }, []);
 
   // Peer-to-Peer Communication State
   const [commModalVisit, setCommModalVisit] = useState(null);
@@ -68,6 +90,7 @@ export default function VolunteerScheduleScreen({ onNavigateTab, onStartChat }) 
       if (res?.success) {
         const list = res.data || [];
         setSchedule(list);
+        AsyncStorage.setItem(CACHE_SCHEDULE_KEY, JSON.stringify(list)).catch(() => {});
         setActiveTripVisit((current) => {
           if (!current) return null;
           const currentId = current._id || current.id;
@@ -90,8 +113,10 @@ export default function VolunteerScheduleScreen({ onNavigateTab, onStartChat }) 
   }, []);
 
   useEffect(() => {
-    fetchSchedule();
-  }, [fetchSchedule]);
+    if (isActive) {
+      fetchSchedule();
+    }
+  }, [isActive, fetchSchedule]);
 
   const onRefresh = () => {
     setRefreshing(true);

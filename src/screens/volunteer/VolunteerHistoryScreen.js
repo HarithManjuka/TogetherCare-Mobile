@@ -16,12 +16,17 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as volunteerService from '../../services/volunteerService';
 import * as reviewService from '../../services/reviewService';
 import AddHistoryLogModal from '../../components/volunteer/AddHistoryLogModal';
 import { showAppAlert } from '../../utils/alert';
 
-export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
+const CACHE_HISTORY_KEY = '@volunteer_cache_history';
+const CACHE_STATS_HIST_KEY = '@volunteer_cache_stats_history';
+const CACHE_REVIEWS_KEY = '@volunteer_cache_reviews';
+
+export default function VolunteerHistoryScreen({ isActive = true, onBack, onStartChat }) {
   const [activeSegment, setActiveSegment] = useState('reviews'); // 'reviews' | 'logs'
   const [history, setHistory] = useState([]);
   const [reviewsData, setReviewsData] = useState({ totalReviews: 0, averageRating: 0, reviews: [] });
@@ -32,6 +37,41 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
   });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Restore cached history and stats immediately on mount
+  useEffect(() => {
+    const restoreCachedHistory = async () => {
+      try {
+        const [savedHist, savedStats, savedReviews] = await Promise.all([
+          AsyncStorage.getItem(CACHE_HISTORY_KEY),
+          AsyncStorage.getItem(CACHE_STATS_HIST_KEY),
+          AsyncStorage.getItem(CACHE_REVIEWS_KEY),
+        ]);
+        if (savedHist) {
+          const parsed = JSON.parse(savedHist);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setHistory(parsed);
+            setLoading(false);
+          }
+        }
+        if (savedStats) {
+          const parsed = JSON.parse(savedStats);
+          if (parsed && typeof parsed === 'object') {
+            setStats(parsed);
+          }
+        }
+        if (savedReviews) {
+          const parsed = JSON.parse(savedReviews);
+          if (parsed && typeof parsed === 'object') {
+            setReviewsData(parsed);
+          }
+        }
+      } catch (e) {
+        // Ignore cache restore errors
+      }
+    };
+    restoreCachedHistory();
+  }, []);
 
   // Modals for inspecting elder, visit details, and adding history log
   const [selectedElder, setSelectedElder] = useState(null);
@@ -67,13 +107,19 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
       ]);
 
       if (histRes.status === 'fulfilled' && histRes.value?.success) {
-        setHistory(histRes.value.data || []);
+        const freshHist = histRes.value.data || [];
+        setHistory(freshHist);
+        AsyncStorage.setItem(CACHE_HISTORY_KEY, JSON.stringify(freshHist)).catch(() => {});
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
-        setStats(statsRes.value.data || { totalCompletedVisits: 0, totalHours: '0.0', averageRating: 0 });
+        const freshStats = statsRes.value.data || { totalCompletedVisits: 0, totalHours: '0.0', averageRating: 0 };
+        setStats(freshStats);
+        AsyncStorage.setItem(CACHE_STATS_HIST_KEY, JSON.stringify(freshStats)).catch(() => {});
       }
       if (reviewsRes.status === 'fulfilled' && reviewsRes.value?.success) {
-        setReviewsData(reviewsRes.value.data || { totalReviews: 0, averageRating: 0, reviews: [] });
+        const freshReviews = reviewsRes.value.data || { totalReviews: 0, averageRating: 0, reviews: [] };
+        setReviewsData(freshReviews);
+        AsyncStorage.setItem(CACHE_REVIEWS_KEY, JSON.stringify(freshReviews)).catch(() => {});
       }
     } catch (error) {
       console.error('Fetch history & reviews error:', error);
@@ -84,8 +130,10 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
   }, []);
 
   useEffect(() => {
-    fetchHistoryAndStats();
-  }, [fetchHistoryAndStats]);
+    if (isActive) {
+      fetchHistoryAndStats();
+    }
+  }, [isActive, fetchHistoryAndStats]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -105,9 +153,10 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
   };
 
   const reviewsList = reviewsData?.reviews || [];
-  const displayRating = (reviewsData?.averageRating || stats.averageRating) > 0
+  const hasOverallRating = (reviewsData?.averageRating || stats.averageRating) > 0;
+  const displayRating = hasOverallRating
     ? (reviewsData?.averageRating || stats.averageRating).toFixed(1)
-    : 'New';
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -153,7 +202,7 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
             <Text style={styles.metricLbl}>Total Hours</Text>
           </View>
           <View style={styles.metricBox}>
-            <Text style={styles.metricVal}>{displayRating} ⭐</Text>
+            <Text style={styles.metricVal}>{displayRating ? `${displayRating} ⭐` : 'No ratings'}</Text>
             <Text style={styles.metricLbl}>Overall Rating</Text>
           </View>
         </View>
@@ -368,32 +417,54 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
               </View>
               {history.map((log) => {
                 const logKey = log._id || log.id;
+                // Only consider rated if elder explicitly rated the volunteer
+                const hasRealRating = Boolean(
+                  log.hasRated === true ||
+                  (log.hasRated !== false &&
+                    log.rating !== null &&
+                    log.rating !== undefined &&
+                    Number(log.rating) > 0 &&
+                    log.feedback !== 'Wonderful conversation and company!' &&
+                    log.feedback !== 'Very punctual and polite! Thank you for the quick help.')
+                );
+                const ratingNum = hasRealRating ? Number(log.rating) : null;
+                const feedbackText = hasRealRating && log.feedback && log.feedback.trim() &&
+                  log.feedback !== 'Wonderful conversation and company!' &&
+                  log.feedback !== 'Very punctual and polite! Thank you for the quick help.'
+                    ? log.feedback.trim()
+                    : null;
+
                 return (
                   <View key={logKey} style={styles.historyCard}>
                     <View style={styles.cardHeader}>
                       <Text style={styles.serviceName}>{log.service || 'Companionship'}</Text>
                       <Text style={styles.dateText}>{log.date || 'Completed'}</Text>
                     </View>
-                  <Text style={styles.elderText}>Senior: {log.elderName || 'Senior Member'}</Text>
+                    <Text style={styles.elderText}>Senior: {log.elderName || 'Senior Member'}</Text>
 
-                  <View style={styles.ratingRow}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Ionicons
-                        key={star}
-                        name={star <= (log.rating || 5) ? 'star' : 'star-outline'}
-                        size={14}
-                        color="#F59E0B"
-                      />
-                    ))}
-                    <Text style={styles.ratingNumber}>{(log.rating || 5).toFixed(1)}</Text>
+                    {/* Rating part is removed for unrated tasks. It ONLY shows after elder really rates the volunteer */}
+                    {hasRealRating && ratingNum ? (
+                      <View style={styles.ratingSectionWrap}>
+                        <View style={[styles.ratingRow, !feedbackText && { marginBottom: 0 }]}>
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Ionicons
+                              key={star}
+                              name={star <= Math.round(ratingNum) ? 'star' : 'star-outline'}
+                              size={14}
+                              color="#F59E0B"
+                            />
+                          ))}
+                          <Text style={styles.ratingNumber}>{ratingNum.toFixed(1)}</Text>
+                        </View>
+
+                        {feedbackText ? (
+                          <Text style={styles.feedbackText}>"{feedbackText}"</Text>
+                        ) : null}
+                      </View>
+                    ) : null}
                   </View>
-
-                  {log.feedback ? (
-                    <Text style={styles.feedbackText}>"{log.feedback}"</Text>
-                  ) : null}
-                </View>
-              );
-            })}
+                );
+              })}
             </>
           )
         )}
@@ -1012,6 +1083,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#475569',
     marginBottom: 6,
+  },
+  ratingSectionWrap: {
+    marginTop: 4,
   },
   ratingRow: {
     flexDirection: 'row',
