@@ -2,6 +2,7 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 import { getItem, setItem } from '../utils/storage';
+import { COLORS } from '../constants/theme';
 
 const SCALE_KEY = '@togethercare_ui_scale';
 const THEME_KEY = '@togethercare_theme_mode';
@@ -25,7 +26,7 @@ export const ThemeProvider = ({ children }) => {
         }
 
         const savedScale = await getItem(SCALE_KEY);
-        if (savedScale) {
+        if (savedScale && !isNaN(Number(savedScale))) {
           setUiScale(Number(savedScale));
         }
       } catch (err) {
@@ -56,10 +57,13 @@ export const ThemeProvider = ({ children }) => {
     <ThemeContext.Provider
       value={{
         isDarkMode,
+        isDark: isDarkMode,
         toggleTheme,
         uiScale,
         scale: uiScale,
+        isLarge: uiScale > 1.0,
         cycleUiScale,
+        colors: COLORS,
       }}
     >
       {children}
