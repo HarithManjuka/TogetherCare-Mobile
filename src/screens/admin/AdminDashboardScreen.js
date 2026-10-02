@@ -5,6 +5,7 @@ import AppBottomNav from '../../components/common/AppBottomNav';
 import AppHeader from '../../components/common/AppHeader';
 import AdminDashboardHome from './AdminDashboardHome';
 import AdminUsersScreen from './AdminUsersScreen';
+import AdminRequestsScreen from './AdminRequestsScreen';
 import AdminSafetyScreen from './AdminSafetyScreen';
 import AdminSettingsScreen from './settings/AdminSettingsScreen';
 import AdminProfileScreen from './settings/AdminProfileScreen';
@@ -44,8 +45,9 @@ export default function AdminDashboardScreen() {
   }, []);
 
   const handleNavigateTab = (tab, subScreen = null) => {
-    setActiveTab(tab);
-    if (tab === 'settings') {
+    const targetTab = tab === 'alerts' || tab === 'request' ? 'requests' : tab;
+    setActiveTab(targetTab);
+    if (targetTab === 'settings') {
       setSettingsScreen(subScreen || 'menu');
     }
   };
@@ -77,6 +79,19 @@ export default function AdminDashboardScreen() {
   const elderlyCount = users.filter((u) => u.role === 'elderly').length;
   const volunteerCount = users.filter((u) => u.role === 'volunteer').length;
   const caregiverCount = users.filter((u) => u.role === 'caregiver').length;
+
+  // Calculate pending volunteer ID verification requests count
+  const pendingRequestsCount = users.filter((u) => {
+    const isVolunteer = u.role === 'volunteer';
+    const isBadgePending =
+      u.verificationBadgeStatus === 'pending' ||
+      u.verificationBadgeStatus === 'pending_approval' ||
+      u.verificationBadgeStatus === 'Pending Approval';
+    const isVerificationPending =
+      u.volunteerVerification?.status === 'PENDING' ||
+      u.volunteerVerification?.status === 'pending';
+    return isVolunteer && (isBadgePending || isVerificationPending);
+  }).length;
 
   const renderSettingsContent = () => {
     switch (settingsScreen) {
@@ -112,8 +127,15 @@ export default function AdminDashboardScreen() {
             setRoleFilter={setRoleFilter}
           />
         );
+      case 'requests':
+      case 'request':
       case 'alerts':
-        return <AdminSafetyScreen />;
+        return (
+          <AdminRequestsScreen
+            users={users}
+            onUserUpdated={fetchUsers}
+          />
+        );
       case 'settings':
         return (
           <View style={styles.tabContent}>
@@ -125,6 +147,7 @@ export default function AdminDashboardScreen() {
         return (
           <AdminDashboardHome
             user={user}
+            users={users}
             totalUsers={totalUsers}
             elderlyCount={elderlyCount}
             volunteerCount={volunteerCount}
@@ -142,7 +165,7 @@ export default function AdminDashboardScreen() {
       {activeTab !== 'settings' && (
         <AppHeader
           onProfilePress={() => handleNavigateTab('settings', 'profile')}
-          onNotificationPress={() => setActiveTab('alerts')}
+          onNotificationPress={() => setActiveTab('requests')}
           onNavigateTab={handleNavigateTab}
         />
       )}
@@ -154,7 +177,8 @@ export default function AdminDashboardScreen() {
       {/* Fixed Mobile Bottom Navigation */}
       <AppBottomNav
         role="admin"
-        activeTab={activeTab}
+        activeTab={activeTab === 'alerts' || activeTab === 'request' ? 'requests' : activeTab}
+        requestBadgeCount={pendingRequestsCount}
         onTabPress={(tabKey) => handleNavigateTab(tabKey, 'menu')}
       />
     </View>
