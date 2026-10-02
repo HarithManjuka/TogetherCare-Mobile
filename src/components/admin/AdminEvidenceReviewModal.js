@@ -15,10 +15,9 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { showAlert } from '../../utils/alert';
 import { reviewVolunteerVerification } from '../../services/adminUserService';
+import { downloadVerificationEvidence } from '../../services/evidenceDownloadService';
 
 export default function AdminEvidenceReviewModal({ visible, onClose, volunteerUser, onReviewCompleted }) {
   const verification = volunteerUser?.volunteerVerification || {};
@@ -32,35 +31,25 @@ export default function AdminEvidenceReviewModal({ visible, onClose, volunteerUs
     `${volunteerUser?.firstName || ''} ${volunteerUser?.lastName || ''}`.trim() ||
     'Volunteer';
 
-  // PDF Download with explicit naming: volunteer_<name>_<verifyType>.pdf
-  const handleDownloadPdf = async (pdfUrl) => {
-    try {
-      const sanitizedName = volunteerDisplayName
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '_');
-      const verifyType = (
-        verification.credentialType ||
-        volunteerUser?.volunteerIdType ||
-        'ID'
-      ).replace(/\s+/g, '_');
-      const targetFileName = `volunteer_${sanitizedName}_${verifyType}.pdf`;
+  // PDF Download directly to device without web redirecting
+  const handleDownloadPdf = async (file, fileIndex) => {
+    const sanitizedName = volunteerDisplayName
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, '_');
+    const verifyType = (
+      verification.credentialType ||
+      volunteerUser?.volunteerIdType ||
+      'ID'
+    ).replace(/\s+/g, '_');
+    const targetFileName =
+      file?.originalName || `volunteer_${sanitizedName}_${verifyType}.pdf`;
 
-      const localUri = `${FileSystem.documentDirectory}${targetFileName}`;
-
-      showAlert('Downloading', 'Downloading verification document...');
-      const downloadResult = await FileSystem.downloadAsync(pdfUrl, localUri);
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(downloadResult.uri, {
-          mimeType: 'application/pdf',
-          dialogTitle: targetFileName,
-        });
-      } else {
-        Linking.openURL(pdfUrl);
-      }
-    } catch {
-      Linking.openURL(pdfUrl);
-    }
+    await downloadVerificationEvidence(
+      volunteerUser?._id,
+      fileIndex,
+      targetFileName,
+      file?.fileType || 'pdf'
+    );
   };
 
   const handleApprove = () => {
@@ -157,7 +146,7 @@ export default function AdminEvidenceReviewModal({ visible, onClose, volunteerUs
                   <Text style={styles.tapToEnlarge}>🔍 Tap to view full screen</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity style={styles.pdfDownloadBtn} onPress={() => handleDownloadPdf(file.url)}>
+                <TouchableOpacity style={styles.pdfDownloadBtn} onPress={() => handleDownloadPdf(file, idx)}>
                   <Ionicons name="cloud-download-outline" size={20} color="#0369A1" />
                   <Text style={styles.pdfDownloadText}>Download & Review PDF</Text>
                 </TouchableOpacity>
