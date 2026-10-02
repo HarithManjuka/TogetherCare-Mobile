@@ -18,6 +18,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as volunteerService from '../../services/volunteerService';
 import * as reviewService from '../../services/reviewService';
+import AddHistoryLogModal from '../../components/volunteer/AddHistoryLogModal';
+import { showAppAlert } from '../../utils/alert';
 
 export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
   const [activeSegment, setActiveSegment] = useState('reviews'); // 'reviews' | 'logs'
@@ -31,9 +33,30 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Modals for inspecting elder and visit details
+  // Modals for inspecting elder, visit details, and adding history log
   const [selectedElder, setSelectedElder] = useState(null);
   const [selectedVisit, setSelectedVisit] = useState(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [savingLog, setSavingLog] = useState(false);
+
+  const handleSaveLog = async (logData) => {
+    try {
+      setSavingLog(true);
+      const res = await volunteerService.addHistoryLog(logData);
+      if (res?.success) {
+        setAddModalVisible(false);
+        showAppAlert(
+          '🎉 Service Logged!',
+          `Great work! Your ${logData.serviceType} visit has been recorded in your volunteer history.`
+        );
+        fetchHistoryAndStats();
+      }
+    } catch (err) {
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to save volunteer history log');
+    } finally {
+      setSavingLog(false);
+    }
+  };
 
   const fetchHistoryAndStats = useCallback(async () => {
     try {
@@ -100,6 +123,14 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
             <Text style={styles.headerTitle}>Volunteer Impact & Ratings</Text>
             <Text style={styles.headerSub}>Community feedback, elder reviews, and completed trips</Text>
           </View>
+          <TouchableOpacity
+            style={styles.headerAddBtn}
+            onPress={() => setAddModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="add" size={18} color="#FFFFFF" />
+            <Text style={styles.headerAddBtnText}>Log Visit</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -126,6 +157,24 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
             <Text style={styles.metricLbl}>Overall Rating</Text>
           </View>
         </View>
+
+        {/* Banner: Quick Log Past Volunteer Service */}
+        <TouchableOpacity
+          style={styles.logActivityBanner}
+          activeOpacity={0.85}
+          onPress={() => setAddModalVisible(true)}
+        >
+          <View style={styles.logActivityIconBox}>
+            <Ionicons name="add-circle" size={24} color="#1E40AF" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.logActivityTitle}>Log Volunteer Service</Text>
+            <Text style={styles.logActivitySub}>
+              Record an offline assistance visit, companionship hours, or community task
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#94A3B8" />
+        </TouchableOpacity>
 
         {/* Sub-tabs Segmented Control */}
         <View style={styles.segmentedControl}>
@@ -295,16 +344,36 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
               <Text style={styles.emptySub}>
                 Your completed support trips and logs will appear here once you finish visits.
               </Text>
+              <TouchableOpacity
+                style={styles.emptyAddBtn}
+                activeOpacity={0.85}
+                onPress={() => setAddModalVisible(true)}
+              >
+                <Ionicons name="add-circle" size={17} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.emptyAddBtnText}>Log Past Volunteer Service</Text>
+              </TouchableOpacity>
             </View>
           ) : (
-            history.map((log) => {
-              const logKey = log._id || log.id;
-              return (
-                <View key={logKey} style={styles.historyCard}>
-                  <View style={styles.cardHeader}>
-                    <Text style={styles.serviceName}>{log.service || 'Companionship'}</Text>
-                    <Text style={styles.dateText}>{log.date || 'Completed'}</Text>
-                  </View>
+            <>
+              <View style={styles.logsSectionHeader}>
+                <Text style={styles.logsSectionTitle}>Completed Visits & Hours ({history.length})</Text>
+                <TouchableOpacity
+                  style={styles.logsAddBtn}
+                  onPress={() => setAddModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="add" size={14} color="#1E40AF" />
+                  <Text style={styles.logsAddBtnText}>Add Log</Text>
+                </TouchableOpacity>
+              </View>
+              {history.map((log) => {
+                const logKey = log._id || log.id;
+                return (
+                  <View key={logKey} style={styles.historyCard}>
+                    <View style={styles.cardHeader}>
+                      <Text style={styles.serviceName}>{log.service || 'Companionship'}</Text>
+                      <Text style={styles.dateText}>{log.date || 'Completed'}</Text>
+                    </View>
                   <Text style={styles.elderText}>Senior: {log.elderName || 'Senior Member'}</Text>
 
                   <View style={styles.ratingRow}>
@@ -324,7 +393,8 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
                   ) : null}
                 </View>
               );
-            })
+            })}
+            </>
           )
         )}
       </ScrollView>
@@ -518,6 +588,14 @@ export default function VolunteerHistoryScreen({ onBack, onStartChat }) {
           </View>
         </View>
       </Modal>
+
+      {/* MODAL 3: Add Volunteer History Log Modal */}
+      <AddHistoryLogModal
+        visible={addModalVisible}
+        onClose={() => setAddModalVisible(false)}
+        onSubmit={handleSaveLog}
+        isSaving={savingLog}
+      />
     </SafeAreaView>
   );
 }
@@ -554,6 +632,91 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#64748B',
     marginTop: 2,
+  },
+  headerAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    gap: 4,
+  },
+  headerAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  logActivityBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    marginBottom: 16,
+    gap: 12,
+  },
+  logActivityIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logActivityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  logActivitySub: {
+    fontSize: 12,
+    color: '#3B82F6',
+    marginTop: 2,
+  },
+  emptyAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginTop: 14,
+  },
+  emptyAddBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  logsSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  logsSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  logsAddBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    gap: 4,
+  },
+  logsAddBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#1E40AF',
   },
   container: {
     flex: 1,

@@ -173,6 +173,22 @@ describe('IT23819092: Volunteer Mobile Unit Tests', () => {
       expect(result.data.hoursThisMonth).toBe(12);
       expect(result.data.peopleHelped).toBe(4);
     });
+
+    it('manually logs past volunteer service via addHistoryLog()', async () => {
+      const payload = {
+        serviceType: 'Companionship',
+        elderName: 'Wasantha Perera',
+        durationHours: '2.0',
+        rating: 5,
+      };
+      client.post.mockResolvedValueOnce({
+        data: { success: true, message: 'Volunteer history log added successfully!' },
+      });
+
+      const result = await volunteerService.addHistoryLog(payload);
+      expect(client.post).toHaveBeenCalledWith('/volunteer-offers/my-history', payload);
+      expect(result.success).toBe(true);
+    });
   });
 
   describe('Volunteer UI Screens Integrity', () => {

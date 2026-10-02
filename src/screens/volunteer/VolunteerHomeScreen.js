@@ -141,7 +141,15 @@ export default function VolunteerHomeScreen() {
       case 'request':
         return <VolunteerRequestsScreen onNavigateTab={setCurrentTab} />;
       case 'schedule':
-        return <VolunteerScheduleScreen onNavigateTab={setCurrentTab} />;
+        return (
+          <VolunteerScheduleScreen
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        );
       case 'messages':
         if (activeChatUser) {
           return (
