@@ -157,11 +157,14 @@ export const getVisitLiveStatus = (item) => {
   if (rawStatus === 'cancelled') return 'cancelled';
   if (rawStatus === 'completed') return 'completed';
 
-  const { isWithin, isAfter } = getVisitTimeWindow(item);
+  const { isWithin, isAfter, dateStr } = getVisitTimeWindow(item);
+  const todayStr = getLocalDateString(new Date());
+  const isPastDay = dateStr < todayStr;
 
-  // If request is still unaccepted (pending / searching) and its time window has passed -> outdated / expired
+  // If request is still unaccepted (pending / searching):
+  // Only mark expired if the date is strictly in the past
   if (rawStatus === 'pending' || rawStatus === 'searching') {
-    if (isAfter) {
+    if (isPastDay && isAfter) {
       return 'expired';
     }
     return 'pending';
@@ -169,21 +172,19 @@ export const getVisitLiveStatus = (item) => {
 
   // 1. If visit was explicitly started / ongoing / arrived:
   if (['ongoing', 'arrived', 'in_progress'].includes(rawStatus)) {
-    if (isAfter) {
-      // Exactly at end time -> automatically complete
+    if (isPastDay && isAfter) {
       return 'completed';
     }
-    return 'ongoing';
+    return rawStatus === 'arrived' ? 'arrived' : 'ongoing';
   }
 
   // 2. If visit is accepted / scheduled / confirmed:
   if (['accepted', 'scheduled', 'confirmed'].includes(rawStatus)) {
-    if (isAfter) {
-      // Exactly at end time -> automatically complete
+    if (isPastDay && isAfter) {
       return 'completed';
     }
-    if (isWithin) {
-      // Exactly at start time -> automatically start and move to ongoing
+    if (isWithin || isAfter) {
+      // For today, if it reached start time, move to ongoing
       return 'ongoing';
     }
     // Before start time -> upcoming

@@ -24,9 +24,14 @@ import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDeta
 import AvatarActionModal from '../../components/common/AvatarActionModal';
 import * as volunteerService from '../../services/volunteerService';
 import * as messageService from '../../services/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showAppAlert } from '../../utils/alert';
 
-export default function VolunteerDashboardHome({ onNavigateTab }) {
+const CACHE_OFFERS_KEY = '@volunteer_cache_offers';
+const CACHE_STATS_KEY = '@volunteer_cache_stats';
+const CACHE_REQUESTS_KEY = '@volunteer_cache_requests';
+
+export default function VolunteerDashboardHome({ isActive = true, onNavigateTab, onStartChat }) {
   const { user, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
 
   // State management
@@ -52,6 +57,41 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Restore cached dashboard data immediately on mount to prevent any data reset or blank flashing
+  useEffect(() => {
+    const restoreCache = async () => {
+      try {
+        const [savedOffers, savedStats, savedRequests] = await Promise.all([
+          AsyncStorage.getItem(CACHE_OFFERS_KEY),
+          AsyncStorage.getItem(CACHE_STATS_KEY),
+          AsyncStorage.getItem(CACHE_REQUESTS_KEY),
+        ]);
+        if (savedOffers) {
+          const parsed = JSON.parse(savedOffers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMyOffers(parsed);
+            setLoading(false);
+          }
+        }
+        if (savedStats) {
+          const parsed = JSON.parse(savedStats);
+          if (parsed && typeof parsed === 'object') {
+            setStats(parsed);
+          }
+        }
+        if (savedRequests) {
+          const parsed = JSON.parse(savedRequests);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRequestsList(parsed);
+          }
+        }
+      } catch (e) {
+        // Ignore cache restore errors
+      }
+    };
+    restoreCache();
+  }, []);
 
   // Form states for Availability
   const [availHours, setAvailHours] = useState('Weekdays & Weekends (9 AM - 6 PM)');
@@ -174,13 +214,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       ]);
 
       if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
-        setMyOffers(offersRes.value.data || []);
+        const freshOffers = offersRes.value.data || [];
+        setMyOffers(freshOffers);
+        AsyncStorage.setItem(CACHE_OFFERS_KEY, JSON.stringify(freshOffers)).catch(() => {});
       }
       if (reqsRes.status === 'fulfilled' && reqsRes.value?.success) {
-        setRequestsList(reqsRes.value.data || []);
+        const freshReqs = reqsRes.value.data || [];
+        setRequestsList(freshReqs);
+        AsyncStorage.setItem(CACHE_REQUESTS_KEY, JSON.stringify(freshReqs)).catch(() => {});
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
-        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 0 });
+        const freshStats = statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 0 };
+        setStats(freshStats);
+        AsyncStorage.setItem(CACHE_STATS_KEY, JSON.stringify(freshStats)).catch(() => {});
       }
       if (directRes.status === 'fulfilled' && directRes.value?.success) {
         setDirectRequests(directRes.value.data || []);
@@ -201,8 +247,10 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   }, []);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (isActive) {
+      loadDashboardData();
+    }
+  }, [isActive, loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
