@@ -13,12 +13,13 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useMySchedule } from '../../hooks/useMySchedule';
 import { useTheme } from '../../context/ThemeContext';
 import CreateCompanionshipScreen from './CreateCompanionshipScreen';
 import RateVisitModal from '../../components/elderly/RateVisitModal';
 import VolunteerProfileDetailModal from '../../components/elderly/VolunteerProfileDetailModal';
+import AppHeader from '../../components/common/AppHeader';
 import { getMyScheduleScreenStyles } from '../../styles/MyScheduleScreen.styles';
 import { getVisitLiveStatus, getVisitTimeWindow } from '../../utils/scheduleTimeHelper';
 
@@ -29,7 +30,16 @@ const TABS = [
   { key: 'completed', label: 'Completed' },
 ];
 
-export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) {
+export default function MyScheduleScreen({
+  onBack,
+  onRequestNew,
+  onStartChat,
+  onNavigateTab,
+  onOpenProfile,
+  onOpenNotifications,
+  hasUnreadNotifications = false,
+  unreadNotificationCount = 0,
+}) {
   const { scale } = useTheme();
   const styles = useMemo(() => getMyScheduleScreenStyles(scale), [scale]);
 
@@ -69,7 +79,6 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
     currentList,
     isLoading,
     refreshing,
-    fetchError,
     onRefresh,
     selectedSchedule,
     setSelectedSchedule,
@@ -281,20 +290,29 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#1A365D" />
+    <View style={styles.safeArea}>
+      {/* Top App Bar Header Preserving Responsiveness and Global Navigation */}
+      <AppHeader
+        onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
+        onNotificationPress={onOpenNotifications || (() => {})}
+        onNavigateTab={onNavigateTab}
+        hasUnreadNotifications={hasUnreadNotifications}
+        unreadNotificationsCount={unreadNotificationCount}
+      />
 
-      {/* WhatsApp-Style Top Header */}
+      {/* Schedule Sub-Header Bar */}
       <View style={styles.headerBar}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={onBack}
-            activeOpacity={0.7}
-            accessibilityLabel="Back"
-          >
-            <Ionicons name="arrow-back" size={Math.round(24 * scale)} color="#FFFFFF" />
-          </TouchableOpacity>
+          {onBack && (
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={onBack}
+              activeOpacity={0.7}
+              accessibilityLabel="Back"
+            >
+              <Ionicons name="arrow-back" size={Math.round(22 * scale)} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
           <Text style={styles.headerTitle}>My Care Schedule</Text>
         </View>
 
@@ -305,7 +323,7 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
             activeOpacity={0.7}
             accessibilityLabel="Refresh"
           >
-            <Ionicons name="refresh" size={Math.round(22 * scale)} color="#FFFFFF" />
+            <Ionicons name="refresh" size={Math.round(20 * scale)} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
       </View>
@@ -1106,6 +1124,6 @@ export default function MyScheduleScreen({ onBack, onRequestNew, onStartChat }) 
         offer={viewingVolunteerProfile}
         onClose={() => setViewingVolunteerProfile(null)}
       />
-    </SafeAreaView>
+    </View>
   );
 }

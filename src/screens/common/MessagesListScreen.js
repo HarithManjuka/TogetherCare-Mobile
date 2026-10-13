@@ -20,8 +20,18 @@ import { COLORS } from '../../constants/theme';
 import { useAuth } from '../../context/AuthContext';
 import * as messageService from '../../services/messageService';
 import socketService from '../../services/socketService';
+import AppHeader from '../../components/common/AppHeader';
 
-export default function MessagesListScreen({ onSelectConversation, onBack }) {
+export default function MessagesListScreen({
+  onSelectConversation,
+  onBack,
+  showAppHeader = false,
+  onNavigateTab,
+  onOpenProfile,
+  onOpenNotifications,
+  hasUnreadNotifications = false,
+  unreadNotificationCount = 0,
+}) {
   const { user, token } = useAuth();
   const [activeTab, setActiveTab] = useState('chats'); // 'chats' | 'contacts'
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,10 +243,21 @@ export default function MessagesListScreen({ onSelectConversation, onBack }) {
   };
 
   const totalUnreadCount = conversations.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+  const ContainerView = showAppHeader ? View : SafeAreaView;
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Top Header */}
+    <ContainerView style={showAppHeader ? styles.safeAreaHeaderWrap : styles.container}>
+      {showAppHeader && (
+        <AppHeader
+          onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
+          onNotificationPress={onOpenNotifications || (() => {})}
+          onNavigateTab={onNavigateTab}
+          hasUnreadNotifications={hasUnreadNotifications}
+          unreadNotificationsCount={unreadNotificationCount}
+        />
+      )}
+      <View style={styles.container}>
+        {/* Top Header */}
       <View style={styles.header}>
         {onBack && (
           <TouchableOpacity onPress={onBack} style={styles.backBtn}>
@@ -709,11 +730,16 @@ export default function MessagesListScreen({ onSelectConversation, onBack }) {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </View>
+    </ContainerView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeAreaHeaderWrap: {
+    flex: 1,
+    backgroundColor: '#1E3A8A', // Matches TogetherCare AppHeader seamless blue
+  },
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',

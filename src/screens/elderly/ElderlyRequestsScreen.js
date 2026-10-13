@@ -10,11 +10,10 @@ import {
   ActivityIndicator,
   TextInput,
   Modal,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../context/ThemeContext';
 import { getAllOffers, acceptOffer } from '../../services/volunteerOfferService';
+import AppHeader from '../../components/common/AppHeader';
 import VolunteerProfileDetailModal from '../../components/elderly/VolunteerProfileDetailModal';
 import VolunteerOfferDetailModal from '../../components/elderly/VolunteerOfferDetailModal';
 
@@ -34,9 +33,12 @@ export default function ElderlyRequestsScreen({
   onNavigateToSchedule,
   onRequestNew,
   onBack,
+  onNavigateTab,
+  onOpenProfile,
+  onOpenNotifications,
+  hasUnreadNotifications = false,
+  unreadNotificationCount = 0,
 }) {
-  const { colors, isDark, scale } = useTheme();
-
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -51,7 +53,7 @@ export default function ElderlyRequestsScreen({
   const [selectedDetailOffer, setSelectedDetailOffer] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
 
-  // In-app Confirmation Modal State (Reliable across Web, iOS, Android)
+  // In-app Confirmation Modal State
   const [confirmingOffer, setConfirmingOffer] = useState(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -137,20 +139,13 @@ export default function ElderlyRequestsScreen({
   };
 
   const renderOfferCard = ({ item }) => {
-    const isVerified =
-      item.volunteerId?.verificationBadgeStatus === 'approved' ||
-      item.volunteerId?.verificationBadgeStatus === 'verified';
+    // Real ID verification status strictly requires official ID verification approval
+    const volunteer = item.volunteerId || {};
+    const vvStatus = (volunteer.volunteerVerification?.status || '').toUpperCase();
+    const isIdVerified = volunteer.isVolunteerVerified === true || vvStatus === 'APPROVED';
 
     return (
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-            borderColor: isDark ? '#334155' : '#E2E8F0',
-          },
-        ]}
-      >
+      <View style={styles.card}>
         {/* Card Header: Clickable Profile Avatar & Name */}
         <View style={styles.cardHeader}>
           <TouchableOpacity
@@ -158,16 +153,11 @@ export default function ElderlyRequestsScreen({
             activeOpacity={0.75}
             onPress={() => handleOpenProfile(item)}
           >
-            <View
-              style={[
-                styles.avatarCircle,
-                { backgroundColor: isDark ? '#3B82F6' : '#2563EB' },
-              ]}
-            >
+            <View style={styles.avatarCircle}>
               <Text style={styles.avatarInitial}>
                 {(item.volunteerName || 'V').charAt(0).toUpperCase()}
               </Text>
-              {isVerified && (
+              {isIdVerified && (
                 <View style={styles.avatarVerifiedBadge}>
                   <Ionicons name="checkmark-circle" size={14} color="#10B981" />
                 </View>
@@ -176,15 +166,10 @@ export default function ElderlyRequestsScreen({
 
             <View style={styles.volunteerDetails}>
               <View style={styles.nameBadgeRow}>
-                <Text
-                  style={[
-                    styles.volunteerName,
-                    { color: isDark ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
+                <Text style={styles.volunteerName}>
                   {item.volunteerName}
                 </Text>
-                {isVerified && (
+                {isIdVerified && (
                   <View style={styles.verifiedMiniBadge}>
                     <Ionicons name="shield-checkmark" size={14} color="#10B981" />
                   </View>
@@ -208,21 +193,13 @@ export default function ElderlyRequestsScreen({
 
         {/* Date, Time & Location Bar */}
         <TouchableOpacity
-          style={[
-            styles.dateTimeBar,
-            { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' },
-          ]}
+          style={styles.dateTimeBar}
           activeOpacity={0.8}
           onPress={() => handleOpenDetails(item)}
         >
           <View style={styles.metaCol}>
-            <Ionicons name="calendar" size={15} color="#3B82F6" />
-            <Text
-              style={[
-                styles.metaText,
-                { color: isDark ? '#CBD5E1' : '#334155' },
-              ]}
-            >
+            <Ionicons name="calendar" size={15} color="#2563EB" />
+            <Text style={styles.metaText}>
               {item.date || 'Available Date'}
             </Text>
           </View>
@@ -230,13 +207,8 @@ export default function ElderlyRequestsScreen({
           <View style={styles.metaDivider} />
 
           <View style={styles.metaCol}>
-            <Ionicons name="time" size={15} color="#8B5CF6" />
-            <Text
-              style={[
-                styles.metaText,
-                { color: isDark ? '#CBD5E1' : '#334155' },
-              ]}
-            >
+            <Ionicons name="time" size={15} color="#7C3AED" />
+            <Text style={styles.metaText}>
               {item.startTime} - {item.endTime}
             </Text>
           </View>
@@ -245,13 +217,7 @@ export default function ElderlyRequestsScreen({
 
           <View style={styles.metaCol}>
             <Ionicons name="location" size={15} color="#DC2626" />
-            <Text
-              numberOfLines={1}
-              style={[
-                styles.metaText,
-                { color: isDark ? '#CBD5E1' : '#334155', fontWeight: '700' },
-              ]}
-            >
+            <Text numberOfLines={1} style={[styles.metaText, { fontWeight: '700' }]}>
               {item.serviceArea}
             </Text>
           </View>
@@ -260,19 +226,8 @@ export default function ElderlyRequestsScreen({
         {/* Services Badges */}
         <View style={styles.servicesRow}>
           {(item.services || ['Companionship']).map((svc, idx) => (
-            <View
-              key={idx}
-              style={[
-                styles.serviceChip,
-                { backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.serviceChipText,
-                  { color: isDark ? '#93C5FD' : '#1D4ED8' },
-                ]}
-              >
+            <View key={idx} style={styles.serviceChip}>
+              <Text style={styles.serviceChipText}>
                 {svc}
               </Text>
             </View>
@@ -281,13 +236,7 @@ export default function ElderlyRequestsScreen({
 
         {/* Notes if available */}
         {Boolean(item.specialSkills) && (
-          <Text
-            numberOfLines={2}
-            style={[
-              styles.notesText,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
+          <Text numberOfLines={2} style={styles.notesText}>
             "{item.specialSkills}"
           </Text>
         )}
@@ -295,53 +244,23 @@ export default function ElderlyRequestsScreen({
         {/* Actions Button Group: View Details & Map | View Profile | Accept Visit */}
         <View style={styles.cardActionsRow}>
           <TouchableOpacity
-            style={[
-              styles.viewDetailsCardBtn,
-              {
-                borderColor: isDark ? '#3B82F6' : '#BFDBFE',
-                backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF',
-              },
-            ]}
+            style={styles.viewDetailsCardBtn}
             onPress={() => handleOpenDetails(item)}
             activeOpacity={0.8}
           >
-            <Ionicons
-              name="map-outline"
-              size={16}
-              color={isDark ? '#93C5FD' : '#1D4ED8'}
-            />
-            <Text
-              style={[
-                styles.viewDetailsCardBtnText,
-                { color: isDark ? '#93C5FD' : '#1D4ED8' },
-              ]}
-            >
+            <Ionicons name="map-outline" size={16} color="#1D4ED8" />
+            <Text style={styles.viewDetailsCardBtnText}>
               View Details
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.viewProfileBtn,
-              {
-                borderColor: isDark ? '#475569' : '#CBD5E1',
-                backgroundColor: isDark ? '#334155' : '#F8FAFC',
-              },
-            ]}
+            style={styles.viewProfileBtn}
             onPress={() => handleOpenProfile(item)}
             activeOpacity={0.75}
           >
-            <Ionicons
-              name="person-circle-outline"
-              size={16}
-              color={isDark ? '#CBD5E1' : '#475569'}
-            />
-            <Text
-              style={[
-                styles.viewProfileBtnText,
-                { color: isDark ? '#CBD5E1' : '#475569' },
-              ]}
-            >
+            <Ionicons name="person-circle-outline" size={16} color="#475569" />
+            <Text style={styles.viewProfileBtnText}>
               Profile
             </Text>
           </TouchableOpacity>
@@ -360,190 +279,148 @@ export default function ElderlyRequestsScreen({
   };
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor: isDark ? '#0F172A' : '#F1F5F9' },
-      ]}
-    >
-      {/* Screen Header */}
-      <View
-        style={[
-          styles.header,
-          {
-            backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-            borderBottomColor: isDark ? '#334155' : '#E2E8F0',
-          },
-        ]}
-      >
-        <View style={styles.headerTop}>
-          <View>
-            <Text
-              style={[
-                styles.headerTitle,
-                { color: isDark ? '#F8FAFC' : '#0F172A' },
-              ]}
-            >
-              Volunteer Offers
-            </Text>
-            <Text style={styles.headerSubtitle}>
-              Find friendly companions ready to visit you
-            </Text>
+    <View style={styles.safeArea}>
+      {/* Top App Bar Header Preserving Responsiveness and Global Navigation */}
+      <AppHeader
+        onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
+        onNotificationPress={onOpenNotifications || (() => {})}
+        onNavigateTab={onNavigateTab}
+        hasUnreadNotifications={hasUnreadNotifications}
+        unreadNotificationsCount={unreadNotificationCount}
+      />
+
+      <View style={styles.mainContainer}>
+        {/* Screen Header in Signature TogetherCare Light Style */}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.headerTitle}>
+                Volunteer Offers
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                Find friendly companions ready to visit you
+              </Text>
+            </View>
+
+            {onRequestNew && (
+              <TouchableOpacity
+                style={styles.requestNewBtn}
+                onPress={onRequestNew}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="add" size={18} color="#FFFFFF" />
+                <Text style={styles.requestNewBtnText}>Post Request</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {onRequestNew && (
-            <TouchableOpacity
-              style={styles.requestNewBtn}
-              onPress={onRequestNew}
-            >
-              <Ionicons name="add" size={18} color="#FFFFFF" />
-              <Text style={styles.requestNewBtnText}>Post Request</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Search Input */}
-        <View
-          style={[
-            styles.searchBox,
-            {
-              backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-              borderColor: isDark ? '#334155' : '#CBD5E1',
-            },
-          ]}
-        >
-          <Ionicons
-            name="search"
-            size={18}
-            color={isDark ? '#94A3B8' : '#64748B'}
-          />
-          <TextInput
-            style={[
-              styles.searchInput,
-              { color: isDark ? '#F8FAFC' : '#0F172A' },
-            ]}
-            placeholder="Search by city, town or area..."
-            placeholderTextColor={isDark ? '#64748B' : '#94A3B8'}
-            value={searchLocation}
-            onChangeText={setSearchLocation}
-            returnKeyType="search"
-          />
-          {Boolean(searchLocation) && (
-            <TouchableOpacity onPress={() => setSearchLocation('')}>
-              <Ionicons
-                name="close-circle"
-                size={18}
-                color={isDark ? '#94A3B8' : '#64748B'}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Category Horizontal Scroll */}
-        <FlatList
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          data={CATEGORIES}
-          keyExtractor={(item) => item}
-          contentContainerStyle={styles.categoriesList}
-          renderItem={({ item }) => {
-            const isSelected = selectedCategory === item;
-            return (
-              <TouchableOpacity
-                onPress={() => setSelectedCategory(item)}
-                style={[
-                  styles.categoryPill,
-                  isSelected
-                    ? styles.categoryPillActive
-                    : {
-                        backgroundColor: isDark ? '#0F172A' : '#F1F5F9',
-                        borderColor: isDark ? '#334155' : '#E2E8F0',
-                      },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.categoryPillText,
-                    isSelected
-                      ? styles.categoryPillTextActive
-                      : { color: isDark ? '#CBD5E1' : '#64748B' },
-                  ]}
-                >
-                  {item}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-
-      {/* Main Content Area */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
-          <Text
-            style={[
-              styles.loadingText,
-              { color: isDark ? '#94A3B8' : '#64748B' },
-            ]}
-          >
-            Finding available volunteers...
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          data={offers}
-          keyExtractor={(item) => item._id}
-          renderItem={renderOfferCard}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#2563EB"
-              colors={['#2563EB']}
+          {/* Search Input */}
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={18} color="#64748B" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by city, town or area..."
+              placeholderTextColor="#94A3B8"
+              value={searchLocation}
+              onChangeText={setSearchLocation}
+              returnKeyType="search"
             />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons
-                name="heart-dislike-outline"
-                size={56}
-                color={isDark ? '#475569' : '#94A3B8'}
-              />
-              <Text
-                style={[
-                  styles.emptyStateTitle,
-                  { color: isDark ? '#F8FAFC' : '#1E293B' },
-                ]}
+            {Boolean(searchLocation) && (
+              <TouchableOpacity
+                onPress={() => setSearchLocation('')}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                No Volunteer Offers Found
-              </Text>
-              <Text
-                style={[
-                  styles.emptyStateSubtext,
-                  { color: isDark ? '#94A3B8' : '#64748B' },
-                ]}
-              >
-                {selectedCategory !== 'All' || searchLocation
-                  ? 'Try changing your category filter or search area.'
-                  : 'Check back soon as volunteers frequently post new companionship availability!'}
-              </Text>
-              {onRequestNew && (
+                <Ionicons name="close-circle" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Category Horizontal Scroll */}
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={CATEGORIES}
+            keyExtractor={(item) => item}
+            contentContainerStyle={styles.categoriesList}
+            renderItem={({ item }) => {
+              const isSelected = selectedCategory === item;
+              return (
                 <TouchableOpacity
-                  style={styles.emptyRequestBtn}
-                  onPress={onRequestNew}
+                  onPress={() => setSelectedCategory(item)}
+                  style={[
+                    styles.categoryPill,
+                    isSelected ? styles.categoryPillActive : styles.categoryPillInactive,
+                  ]}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="add-circle" size={20} color="#FFFFFF" />
-                  <Text style={styles.emptyRequestBtnText}>
-                    Request a Companion Now
+                  <Text
+                    style={[
+                      styles.categoryPillText,
+                      isSelected ? styles.categoryPillTextActive : styles.categoryPillTextInactive,
+                    ]}
+                  >
+                    {item}
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
-          }
-        />
-      )}
+              );
+            }}
+          />
+        </View>
+
+        {/* Main Content Area */}
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1E3A8A" />
+            <Text style={styles.loadingText}>
+              Finding available volunteers...
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={offers}
+            keyExtractor={(item) => item._id}
+            renderItem={renderOfferCard}
+            contentContainerStyle={styles.listContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#1E3A8A"
+                colors={['#1E3A8A']}
+              />
+            }
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Ionicons
+                  name="heart-dislike-outline"
+                  size={56}
+                  color="#94A3B8"
+                />
+                <Text style={styles.emptyStateTitle}>
+                  No Volunteer Offers Found
+                </Text>
+                <Text style={styles.emptyStateSubtext}>
+                  {selectedCategory !== 'All' || searchLocation
+                    ? 'Try changing your category filter or search area.'
+                    : 'Check back soon as volunteers frequently post new companionship availability!'}
+                </Text>
+                {onRequestNew && (
+                  <TouchableOpacity
+                    style={styles.emptyRequestBtn}
+                    onPress={onRequestNew}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="add-circle" size={20} color="#FFFFFF" />
+                    <Text style={styles.emptyRequestBtnText}>
+                      Request a Companion Now
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            }
+          />
+        )}
+      </View>
 
       {/* 1. Full Volunteer Offer Details & Location Interactive Map Modal */}
       <VolunteerOfferDetailModal
@@ -573,7 +450,7 @@ export default function ElderlyRequestsScreen({
         isAccepting={isAccepting}
       />
 
-      {/* 2. In-App Confirmation Modal Sheet (Zero dependency on native alerts) */}
+      {/* 3. In-App Confirmation Modal Sheet */}
       <Modal
         visible={!!confirmingOffer}
         transparent={true}
@@ -581,23 +458,13 @@ export default function ElderlyRequestsScreen({
         onRequestClose={() => !isAccepting && setConfirmingOffer(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.confirmCard,
-              { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' },
-            ]}
-          >
+          <View style={styles.confirmCard}>
             <View style={styles.confirmHeaderRow}>
               <View style={styles.confirmIconWrap}>
-                <Ionicons name="calendar" size={26} color="#2563EB" />
+                <Ionicons name="calendar" size={26} color="#1E3A8A" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text
-                  style={[
-                    styles.confirmTitle,
-                    { color: isDark ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
+                <Text style={styles.confirmTitle}>
                   Confirm Companion Visit
                 </Text>
                 <Text style={styles.confirmSub}>
@@ -607,68 +474,38 @@ export default function ElderlyRequestsScreen({
             </View>
 
             {confirmingOffer && (
-              <View
-                style={[
-                  styles.offerSummaryBox,
-                  { backgroundColor: isDark ? '#0F172A' : '#F8FAFC' },
-                ]}
-              >
+              <View style={styles.offerSummaryBox}>
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Volunteer:</Text>
-                  <Text
-                    style={[
-                      styles.summaryValue,
-                      { color: isDark ? '#93C5FD' : '#1D4ED8' },
-                    ]}
-                  >
+                  <Text style={styles.summaryValueName}>
                     {confirmingOffer.volunteerName}
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Scheduled Date:</Text>
-                  <Text
-                    style={[
-                      styles.summaryValue,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.summaryValue}>
                     {confirmingOffer.date}
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Time Window:</Text>
-                  <Text
-                    style={[
-                      styles.summaryValue,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.summaryValue}>
                     {confirmingOffer.startTime} - {confirmingOffer.endTime}
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Location:</Text>
-                  <Text
-                    style={[
-                      styles.summaryValue,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.summaryValue}>
                     {confirmingOffer.serviceArea}
                   </Text>
                 </View>
 
                 <View style={styles.summaryItem}>
                   <Text style={styles.summaryLabel}>Services:</Text>
-                  <Text
-                    style={[
-                      styles.summaryValue,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.summaryValue}>
                     {(confirmingOffer.services || []).join(', ')}
                   </Text>
                 </View>
@@ -685,21 +522,11 @@ export default function ElderlyRequestsScreen({
 
             <View style={styles.confirmBtnRow}>
               <TouchableOpacity
-                style={[
-                  styles.cancelConfirmBtn,
-                  { borderColor: isDark ? '#475569' : '#CBD5E1' },
-                ]}
+                style={styles.cancelConfirmBtn}
                 onPress={() => setConfirmingOffer(null)}
                 disabled={isAccepting}
               >
-                <Text
-                  style={[
-                    styles.cancelConfirmBtnText,
-                    { color: isDark ? '#94A3B8' : '#64748B' },
-                  ]}
-                >
-                  Cancel
-                </Text>
+                <Text style={styles.cancelConfirmBtnText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -726,7 +553,7 @@ export default function ElderlyRequestsScreen({
         </View>
       </Modal>
 
-      {/* 3. Visit Confirmation Success Modal Sheet */}
+      {/* 4. Visit Confirmation Success Modal Sheet */}
       <Modal
         visible={!!successOffer}
         transparent={true}
@@ -734,33 +561,18 @@ export default function ElderlyRequestsScreen({
         onRequestClose={() => setSuccessOffer(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View
-            style={[
-              styles.successCard,
-              { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' },
-            ]}
-          >
+          <View style={styles.successCard}>
             <View style={styles.successIconCircle}>
               <Ionicons name="checkmark-circle" size={60} color="#10B981" />
             </View>
 
-            <Text
-              style={[
-                styles.successTitle,
-                { color: isDark ? '#F8FAFC' : '#0F172A' },
-              ]}
-            >
+            <Text style={styles.successTitle}>
               Companionship Scheduled! 🎉
             </Text>
 
-            <Text
-              style={[
-                styles.successBody,
-                { color: isDark ? '#94A3B8' : '#475569' },
-              ]}
-            >
+            <Text style={styles.successBody}>
               Your session with{' '}
-              <Text style={{ fontWeight: '700', color: '#2563EB' }}>
+              <Text style={{ fontWeight: '700', color: '#1E3A8A' }}>
                 {successOffer?.volunteerName}
               </Text>{' '}
               has been successfully booked for{' '}
@@ -787,18 +599,10 @@ export default function ElderlyRequestsScreen({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[
-                  styles.stayBtn,
-                  { borderColor: isDark ? '#475569' : '#E2E8F0' },
-                ]}
+                style={styles.stayBtn}
                 onPress={() => setSuccessOffer(null)}
               >
-                <Text
-                  style={[
-                    styles.stayBtnText,
-                    { color: isDark ? '#94A3B8' : '#64748B' },
-                  ]}
-                >
+                <Text style={styles.stayBtnText}>
                   Browse More Volunteers
                 </Text>
               </TouchableOpacity>
@@ -811,14 +615,21 @@ export default function ElderlyRequestsScreen({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+    backgroundColor: '#1E3A8A', // Seamlessly matches AppHeader status bar
+  },
+  mainContainer: {
+    flex: 1,
+    backgroundColor: '#F8FAFC', // Signature accessible light canvas
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 54 : 32,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
+    paddingTop: 14,
     paddingBottom: 12,
     borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
   },
   headerTop: {
     flexDirection: 'row',
@@ -830,6 +641,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.5,
+    color: '#0F172A',
   },
   headerSubtitle: {
     fontSize: 13,
@@ -839,21 +651,28 @@ const styles = StyleSheet.create({
   requestNewBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 12,
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     gap: 4,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   requestNewBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 42,
@@ -863,6 +682,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
+    color: '#0F172A',
   },
   categoriesList: {
     gap: 8,
@@ -875,8 +695,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   categoryPillActive: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
+  },
+  categoryPillInactive: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
   },
   categoryPillText: {
     fontSize: 13,
@@ -884,6 +708,9 @@ const styles = StyleSheet.create({
   },
   categoryPillTextActive: {
     color: '#FFFFFF',
+  },
+  categoryPillTextInactive: {
+    color: '#475569',
   },
   loadingContainer: {
     flex: 1,
@@ -893,14 +720,18 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
+    color: '#64748B',
+    fontWeight: '500',
   },
   listContent: {
     padding: 16,
     paddingBottom: 90,
   },
   card: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     borderWidth: 1,
+    borderColor: '#E2E8F0',
     padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
@@ -925,6 +756,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#1E3A8A',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -944,6 +776,7 @@ const styles = StyleSheet.create({
   volunteerName: {
     fontSize: 16,
     fontWeight: '700',
+    color: '#0F172A',
   },
   verifiedMiniBadge: {
     marginLeft: 2,
@@ -970,6 +803,9 @@ const styles = StyleSheet.create({
   dateTimeBar: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 10,
@@ -991,6 +827,7 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#334155',
   },
   servicesRow: {
     flexDirection: 'row',
@@ -999,6 +836,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   serviceChip: {
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#DBEAFE',
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1006,10 +846,12 @@ const styles = StyleSheet.create({
   serviceChipText: {
     fontSize: 12,
     fontWeight: '600',
+    color: '#1D4ED8',
   },
   notesText: {
     fontSize: 13,
     fontStyle: 'italic',
+    color: '#64748B',
     marginBottom: 12,
     lineHeight: 18,
   },
@@ -1033,11 +875,14 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1.5,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
     gap: 5,
   },
   viewDetailsCardBtnText: {
     fontSize: 13,
     fontWeight: '700',
+    color: '#1D4ED8',
   },
   viewProfileBtn: {
     flex: 1,
@@ -1047,24 +892,27 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F8FAFC',
     gap: 5,
   },
   viewProfileBtnText: {
     fontSize: 13,
     fontWeight: '600',
+    color: '#475569',
   },
   acceptCardBtn: {
     flex: 1.1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingVertical: 10,
     borderRadius: 12,
     gap: 5,
-    shadowColor: '#2563EB',
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
@@ -1082,11 +930,13 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: '700',
+    color: '#1E293B',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateSubtext: {
     fontSize: 14,
+    color: '#64748B',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 20,
@@ -1094,11 +944,16 @@ const styles = StyleSheet.create({
   emptyRequestBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 14,
     gap: 8,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   emptyRequestBtnText: {
     color: '#FFFFFF',
@@ -1107,7 +962,7 @@ const styles = StyleSheet.create({
   },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -1115,6 +970,7 @@ const styles = StyleSheet.create({
   confirmCard: {
     width: '100%',
     maxWidth: 420,
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 22,
     shadowColor: '#000',
@@ -1140,6 +996,7 @@ const styles = StyleSheet.create({
   confirmTitle: {
     fontSize: 18,
     fontWeight: '800',
+    color: '#0F172A',
   },
   confirmSub: {
     fontSize: 13,
@@ -1147,6 +1004,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   offerSummaryBox: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     borderRadius: 14,
     padding: 14,
     gap: 8,
@@ -1165,6 +1025,12 @@ const styles = StyleSheet.create({
   summaryValue: {
     fontSize: 13,
     fontWeight: '700',
+    color: '#0F172A',
+  },
+  summaryValueName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E3A8A',
   },
   errorBanner: {
     flexDirection: 'row',
@@ -1190,23 +1056,26 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: 12,
     borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelConfirmBtnText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#64748B',
   },
   primaryConfirmBtn: {
     flex: 1.8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingVertical: 13,
     borderRadius: 12,
     gap: 6,
-    shadowColor: '#2563EB',
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -1220,6 +1089,7 @@ const styles = StyleSheet.create({
   successCard: {
     width: '100%',
     maxWidth: 400,
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
@@ -1235,11 +1105,13 @@ const styles = StyleSheet.create({
   successTitle: {
     fontSize: 20,
     fontWeight: '800',
+    color: '#0F172A',
     textAlign: 'center',
     marginBottom: 8,
   },
   successBody: {
     fontSize: 14,
+    color: '#475569',
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 20,
@@ -1252,11 +1124,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingVertical: 14,
     borderRadius: 14,
     gap: 8,
-    shadowColor: '#2563EB',
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -1273,9 +1145,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
   },
   stayBtnText: {
     fontSize: 14,
     fontWeight: '600',
+    color: '#64748B',
   },
 });

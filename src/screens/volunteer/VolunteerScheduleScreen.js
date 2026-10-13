@@ -481,96 +481,140 @@ export default function VolunteerScheduleScreen({ isActive = true, onNavigateTab
                 )}
 
                 {/* Interactive Workflow Actions */}
-                <View style={styles.actionsRow}>
-                  <TouchableOpacity
-                    style={styles.callBtn}
-                    onPress={() => handleOpenPeerConnect(visit)}
-                  >
-                    <Ionicons name="chatbubbles-outline" size={15} color="#1E40AF" />
-                    <Text style={styles.callBtnText}>Call / Chat</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.mapBtn}
-                    onPress={() => handleOpenMaps(visit.location)}
-                  >
-                    <Ionicons name="map-outline" size={15} color="#1E40AF" />
-                    <Text style={styles.mapBtnText}>Map</Text>
-                  </TouchableOpacity>
-
-                  {isMatched ? (
-                    <>
+                {isOngoing ? (
+                  <View style={styles.ongoingActionsContainer}>
+                    {/* Utility Actions: Call / Chat & Map */}
+                    <View style={styles.utilityActionsRow}>
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.declineBtn, isActionLoading && { opacity: 0.7 }]}
-                        onPress={() => handleDeclineDirectRequest(visit)}
-                        disabled={isActionLoading}
+                        style={styles.utilityCallBtn}
+                        onPress={() => handleOpenPeerConnect(visit)}
+                        activeOpacity={0.8}
                       >
-                        <Ionicons name="close-circle-outline" size={15} color="#EF4444" style={{ marginRight: 4 }} />
-                        <Text style={styles.declineBtnText}>Decline</Text>
+                        <Ionicons name="chatbubbles-outline" size={15} color="#1E40AF" />
+                        <Text style={styles.callBtnText}>Call / Chat</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.acceptBtn, isActionLoading && { opacity: 0.7 }]}
-                        onPress={() => handleAcceptDirectRequest(visit)}
-                        disabled={isActionLoading}
+                        style={styles.utilityMapBtn}
+                        onPress={() => handleOpenMaps(visit.location)}
+                        activeOpacity={0.8}
                       >
-                        {isActionLoading ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <>
-                            <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.acceptBtnText}>Accept</Text>
-                          </>
-                        )}
+                        <Ionicons name="map-outline" size={15} color="#1E40AF" />
+                        <Text style={styles.mapBtnText}>Map</Text>
                       </TouchableOpacity>
-                    </>
-                  ) : isConfirmed ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.actionBtn,
-                        styles.startTripBtn,
-                        !canStart && styles.startTripBtnEarlyNotice,
-                        isActionLoading && { opacity: 0.7 },
-                      ]}
-                      onPress={!isActionLoading ? () => handleStartTrip(visit) : undefined}
-                      disabled={isActionLoading}
-                    >
-                      {isActionLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="navigate-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.startTripBtnText}>
-                            {canStart ? 'Start Trip & Share' : 'Start Trip & Share (Early)'}
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  ) : isOngoing ? (
-                    <>
+                    </View>
+
+                    {/* Trip Workflow Actions: 3 Responsive Full-Width Buttons */}
+                    <View style={styles.tripControlsRow}>
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.viewTripBtn]}
+                        style={[styles.tripControlBtn, styles.viewTripBtn]}
                         onPress={() => setActiveTripVisit(visit)}
+                        activeOpacity={0.8}
                       >
                         <Ionicons name="navigate-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-                        <Text style={styles.viewTripBtnText}>Active Trip</Text>
+                        <Text style={styles.viewTripBtnText} numberOfLines={1}>Active Trip</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[styles.actionBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
+                        style={[styles.tripControlBtn, styles.arrivedBtn, isActionLoading && { opacity: 0.7 }]}
                         onPress={() => handleMarkArrived(visit)}
                         disabled={isActionLoading}
+                        activeOpacity={0.8}
                       >
                         {isActionLoading ? (
                           <ActivityIndicator size="small" color="#FFFFFF" />
                         ) : (
                           <>
                             <Ionicons name="checkmark-done-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.arrivedBtnText}>Arrived</Text>
+                            <Text style={styles.arrivedBtnText} numberOfLines={1}>Arrived</Text>
                           </>
                         )}
                       </TouchableOpacity>
 
+                      <TouchableOpacity
+                        style={[styles.tripControlBtn, styles.completeBtn, isActionLoading && { opacity: 0.7 }]}
+                        onPress={() => handleCompleteVisit(visit)}
+                        disabled={isActionLoading}
+                        activeOpacity={0.8}
+                      >
+                        {isActionLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.completeBtnText} numberOfLines={1}>Complete</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.actionsRow}>
+                    <TouchableOpacity
+                      style={styles.callBtn}
+                      onPress={() => handleOpenPeerConnect(visit)}
+                    >
+                      <Ionicons name="chatbubbles-outline" size={15} color="#1E40AF" />
+                      <Text style={styles.callBtnText}>Call / Chat</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.mapBtn}
+                      onPress={() => handleOpenMaps(visit.location)}
+                    >
+                      <Ionicons name="map-outline" size={15} color="#1E40AF" />
+                      <Text style={styles.mapBtnText}>Map</Text>
+                    </TouchableOpacity>
+
+                    {isMatched ? (
+                      <>
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.declineBtn, isActionLoading && { opacity: 0.7 }]}
+                          onPress={() => handleDeclineDirectRequest(visit)}
+                          disabled={isActionLoading}
+                        >
+                          <Ionicons name="close-circle-outline" size={15} color="#EF4444" style={{ marginRight: 4 }} />
+                          <Text style={styles.declineBtnText}>Decline</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.actionBtn, styles.acceptBtn, isActionLoading && { opacity: 0.7 }]}
+                          onPress={() => handleAcceptDirectRequest(visit)}
+                          disabled={isActionLoading}
+                        >
+                          {isActionLoading ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <Ionicons name="checkmark-circle-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+                              <Text style={styles.acceptBtnText}>Accept</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </>
+                    ) : isConfirmed ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          styles.startTripBtn,
+                          !canStart && styles.startTripBtnEarlyNotice,
+                          isActionLoading && { opacity: 0.7 },
+                        ]}
+                        onPress={!isActionLoading ? () => handleStartTrip(visit) : undefined}
+                        disabled={isActionLoading}
+                      >
+                        {isActionLoading ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <>
+                            <Ionicons name="navigate-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                            <Text style={styles.startTripBtnText}>
+                              {canStart ? 'Start Trip & Share' : 'Start Trip & Share (Early)'}
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    ) : isArrived ? (
                       <TouchableOpacity
                         style={[styles.actionBtn, styles.completeBtn, isActionLoading && { opacity: 0.7 }]}
                         onPress={() => handleCompleteVisit(visit)}
@@ -581,28 +625,13 @@ export default function VolunteerScheduleScreen({ isActive = true, onNavigateTab
                         ) : (
                           <>
                             <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.completeBtnText}>Complete</Text>
+                            <Text style={styles.completeBtnText}>Complete Visit</Text>
                           </>
                         )}
                       </TouchableOpacity>
-                    </>
-                  ) : isArrived ? (
-                    <TouchableOpacity
-                      style={[styles.actionBtn, styles.completeBtn, isActionLoading && { opacity: 0.7 }]}
-                      onPress={() => handleCompleteVisit(visit)}
-                      disabled={isActionLoading}
-                    >
-                      {isActionLoading ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <Ionicons name="checkmark-circle-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                          <Text style={styles.completeBtnText}>Complete Visit</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
+                    ) : null}
+                  </View>
+                )}
               </View>
             );
           })
@@ -1081,6 +1110,57 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 6,
   },
+  ongoingActionsContainer: {
+    marginTop: 14,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 10,
+  },
+  utilityActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  utilityCallBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#EEF2FF',
+    gap: 6,
+  },
+  utilityMapBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    gap: 6,
+  },
+  tripControlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  tripControlBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 10,
+    minHeight: 42,
+  },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1132,7 +1212,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#D97706',
   },
   arrivedBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1140,7 +1220,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#16A34A',
   },
   completeBtnText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -1203,7 +1283,6 @@ const styles = StyleSheet.create({
   },
   viewTripBtn: {
     backgroundColor: '#0284C7',
-    marginRight: 4,
   },
   viewTripBtnText: {
     fontSize: 12,
