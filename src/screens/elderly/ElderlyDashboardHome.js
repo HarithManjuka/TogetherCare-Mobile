@@ -477,21 +477,42 @@ export default function ElderlyDashboardHome({
         <Modal
           visible={!!selectedVisit}
           transparent
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setSelectedVisit(null)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setSelectedVisit(null)}
+          >
+            <TouchableOpacity
+              style={styles.modalContent}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation && e.stopPropagation()}
+            >
               {selectedVisit && (
                 <>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Visit Details</Text>
-                    <TouchableOpacity onPress={() => setSelectedVisit(null)}>
-                      <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                    <View style={styles.modalHeaderTitleGroup}>
+                      <View style={styles.modalIconWrap}>
+                        <Ionicons name="calendar" size={Math.round(22 * scale)} color="#1E3A8A" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalTitle}>Visit Details</Text>
+                        <Text style={styles.modalSubtitle}>Scheduled Care Visit</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.modalCloseIconBtn}
+                      onPress={() => setSelectedVisit(null)}
+                      accessibilityLabel="Close"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={20} color={COLORS.textSecondary} />
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.modalBody}>
+                  <ScrollView showsVerticalScrollIndicator={false} style={styles.modalBody}>
                     <View style={styles.modalRow}>
                       <Text style={styles.modalLabel}>Activity</Text>
                       <Text style={styles.modalValue}>{selectedVisit.activityType}</Text>
@@ -506,9 +527,11 @@ export default function ElderlyDashboardHome({
 
                     <View style={styles.modalRow}>
                       <Text style={styles.modalLabel}>Status</Text>
-                      <Text style={[styles.modalValue, { color: COLORS.primary, textTransform: 'capitalize' }]}>
-                        {selectedVisit.status || 'Accepted'}
-                      </Text>
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>
+                          {selectedVisit.status || 'Accepted'}
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={styles.modalRow}>
@@ -517,18 +540,42 @@ export default function ElderlyDashboardHome({
                         {selectedVisit.companion || 'Awaiting volunteer'}
                       </Text>
                     </View>
-                  </View>
+
+                    {selectedVisit.volunteer?.phone ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Volunteer Contact</Text>
+                        <Text style={styles.modalValue}>{selectedVisit.volunteer.phone}</Text>
+                      </View>
+                    ) : null}
+
+                    {selectedVisit.location ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Location</Text>
+                        <Text style={styles.modalValue}>{selectedVisit.location}</Text>
+                      </View>
+                    ) : null}
+
+                    {selectedVisit.notes || selectedVisit.specialInstructions ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Notes / Instructions</Text>
+                        <Text style={styles.modalValue}>
+                          {selectedVisit.notes || selectedVisit.specialInstructions}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </ScrollView>
 
                   <TouchableOpacity
                     style={styles.modalCloseButton}
                     onPress={() => setSelectedVisit(null)}
+                    activeOpacity={0.85}
                   >
                     <Text style={styles.modalCloseButtonText}>Close</Text>
                   </TouchableOpacity>
                 </>
               )}
-            </View>
-          </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
 
         {/* Emergency SOS Modal Sheet */}

@@ -13,7 +13,6 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../context/ThemeContext';
 
 export default function VolunteerOfferDetailModal({
   visible,
@@ -23,7 +22,6 @@ export default function VolunteerOfferDetailModal({
   onViewProfile,
   isAccepting = false,
 }) {
-  const { colors, isDark } = useTheme();
   const [mapTab, setMapTab] = useState(Platform.OS === 'web' ? 'live' : 'route');
 
   if (!offer) return null;
@@ -32,11 +30,12 @@ export default function VolunteerOfferDetailModal({
   const volunteerName =
     offer.volunteerName ||
     `${volunteer.firstName || 'Volunteer'} ${volunteer.lastName || ''}`.trim();
-  const isVerified =
-    volunteer.verificationBadgeStatus === 'approved' ||
-    volunteer.verificationBadgeStatus === 'verified';
+  
+  // Real ID verification status (strictly requires official ID verification approval, not email or generic badge)
+  const vvStatus = (volunteer.volunteerVerification?.status || '').toUpperCase();
+  const isVerified = volunteer.isVolunteerVerified === true || vvStatus === 'APPROVED';
+
   const serviceArea = offer.serviceArea || 'Local Community Area';
-  const volunteerPhone = volunteer.phone || '';
   const hasRating = volunteer.rating !== undefined && volunteer.rating !== null && Number(volunteer.rating) > 0;
   const rating = hasRating ? Number(volunteer.rating).toFixed(1) : null;
   const profilePic = volunteer.profilePicture;
@@ -62,12 +61,6 @@ export default function VolunteerOfferDetailModal({
       });
   };
 
-  const handleCallVolunteer = () => {
-    if (volunteerPhone) {
-      Linking.openURL(`tel:${volunteerPhone}`).catch(() => {});
-    }
-  };
-
   return (
     <Modal
       visible={visible}
@@ -76,19 +69,9 @@ export default function VolunteerOfferDetailModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalCard,
-            { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' },
-          ]}
-        >
+        <View style={styles.modalCard}>
           {/* Header */}
-          <View
-            style={[
-              styles.headerRow,
-              { borderBottomColor: isDark ? '#334155' : '#F1F5F9' },
-            ]}
-          >
+          <View style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <View style={styles.badgeRow}>
                 <View style={styles.openBadge}>
@@ -102,27 +85,19 @@ export default function VolunteerOfferDetailModal({
                   </Text>
                 </View>
               </View>
-              <Text
-                style={[
-                  styles.modalTitle,
-                  { color: isDark ? '#F8FAFC' : '#0F172A' },
-                ]}
-              >
+              <Text style={styles.modalTitle}>
                 Volunteer Visit Details
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
-              style={[
-                styles.closeBtn,
-                { backgroundColor: isDark ? '#334155' : '#F1F5F9' },
-              ]}
+              style={styles.closeBtn}
               activeOpacity={0.7}
             >
               <Ionicons
                 name="close"
                 size={22}
-                color={isDark ? '#94A3B8' : '#64748B'}
+                color="#64748B"
               />
             </TouchableOpacity>
           </View>
@@ -134,13 +109,7 @@ export default function VolunteerOfferDetailModal({
           >
             {/* Volunteer Header Info & Profile Quick-Access Card */}
             <TouchableOpacity
-              style={[
-                styles.volunteerCard,
-                {
-                  backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                  borderColor: isDark ? '#334155' : '#E2E8F0',
-                },
-              ]}
+              style={styles.volunteerCard}
               activeOpacity={0.85}
               onPress={() => onViewProfile && onViewProfile(offer)}
             >
@@ -163,12 +132,7 @@ export default function VolunteerOfferDetailModal({
 
               <View style={{ flex: 1 }}>
                 <View style={styles.nameRow}>
-                  <Text
-                    style={[
-                      styles.volunteerCardName,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.volunteerCardName}>
                     {volunteerName}
                   </Text>
                   {isVerified && (
@@ -191,29 +155,16 @@ export default function VolunteerOfferDetailModal({
               <Ionicons
                 name="chevron-forward"
                 size={20}
-                color={isDark ? '#64748B' : '#94A3B8'}
+                color="#94A3B8"
               />
             </TouchableOpacity>
 
             {/* Visit Time & Schedule Meta Grid */}
-            <View
-              style={[
-                styles.metaGrid,
-                {
-                  backgroundColor: isDark ? '#0F172A' : '#EFF6FF',
-                  borderColor: isDark ? '#1E3A8A' : '#DBEAFE',
-                },
-              ]}
-            >
+            <View style={styles.metaGrid}>
               <View style={styles.metaCol}>
                 <Ionicons name="calendar" size={18} color="#2563EB" />
                 <Text style={styles.metaColLabel}>Date</Text>
-                <Text
-                  style={[
-                    styles.metaColValue,
-                    { color: isDark ? '#F8FAFC' : '#1E3A8A' },
-                  ]}
-                >
+                <Text style={styles.metaColValue}>
                   {offer.date || 'Available Date'}
                 </Text>
               </View>
@@ -223,12 +174,7 @@ export default function VolunteerOfferDetailModal({
               <View style={styles.metaCol}>
                 <Ionicons name="time" size={18} color="#7C3AED" />
                 <Text style={styles.metaColLabel}>Time Window</Text>
-                <Text
-                  style={[
-                    styles.metaColValue,
-                    { color: isDark ? '#F8FAFC' : '#1E3A8A' },
-                  ]}
-                >
+                <Text style={styles.metaColValue}>
                   {offer.startTime} - {offer.endTime}
                 </Text>
               </View>
@@ -238,12 +184,7 @@ export default function VolunteerOfferDetailModal({
               <View style={styles.metaCol}>
                 <Ionicons name="navigate-circle" size={18} color="#059669" />
                 <Text style={styles.metaColLabel}>Coverage</Text>
-                <Text
-                  style={[
-                    styles.metaColValue,
-                    { color: isDark ? '#F8FAFC' : '#1E3A8A' },
-                  ]}
-                >
+                <Text style={styles.metaColValue}>
                   {offer.radius || 'Within 5 km'}
                 </Text>
               </View>
@@ -254,24 +195,14 @@ export default function VolunteerOfferDetailModal({
               <View style={styles.sectionHeaderRow}>
                 <View style={styles.sectionTitleGroup}>
                   <Ionicons name="location" size={18} color="#DC2626" style={{ marginRight: 6 }} />
-                  <Text
-                    style={[
-                      styles.sectionHeading,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.sectionHeading}>
                     Location & Service Area
                   </Text>
                 </View>
 
                 <View style={styles.mapActionsGroup}>
                   {Platform.OS === 'web' && (
-                    <View
-                      style={[
-                        styles.toggleGroup,
-                        { backgroundColor: isDark ? '#0F172A' : '#F1F5F9' },
-                      ]}
-                    >
+                    <View style={styles.toggleGroup}>
                       <TouchableOpacity
                         style={[styles.toggleBtn, mapTab === 'live' && styles.toggleBtnActive]}
                         onPress={() => setMapTab('live')}
@@ -295,13 +226,7 @@ export default function VolunteerOfferDetailModal({
 
                   <TouchableOpacity
                     onPress={handleOpenMaps}
-                    style={[
-                      styles.openMapsLink,
-                      {
-                        backgroundColor: isDark ? '#0F2942' : '#EFF6FF',
-                        borderColor: isDark ? '#0369A1' : '#BFDBFE',
-                      },
-                    ]}
+                    style={styles.openMapsLink}
                     activeOpacity={0.8}
                   >
                     <Ionicons name="navigate-outline" size={13} color="#2563EB" />
@@ -311,12 +236,7 @@ export default function VolunteerOfferDetailModal({
               </View>
 
               {/* Map Canvas Box */}
-              <View
-                style={[
-                  styles.mapBox,
-                  { borderColor: isDark ? '#334155' : '#CBD5E1' },
-                ]}
-              >
+              <View style={styles.mapBox}>
                 {Platform.OS === 'web' && mapTab === 'live' ? (
                   <View style={styles.webMapContainer}>
                     <iframe
@@ -331,12 +251,7 @@ export default function VolunteerOfferDetailModal({
                   </View>
                 ) : (
                   /* Vector Map Representation */
-                  <View
-                    style={[
-                      styles.vectorMapCanvas,
-                      { backgroundColor: isDark ? '#0F172A' : '#F1F5F9' },
-                    ]}
-                  >
+                  <View style={styles.vectorMapCanvas}>
                     {/* Park zones */}
                     <View style={styles.parkZone}>
                       <Ionicons name="leaf-outline" size={12} color="#15803D" style={{ marginRight: 3 }} />
@@ -395,26 +310,13 @@ export default function VolunteerOfferDetailModal({
               </View>
 
               {/* Destination Address Card */}
-              <View
-                style={[
-                  styles.addressCard,
-                  {
-                    backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                    borderColor: isDark ? '#334155' : '#E2E8F0',
-                  },
-                ]}
-              >
+              <View style={styles.addressCard}>
                 <View style={styles.addressIconBox}>
                   <Ionicons name="location" size={22} color="#DC2626" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.addressCardLabel}>SERVICE BASE AREA</Text>
-                  <Text
-                    style={[
-                      styles.addressCardValue,
-                      { color: isDark ? '#F8FAFC' : '#0F172A' },
-                    ]}
-                  >
+                  <Text style={styles.addressCardValue}>
                     {serviceArea}
                   </Text>
                   <Text style={styles.addressCardSub}>
@@ -437,33 +339,17 @@ export default function VolunteerOfferDetailModal({
 
             {/* Services Offered Badges */}
             <View style={styles.sectionBlock}>
-              <Text
-                style={[
-                  styles.sectionHeading,
-                  { color: isDark ? '#F8FAFC' : '#0F172A' },
-                ]}
-              >
+              <Text style={styles.sectionHeading}>
                 Services Included in this Offer
               </Text>
               <View style={styles.servicesGrid}>
                 {(offer.services || ['Companionship']).map((svc, idx) => (
                   <View
                     key={idx}
-                    style={[
-                      styles.serviceTag,
-                      {
-                        backgroundColor: isDark ? '#1E3A8A' : '#EFF6FF',
-                        borderColor: isDark ? '#2563EB' : '#BFDBFE',
-                      },
-                    ]}
+                    style={styles.serviceTag}
                   >
                     <Ionicons name="checkmark-circle" size={16} color="#2563EB" />
-                    <Text
-                      style={[
-                        styles.serviceTagText,
-                        { color: isDark ? '#93C5FD' : '#1E40AF' },
-                      ]}
-                    >
+                    <Text style={styles.serviceTagText}>
                       {svc}
                     </Text>
                   </View>
@@ -474,30 +360,12 @@ export default function VolunteerOfferDetailModal({
             {/* Special Skills / Volunteer Notes */}
             {Boolean(offer.specialSkills) && (
               <View style={styles.sectionBlock}>
-                <Text
-                  style={[
-                    styles.sectionHeading,
-                    { color: isDark ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
+                <Text style={styles.sectionHeading}>
                   Volunteer Message & Skills
                 </Text>
-                <View
-                  style={[
-                    styles.notesBox,
-                    {
-                      backgroundColor: isDark ? '#0F172A' : '#FEF3C7',
-                      borderColor: isDark ? '#B45309' : '#FDE68A',
-                    },
-                  ]}
-                >
+                <View style={styles.notesBox}>
                   <Ionicons name="information-circle" size={18} color="#D97706" style={{ marginTop: 2 }} />
-                  <Text
-                    style={[
-                      styles.notesText,
-                      { color: isDark ? '#FDE68A' : '#92400E' },
-                    ]}
-                  >
+                  <Text style={styles.notesText}>
                     "{offer.specialSkills}"
                   </Text>
                 </View>
@@ -506,37 +374,18 @@ export default function VolunteerOfferDetailModal({
           </ScrollView>
 
           {/* Action Footer */}
-          <View
-            style={[
-              styles.footerRow,
-              {
-                borderTopColor: isDark ? '#334155' : '#F1F5F9',
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-              },
-            ]}
-          >
+          <View style={styles.footerRow}>
             <TouchableOpacity
-              style={[
-                styles.secondaryBtn,
-                {
-                  borderColor: isDark ? '#475569' : '#CBD5E1',
-                  backgroundColor: isDark ? '#334155' : '#F8FAFC',
-                },
-              ]}
+              style={styles.secondaryBtn}
               onPress={() => onViewProfile && onViewProfile(offer)}
               activeOpacity={0.8}
             >
               <Ionicons
                 name="person-circle-outline"
                 size={18}
-                color={isDark ? '#CBD5E1' : '#475569'}
+                color="#475569"
               />
-              <Text
-                style={[
-                  styles.secondaryBtnText,
-                  { color: isDark ? '#CBD5E1' : '#475569' },
-                ]}
-              >
+              <Text style={styles.secondaryBtnText}>
                 Profile
               </Text>
             </TouchableOpacity>
@@ -577,6 +426,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: Platform.OS === 'web' ? 620 : '100%',
+    backgroundColor: '#FFFFFF',
     borderRadius: Platform.OS === 'web' ? 24 : 0,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
@@ -585,7 +435,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.15,
     shadowRadius: 25,
     elevation: 12,
   },
@@ -597,6 +447,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
   badgeRow: {
     flexDirection: 'row',
@@ -635,10 +486,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 19,
     fontWeight: '800',
+    color: '#0F172A',
   },
   closeBtn: {
     padding: 6,
     borderRadius: 18,
+    backgroundColor: '#F1F5F9',
     marginLeft: 10,
   },
   scrollContent: {
@@ -653,6 +506,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 14,
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
     padding: 12,
     marginBottom: 14,
     borderWidth: 1,
@@ -726,6 +581,8 @@ const styles = StyleSheet.create({
   },
   metaGrid: {
     flexDirection: 'row',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#DBEAFE',
     borderRadius: 14,
     padding: 12,
     marginBottom: 16,
@@ -746,6 +603,7 @@ const styles = StyleSheet.create({
   metaColValue: {
     fontSize: 12,
     fontWeight: '800',
+    color: '#1E3A8A',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -770,6 +628,7 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 14,
     fontWeight: '800',
+    color: '#0F172A',
     marginBottom: 8,
   },
   mapActionsGroup: {
@@ -1011,6 +870,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
     padding: 12,
     marginBottom: 10,
     borderWidth: 1,
@@ -1033,6 +894,7 @@ const styles = StyleSheet.create({
   addressCardValue: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#0F172A',
     marginTop: 1,
   },
   addressCardSub: {
@@ -1064,6 +926,8 @@ const styles = StyleSheet.create({
   serviceTag: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+    borderColor: '#BFDBFE',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -1073,10 +937,13 @@ const styles = StyleSheet.create({
   serviceTagText: {
     fontSize: 13,
     fontWeight: '700',
+    color: '#1E40AF',
   },
   notesBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -1086,12 +953,15 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+    color: '#92400E',
   },
   footerRow: {
     flexDirection: 'row',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     gap: 10,
   },
   secondaryBtn: {
@@ -1099,6 +969,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#CBD5E1',
     paddingVertical: 13,
     borderRadius: 12,
     borderWidth: 1.5,
@@ -1107,13 +979,14 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     fontSize: 14,
     fontWeight: '700',
+    color: '#475569',
   },
   primaryBtn: {
     flex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingVertical: 13,
     borderRadius: 12,
     gap: 6,

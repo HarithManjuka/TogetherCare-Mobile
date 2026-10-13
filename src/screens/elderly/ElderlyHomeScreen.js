@@ -174,6 +174,11 @@ export default function ElderlyHomeScreen() {
             onNavigateToSchedule={() => setCurrentTab('schedule')}
             onRequestNew={() => setShowCreateScreen(true)}
             onBack={() => setCurrentTab('home')}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
       case 'schedule':
@@ -181,6 +186,11 @@ export default function ElderlyHomeScreen() {
           <MyScheduleScreen
             onBack={() => setCurrentTab('home')}
             onRequestNew={() => setShowCreateScreen(true)}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
             onStartChat={(volunteerUser) => {
               setActiveChatUser(volunteerUser);
               setCurrentTab('messages');
@@ -200,6 +210,12 @@ export default function ElderlyHomeScreen() {
           <MessagesListScreen
             onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
             onBack={() => setCurrentTab('home')}
+            showAppHeader={true}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
       case 'profile':

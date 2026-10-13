@@ -338,6 +338,24 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
 
   const profilePicUri = user.profilePicture || user.avatar;
 
+  // Determine effective ID verification status (protects against conflating email verification with ID verification)
+  const getEffectiveIdBadgeStatus = () => {
+    if (user?.role === 'volunteer') {
+      const vvStatus = (user?.volunteerVerification?.status || '').toUpperCase();
+      if (user?.isVolunteerVerified === true || vvStatus === 'APPROVED') {
+        return 'verified';
+      }
+      if (vvStatus === 'PENDING') {
+        return 'pending';
+      }
+      if (vvStatus === 'REJECTED') {
+        return 'rejected';
+      }
+      return 'unverified';
+    }
+    return user?.verificationBadgeStatus || 'unverified';
+  };
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -444,7 +462,7 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
           </View>
           <View style={styles.badgeInfoRow}>
             <Text style={styles.infoLabel}>ID Verification Badge:</Text>
-            {renderStatusBadge('idBadge', user.verificationBadgeStatus)}
+            {renderStatusBadge('idBadge', getEffectiveIdBadgeStatus())}
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Registered On:</Text>
@@ -634,7 +652,7 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
             ) : null}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Current Badge:</Text>
-              <Text style={styles.infoValue}>{(user.volunteerVerification?.status || user.verificationBadgeStatus || 'unverified').toUpperCase()}</Text>
+              <Text style={styles.infoValue}>{getEffectiveIdBadgeStatus().toUpperCase()}</Text>
             </View>
 
             {user?.volunteerVerification?.evidenceFiles?.length > 0 && (

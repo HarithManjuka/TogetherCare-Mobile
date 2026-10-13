@@ -1,25 +1,24 @@
 // src/styles/MyScheduleScreen.styles.js
-import { StyleSheet, Platform, StatusBar } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/theme';
 
 export const getMyScheduleScreenStyles = (scale = 1.0) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#1A365D',
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+      backgroundColor: '#1E3A8A', // Matches TogetherCare AppHeader seamless blue
     },
     container: {
       flex: 1,
       backgroundColor: '#F8FAFC',
     },
 
-    // WhatsApp-Style Top App Header
+    // Sub App Header Bar
     headerBar: {
-      backgroundColor: '#1A365D',
+      backgroundColor: '#1E3A8A',
       paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 4,
+      paddingTop: 8,
+      paddingBottom: 6,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -49,11 +48,11 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       borderRadius: 20,
     },
 
-    // WhatsApp-Style Tabs Bar
+    // Schedule Tabs Bar
     tabsBarWrapper: {
-      backgroundColor: '#1A365D',
+      backgroundColor: '#1E3A8A',
       borderBottomWidth: 1,
-      borderBottomColor: '#2A4365',
+      borderBottomColor: 'rgba(255, 255, 255, 0.15)',
     },
     tabsBarScrollContent: {
       flexDirection: 'row',
