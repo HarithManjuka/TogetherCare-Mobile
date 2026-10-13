@@ -1,5 +1,4 @@
-// src/components/elderly/VolunteerProfileDetailModal.js
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -9,9 +8,10 @@ import {
   ScrollView,
   Image,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../context/ThemeContext';
+import { getUserReviews } from '../../services/reviewService';
 
 const getInterestIcon = (interest) => {
   const lower = (interest || '').toLowerCase();
@@ -36,16 +36,47 @@ export default function VolunteerProfileDetailModal({
   onAccept,
   isAccepting = false,
 }) {
-  const { colors, isDark } = useTheme();
+  const [reviewsData, setReviewsData] = useState({ totalReviews: 0, averageRating: 0, reviews: [] });
+  const [loadingReviews, setLoadingReviews] = useState(false);
+
+  const volunteer = offer?.volunteerId || offer?.volunteer || (offer?.firstName ? offer : {});
+  const volunteerId = volunteer._id || volunteer.id;
+
+  useEffect(() => {
+    if (visible && volunteerId) {
+      setLoadingReviews(true);
+      getUserReviews(volunteerId)
+        .then((res) => {
+          if (res && res.success && res.data) {
+            setReviewsData(res.data);
+          }
+        })
+        .catch((err) => console.log('Error loading volunteer reviews:', err.message))
+        .finally(() => setLoadingReviews(false));
+    }
+  }, [visible, volunteerId]);
 
   if (!offer) return null;
 
-  const volunteer = offer.volunteerId || {};
-  const fullName = offer.volunteerName || `${volunteer.firstName || 'Volunteer'} ${volunteer.lastName || ''}`.trim();
-  const isVerified = volunteer.verificationBadgeStatus === 'approved' || volunteer.verificationBadgeStatus === 'verified';
+  const fullName = offer.volunteerName || (volunteer.firstName ? `${volunteer.firstName} ${volunteer.lastName || ''}`.trim() : 'Community Volunteer');
+  
+  // Real ID verification status (strictly requires official ID verification approval, not email or generic badge)
+  const vvStatus = (volunteer.volunteerVerification?.status || '').toUpperCase();
+  const isIdVerified = volunteer.isVolunteerVerified === true || vvStatus === 'APPROVED';
+  const isIdPending = !isIdVerified && vvStatus === 'PENDING';
+  const isIdRejected = !isIdVerified && vvStatus === 'REJECTED';
+
   const age = volunteer.age || offer.volunteerAge || (volunteer.dateOfBirth ? Math.floor((new Date() - new Date(volunteer.dateOfBirth)) / (365.25 * 24 * 60 * 60 * 1000)) : null);
   const institution = volunteer.educationalInstitution || volunteer.institution || 'University Community Volunteer';
-  const rating = volunteer.rating ? volunteer.rating.toFixed(1) : '4.9';
+  
+  // Dynamic database rating metrics (No hardcoding)
+  const hasLiveReviews = Boolean(reviewsData && typeof reviewsData.totalReviews === 'number' && reviewsData.totalReviews > 0);
+  const dbRating = hasLiveReviews
+    ? reviewsData.averageRating
+    : (volunteer.rating !== undefined && volunteer.rating !== null && Number(volunteer.rating) > 0 ? Number(volunteer.rating) : null);
+  const rating = dbRating !== null ? Number(dbRating).toFixed(1) : null;
+  const reviewCount = hasLiveReviews ? reviewsData.totalReviews : (volunteer.totalReviews ?? volunteer.ratingCount ?? volunteer.reviewCount ?? 0);
+  
   const profilePic = volunteer.profilePicture;
   const bio = volunteer.bio || 'Compassionate and dedicated youth volunteer looking to spend meaningful time with seniors in the community.';
 
@@ -62,39 +93,26 @@ export default function VolunteerProfileDetailModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View
-          style={[
-            styles.modalContent,
-            { backgroundColor: isDark ? '#1E293B' : '#FFFFFF' },
-          ]}
-        >
+        <View style={styles.modalContent}>
           {/* Header */}
           <View style={styles.headerRow}>
             <View style={styles.headerTitleContainer}>
-              <Text
-                style={[
-                  styles.modalTitle,
-                  { color: isDark ? '#F8FAFC' : '#0F172A' },
-                ]}
-              >
+              <Text style={styles.modalTitle}>
                 Volunteer Profile
               </Text>
               <Text style={styles.modalSubtitle}>
-                Verified Community Companion
+                {isIdVerified ? 'Verified Community Companion' : isIdPending ? 'Verification Under Review' : 'Community Volunteer'}
               </Text>
             </View>
             <TouchableOpacity
               onPress={onClose}
-              style={[
-                styles.closeButton,
-                { backgroundColor: isDark ? '#334155' : '#F1F5F9' },
-              ]}
+              style={styles.closeButton}
               hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             >
               <Ionicons
                 name="close"
                 size={22}
-                color={isDark ? '#94A3B8' : '#64748B'}
+                color="#64748B"
               />
             </TouchableOpacity>
           </View>
@@ -118,41 +136,57 @@ export default function VolunteerProfileDetailModal({
                     <Ionicons name="person" size={44} color="#FFFFFF" />
                   </View>
                 )}
-                {isVerified && (
+                {isIdVerified && (
                   <View style={styles.verifiedCheckBadge}>
                     <Ionicons name="checkmark-circle" size={24} color="#10B981" />
                   </View>
                 )}
               </View>
 
-              <Text
-                style={[
-                  styles.volunteerNameText,
-                  { color: isDark ? '#F8FAFC' : '#0F172A' },
-                ]}
-              >
+              <Text style={styles.volunteerNameText}>
                 {fullName}
               </Text>
 
               <View style={styles.badgeRow}>
-                {isVerified ? (
+                {isIdVerified ? (
                   <View style={styles.verifiedPill}>
                     <Ionicons name="shield-checkmark" size={14} color="#059669" />
                     <Text style={styles.verifiedPillText}>Identity Verified</Text>
                   </View>
+                ) : isIdPending ? (
+                  <View style={[styles.verifiedPill, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="time-outline" size={14} color="#D97706" />
+                    <Text style={[styles.verifiedPillText, { color: '#B45309' }]}>
+                      ID Verification Pending
+                    </Text>
+                  </View>
+                ) : isIdRejected ? (
+                  <View style={[styles.verifiedPill, { backgroundColor: '#FEE2E2' }]}>
+                    <Ionicons name="close-circle-outline" size={14} color="#DC2626" />
+                    <Text style={[styles.verifiedPillText, { color: '#DC2626' }]}>
+                      ID Rejected
+                    </Text>
+                  </View>
                 ) : (
-                  <View style={[styles.verifiedPill, { backgroundColor: '#EFF6FF' }]}>
-                    <Ionicons name="sparkles" size={14} color="#2563EB" />
-                    <Text style={[styles.verifiedPillText, { color: '#2563EB' }]}>
-                      Community Member
+                  <View style={[styles.verifiedPill, { backgroundColor: '#F1F5F9' }]}>
+                    <Ionicons name="shield-outline" size={14} color="#64748B" />
+                    <Text style={[styles.verifiedPillText, { color: '#475569' }]}>
+                      ID Not Verified
                     </Text>
                   </View>
                 )}
 
-                <View style={styles.ratingPill}>
-                  <Ionicons name="star" size={14} color="#F59E0B" />
-                  <Text style={styles.ratingPillText}>{rating} (Top Rated)</Text>
-                </View>
+                {rating ? (
+                  <View style={styles.ratingPill}>
+                    <Ionicons name="star" size={14} color="#F59E0B" />
+                    <Text style={styles.ratingPillText}>{rating} ⭐ ({reviewCount})</Text>
+                  </View>
+                ) : (
+                  <View style={[styles.verifiedPill, { backgroundColor: '#FEF3C7' }]}>
+                    <Ionicons name="sparkles" size={13} color="#D97706" />
+                    <Text style={[styles.verifiedPillText, { color: '#B45309' }]}>New Volunteer</Text>
+                  </View>
+                )}
 
                 {age ? (
                   <View style={[styles.verifiedPill, { backgroundColor: '#F3E8FF' }]}>
@@ -164,24 +198,11 @@ export default function VolunteerProfileDetailModal({
             </View>
 
             {/* Quick Stats Grid */}
-            <View
-              style={[
-                styles.statsGrid,
-                {
-                  backgroundColor: isDark ? '#0F172A' : '#F8FAFC',
-                  borderColor: isDark ? '#334155' : '#E2E8F0',
-                },
-              ]}
-            >
+            <View style={styles.statsGrid}>
               <View style={styles.statItem}>
                 <Ionicons name="calendar-outline" size={20} color="#3B82F6" />
                 <Text style={styles.statLabel}>Available Date</Text>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: isDark ? '#F8FAFC' : '#1E293B' },
-                  ]}
-                >
+                <Text style={styles.statValue}>
                   {offer.date || 'Anytime'}
                 </Text>
               </View>
@@ -191,12 +212,7 @@ export default function VolunteerProfileDetailModal({
               <View style={styles.statItem}>
                 <Ionicons name="time-outline" size={20} color="#8B5CF6" />
                 <Text style={styles.statLabel}>Time Window</Text>
-                <Text
-                  style={[
-                    styles.statValue,
-                    { color: isDark ? '#F8FAFC' : '#1E293B' },
-                  ]}
-                >
+                <Text style={styles.statValue}>
                   {offer.startTime || '02:00 PM'} - {offer.endTime || '04:00 PM'}
                 </Text>
               </View>
@@ -206,13 +222,7 @@ export default function VolunteerProfileDetailModal({
               <View style={styles.statItem}>
                 <Ionicons name="location-outline" size={20} color="#10B981" />
                 <Text style={styles.statLabel}>Service Area</Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.statValue,
-                    { color: isDark ? '#F8FAFC' : '#1E293B' },
-                  ]}
-                >
+                <Text numberOfLines={1} style={styles.statValue}>
                   {offer.serviceArea || 'Local'}
                 </Text>
               </View>
@@ -220,43 +230,37 @@ export default function VolunteerProfileDetailModal({
 
             {/* About / Bio */}
             <View style={styles.detailSection}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: isDark ? '#E2E8F0' : '#1E293B' },
-                ]}
-              >
+              <Text style={styles.sectionTitle}>
                 About the Volunteer
               </Text>
-              <Text
-                style={[
-                  styles.bodyText,
-                  { color: isDark ? '#94A3B8' : '#475569' },
-                ]}
-              >
+              <Text style={styles.bodyText}>
                 {bio}
               </Text>
             </View>
 
             {/* Background & Affiliation */}
             <View style={styles.detailSection}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: isDark ? '#E2E8F0' : '#1E293B' },
-                ]}
-              >
+              <Text style={styles.sectionTitle}>
                 Background & Affiliation
               </Text>
               <View style={styles.infoRow}>
                 <Ionicons name="school-outline" size={18} color="#6366F1" />
-                <Text
-                  style={[
-                    styles.infoRowText,
-                    { color: isDark ? '#CBD5E1' : '#334155' },
-                  ]}
-                >
+                <Text style={styles.infoRowText}>
                   {institution}
+                </Text>
+              </View>
+              <View style={[styles.infoRow, { marginTop: 10 }]}>
+                <Ionicons
+                  name={isIdVerified ? "shield-checkmark" : isIdPending ? "time-outline" : "shield-outline"}
+                  size={18}
+                  color={isIdVerified ? "#059669" : isIdPending ? "#D97706" : "#64748B"}
+                />
+                <Text style={styles.infoRowText}>
+                  {isIdVerified
+                    ? `Identity Verification: Verified (${volunteer.volunteerVerification?.credentialType || 'Government ID'})`
+                    : isIdPending
+                    ? 'Identity Verification: Under Review (Pending Approval)'
+                    : 'Identity Verification: Official ID Not Verified'}
                 </Text>
               </View>
             </View>
@@ -265,12 +269,7 @@ export default function VolunteerProfileDetailModal({
             {volunteerInterests.length > 0 && (
               <View style={styles.detailSection}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text
-                    style={[
-                      styles.sectionTitle,
-                      { color: isDark ? '#E2E8F0' : '#1E293B' },
-                    ]}
-                  >
+                  <Text style={styles.sectionTitle}>
                     Interests & Hobbies
                   </Text>
                   <View style={styles.databaseBadge}>
@@ -283,25 +282,14 @@ export default function VolunteerProfileDetailModal({
                   {volunteerInterests.map((interest, idx) => (
                     <View
                       key={idx}
-                      style={[
-                        styles.interestChip,
-                        {
-                          backgroundColor: isDark ? '#0F2942' : '#F0F9FF',
-                          borderColor: isDark ? '#0369A1' : '#BAE6FD',
-                        },
-                      ]}
+                      style={styles.interestChip}
                     >
                       <Ionicons
                         name={getInterestIcon(interest)}
                         size={15}
-                        color={isDark ? '#38BDF8' : '#0284C7'}
+                        color="#0284C7"
                       />
-                      <Text
-                        style={[
-                          styles.interestChipText,
-                          { color: isDark ? '#E0F2FE' : '#0369A1' },
-                        ]}
-                      >
+                      <Text style={styles.interestChipText}>
                         {interest}
                       </Text>
                     </View>
@@ -312,12 +300,7 @@ export default function VolunteerProfileDetailModal({
 
             {/* Services Offered */}
             <View style={styles.detailSection}>
-              <Text
-                style={[
-                  styles.sectionTitle,
-                  { color: isDark ? '#E2E8F0' : '#1E293B' },
-                ]}
-              >
+              <Text style={styles.sectionTitle}>
                 Companionship Services Offered
               </Text>
               <View style={styles.tagsContainer}>
@@ -339,30 +322,12 @@ export default function VolunteerProfileDetailModal({
             {/* Special Skills or Notes */}
             {Boolean(offer.specialSkills) && (
               <View style={styles.detailSection}>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { color: isDark ? '#E2E8F0' : '#1E293B' },
-                  ]}
-                >
+                <Text style={styles.sectionTitle}>
                   Volunteer Notes & Skills
                 </Text>
-                <View
-                  style={[
-                    styles.noteBox,
-                    {
-                      backgroundColor: isDark ? '#0F172A' : '#FEF3C7',
-                      borderColor: isDark ? '#B45309' : '#FDE68A',
-                    },
-                  ]}
-                >
+                <View style={styles.noteBox}>
                   <Ionicons name="information-circle" size={18} color="#D97706" />
-                  <Text
-                    style={[
-                      styles.noteBoxText,
-                      { color: isDark ? '#FDE68A' : '#92400E' },
-                    ]}
-                  >
+                  <Text style={styles.noteBoxText}>
                     {offer.specialSkills}
                   </Text>
                 </View>
@@ -376,22 +341,103 @@ export default function VolunteerProfileDetailModal({
                 {offer.slotsLeft || 1} out of {offer.capacity || 1} slots open for this session
               </Text>
             </View>
+
+            {/* Ratings & Reviews Section */}
+            <View style={styles.detailSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>
+                  Ratings & Reviews
+                </Text>
+                <View style={styles.reviewScoreBadge}>
+                  <Ionicons name="star" size={13} color="#F59E0B" />
+                  <Text style={styles.reviewScoreBadgeText}>
+                    {rating ? `${rating} (${reviewCount} ${reviewCount === 1 ? 'review' : 'reviews'})` : 'No reviews yet'}
+                  </Text>
+                </View>
+              </View>
+
+              {loadingReviews ? (
+                <View style={styles.reviewLoadingContainer}>
+                  <ActivityIndicator size="small" color="#2563EB" />
+                  <Text style={styles.loadingText}>
+                    Loading community reviews...
+                  </Text>
+                </View>
+              ) : reviewsData?.reviews && reviewsData.reviews.length > 0 ? (
+                <View style={styles.reviewsListContainer}>
+                  {reviewsData.reviews.map((rev, idx) => {
+                    const reviewer = rev.reviewer || rev.reviewerId || rev.elder || rev.user || {};
+                    const elderName =
+                      (reviewer.firstName ? `${reviewer.firstName} ${reviewer.lastName || ''}`.trim() : '') ||
+                      reviewer.name ||
+                      rev.reviewerName ||
+                      rev.elderName ||
+                      'Senior Companion';
+                    const elderPic = reviewer.profilePicture;
+                    const initial = elderName.charAt(0).toUpperCase() || 'S';
+
+                    return (
+                      <View
+                        key={rev._id || idx}
+                        style={styles.reviewCard}
+                      >
+                        <View style={styles.reviewCardHeader}>
+                          <View style={styles.reviewerInfo}>
+                            <View style={styles.reviewerAvatarSmall}>
+                              {elderPic ? (
+                                <Image source={{ uri: elderPic }} style={styles.reviewerAvatarImg} />
+                              ) : (
+                                <Text style={styles.reviewerInitialText}>{initial}</Text>
+                              )}
+                            </View>
+                            <Text style={styles.reviewerName}>
+                              {elderName}
+                            </Text>
+                          </View>
+                          <View style={styles.reviewStarRow}>
+                            {[1, 2, 3, 4, 5].map((s) => (
+                              <Ionicons
+                                key={s}
+                                name={s <= Math.round(rev.rating || 5) ? 'star' : 'star-outline'}
+                                size={13}
+                                color="#F59E0B"
+                              />
+                            ))}
+                          </View>
+                        </View>
+                        {Boolean(rev.comment || rev.feedback) && (
+                          <Text style={styles.reviewCommentText}>
+                            "{rev.comment || rev.feedback}"
+                          </Text>
+                        )}
+                        <Text style={styles.reviewDateText}>
+                          {new Date(rev.createdAt || Date.now()).toLocaleDateString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                          })}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.emptyReviewsBox}>
+                  <Ionicons name="chatbox-ellipses-outline" size={24} color="#94A3B8" />
+                  <Text style={styles.emptyReviewsText}>
+                    No reviews yet. Be the first to rate after a completed visit!
+                  </Text>
+                </View>
+              )}
+            </View>
           </ScrollView>
 
           {/* Action Footer */}
-          <View
-            style={[
-              styles.footerContainer,
-              {
-                borderTopColor: isDark ? '#334155' : '#F1F5F9',
-                backgroundColor: isDark ? '#1E293B' : '#FFFFFF',
-              },
-            ]}
-          >
+          <View style={styles.footerContainer}>
             <TouchableOpacity
               style={[
                 styles.closeFooterBtn,
-                { borderColor: isDark ? '#475569' : '#CBD5E1' },
+                !onAccept && { flex: 1, backgroundColor: '#1E3A8A', borderColor: '#1E3A8A' },
               ]}
               onPress={onClose}
               disabled={isAccepting}
@@ -399,26 +445,28 @@ export default function VolunteerProfileDetailModal({
               <Text
                 style={[
                   styles.closeFooterBtnText,
-                  { color: isDark ? '#94A3B8' : '#64748B' },
+                  !onAccept ? { color: '#FFFFFF', fontWeight: '700' } : { color: '#475569' },
                 ]}
               >
-                Back
+                {onAccept ? 'Back' : 'Close Profile'}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[
-                styles.acceptBtn,
-                { opacity: isAccepting ? 0.7 : 1 },
-              ]}
-              onPress={() => onAccept(offer)}
-              disabled={isAccepting}
-            >
-              <Ionicons name="calendar" size={18} color="#FFFFFF" />
-              <Text style={styles.acceptBtnText}>
-                {isAccepting ? 'Confirming...' : 'Accept & Schedule'}
-              </Text>
-            </TouchableOpacity>
+            {Boolean(onAccept) && (
+              <TouchableOpacity
+                style={[
+                  styles.acceptBtn,
+                  { opacity: isAccepting ? 0.7 : 1 },
+                ]}
+                onPress={() => onAccept(offer)}
+                disabled={isAccepting}
+              >
+                <Ionicons name="calendar" size={18} color="#FFFFFF" />
+                <Text style={styles.acceptBtnText}>
+                  {isAccepting ? 'Confirming...' : 'Accept & Schedule'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -429,10 +477,11 @@ export default function VolunteerProfileDetailModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
   },
   modalContent: {
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '90%',
@@ -458,6 +507,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '700',
+    color: '#0F172A',
     fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
   },
   modalSubtitle: {
@@ -469,6 +519,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -508,6 +559,7 @@ const styles = StyleSheet.create({
   volunteerNameText: {
     fontSize: 20,
     fontWeight: '700',
+    color: '#0F172A',
     marginBottom: 8,
   },
   badgeRow: {
@@ -547,6 +599,8 @@ const styles = StyleSheet.create({
   },
   statsGrid: {
     flexDirection: 'row',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
@@ -570,6 +624,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 13,
     fontWeight: '700',
+    color: '#1E293B',
     marginTop: 2,
     textAlign: 'center',
   },
@@ -585,6 +640,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 15,
     fontWeight: '700',
+    color: '#1E293B',
     marginBottom: 6,
   },
   databaseBadge: {
@@ -604,6 +660,7 @@ const styles = StyleSheet.create({
   bodyText: {
     fontSize: 14,
     lineHeight: 22,
+    color: '#475569',
   },
   infoRow: {
     flexDirection: 'row',
@@ -613,6 +670,7 @@ const styles = StyleSheet.create({
   infoRowText: {
     fontSize: 14,
     fontWeight: '500',
+    color: '#334155',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -649,6 +707,8 @@ const styles = StyleSheet.create({
   noteBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
@@ -658,6 +718,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     lineHeight: 18,
+    color: '#92400E',
   },
   slotsCard: {
     flexDirection: 'row',
@@ -678,6 +739,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     gap: 12,
   },
   closeFooterBtn: {
@@ -685,25 +748,28 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeFooterBtnText: {
     fontSize: 15,
     fontWeight: '600',
+    color: '#475569',
   },
   acceptBtn: {
     flex: 2,
     flexDirection: 'row',
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     paddingVertical: 14,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#2563EB',
+    shadowColor: '#1E3A8A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
@@ -711,5 +777,107 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
+  },
+  reviewScoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    gap: 4,
+  },
+  reviewScoreBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  reviewLoadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#64748B',
+  },
+  reviewsListContainer: {
+    gap: 10,
+    marginTop: 4,
+  },
+  reviewCard: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  reviewerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  reviewerAvatarSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#DBEAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  reviewerAvatarImg: {
+    width: '100%',
+    height: '100%',
+  },
+  reviewerInitialText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1E40AF',
+  },
+  reviewerName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  reviewStarRow: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  reviewCommentText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: 'italic',
+    color: '#475569',
+  },
+  reviewDateText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  emptyReviewsBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  emptyReviewsText: {
+    fontSize: 13,
+    textAlign: 'center',
+    color: '#64748B',
   },
 });

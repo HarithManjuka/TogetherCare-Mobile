@@ -52,8 +52,11 @@ export const getAvailableRequests = async (category = 'all') => {
  * Accept / Claim a community help request
  * @param {string} requestId
  */
-export const acceptRequest = async (requestId) => {
-  const response = await client.post(`/volunteer-offers/requests/${requestId}/accept`);
+export const acceptRequest = async (requestId, payload) => {
+  const url = `/volunteer-offers/requests/${requestId}/accept`;
+  const response = payload && Object.keys(payload).length > 0
+    ? await client.post(url, payload)
+    : await client.post(url);
   return response.data;
 };
 
@@ -80,6 +83,15 @@ export const updateTaskStatus = async (taskId, status) => {
  */
 export const getMyHistory = async () => {
   const response = await client.get('/volunteer-offers/my-history');
+  return response.data;
+};
+
+/**
+ * Add / log a completed volunteer service activity
+ * @param {Object} logData
+ */
+export const addHistoryLog = async (logData) => {
+  const response = await client.post('/volunteer-offers/my-history', logData);
   return response.data;
 };
 

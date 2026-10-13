@@ -36,3 +36,12 @@ export const updateVerificationStatus = async (userId, status, note = '') => {
   const res = await client.patch(`/auth/users/${userId}/verification`, { status, note });
   return res.data;
 };
+
+export const reviewVolunteerVerification = async (userId, { action, rejectionReason }) => {
+  const response = await client.put(`/admin/users/${userId}/verify-volunteer`, {
+    action,
+    rejectionReason,
+  });
+  return response.data;
+};
+

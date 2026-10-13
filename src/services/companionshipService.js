@@ -54,4 +54,24 @@ export const cancelRequest = async (id) => {
   return response.data;
 };
 
+/**
+ * Update status of companionship visit (accepted -> ongoing -> completed / cancelled)
+ * @param {string} id
+ * @param {string} status
+ */
+export const updateStatus = async (id, status) => {
+  const response = await client.put(`/companionship/${id}/status`, { status });
+  return response.data;
+};
+
+/**
+ * Rate a completed companionship visit and/or volunteer
+ * @param {string} id
+ * @param {Object} ratingData - { visitRating, visitReview, volunteerRating, volunteerReview }
+ */
+export const rateVisit = async (id, ratingData) => {
+  const response = await client.post(`/companionship/${id}/rate`, ratingData);
+  return response.data;
+};
+
 

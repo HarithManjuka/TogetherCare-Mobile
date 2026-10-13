@@ -20,6 +20,8 @@ export default function AppHeader({
   onProfilePress,
   onNavigateTab,
   hasUnreadNotifications = false,
+  unreadNotificationsCount = 0,
+  unreadCount = 0,
   showLeftAction = false,
   onLeftActionPress,
   showMenu = true,
@@ -28,6 +30,8 @@ export default function AppHeader({
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { uiScale, cycleUiScale } = useTheme();
+
+  const badgeCount = unreadNotificationsCount || unreadCount || (hasUnreadNotifications ? 1 : 0);
 
   // Top padding accommodating device status bar insets safely
   const topPadding = Math.max(
@@ -84,14 +88,20 @@ export default function AppHeader({
             </TouchableOpacity>
           )}
 
-          {/* Notification Icon */}
+          {/* Notification Icon with Red Number Badge */}
           <TouchableOpacity
             style={styles.iconBtn}
             onPress={onNotificationPress}
             activeOpacity={0.8}
           >
             <Ionicons name="notifications-outline" size={20} color="#FFFFFF" />
-            {hasUnreadNotifications && <View style={styles.notificationBadge} />}
+            {badgeCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {badgeCount > 9 ? '9+' : badgeCount}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           {/* User Profile Avatar Link */}

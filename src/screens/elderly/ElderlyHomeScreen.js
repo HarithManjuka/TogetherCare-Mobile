@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, BackHandler } from 'react-native';
 import AppBottomNav from '../../components/common/AppBottomNav';
+import NotificationsModal from '../../components/common/NotificationsModal';
 import ElderlyDashboardHome from './ElderlyDashboardHome';
 import ElderlyRequestsScreen from './ElderlyRequestsScreen';
 import MyScheduleScreen from './MyScheduleScreen';
@@ -9,11 +10,21 @@ import CreateCompanionshipScreen from './CreateCompanionshipScreen';
 import ProfileScreen from '../auth/ProfileScreen';
 import MessagesListScreen from '../common/MessagesListScreen';
 import CaregiverChatScreen from '../caregiver/CaregiverChatScreen';
+import * as volunteerOfferService from '../../services/volunteerOfferService';
+import * as notificationService from '../../services/notificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useElderlyHome } from '../../hooks/useElderlyHome';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
 
+const LAST_SEEN_OFFERS_KEY = '@last_seen_offers_time';
+const LAST_SEEN_NOTIFICATIONS_KEY = '@last_seen_elderly_notifications_time';
+
 export default function ElderlyHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'requests' | 'schedule' | 'messages' | 'settings'
+  const [requestCount, setRequestCount] = useState(0);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [showCreateScreen, setShowCreateScreen] = useState(false);
   const [showProfileScreen, setShowProfileScreen] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
@@ -29,6 +40,70 @@ export default function ElderlyHomeScreen() {
       refreshUnreadMsgs();
     }
   }, [activeChatUser, currentTab]);
+
+  // Immediately clear badge count to 0 whenever user visits the requests page
+  useEffect(() => {
+    if (currentTab === 'requests') {
+      const now = new Date().toISOString();
+      AsyncStorage.setItem(LAST_SEEN_OFFERS_KEY, now).catch(() => {});
+      setRequestCount(0);
+    }
+  }, [currentTab]);
+
+  // Dynamically update available volunteer offer count + notification status
+  useEffect(() => {
+    if (currentTab === 'requests') {
+      setRequestCount(0);
+    }
+
+    Promise.allSettled([
+      volunteerOfferService.getAllOffers(),
+      notificationService.getNotifications ? notificationService.getNotifications() : notificationService.getUnreadCount(),
+      AsyncStorage.getItem(LAST_SEEN_OFFERS_KEY),
+      AsyncStorage.getItem(LAST_SEEN_NOTIFICATIONS_KEY),
+    ])
+      .then(([offersRes, notifRes, lastSeenRes, lastSeenNotifRes]) => {
+        if (currentTab !== 'requests' && offersRes.status === 'fulfilled' && offersRes.value?.success) {
+          const offers = offersRes.value.data || [];
+          const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
+
+          if (!lastSeenTime) {
+            setRequestCount(offers.length);
+          } else {
+            const lastSeenDate = new Date(lastSeenTime);
+            const unseenOffers = offers.filter((o) => {
+              if (!o.createdAt) return false;
+              return new Date(o.createdAt) > lastSeenDate;
+            });
+            setRequestCount(unseenOffers.length);
+          }
+        }
+
+        if (notifRes.status === 'fulfilled') {
+          const notifs = notifRes.value?.data || [];
+          const lastSeenNotifTime = lastSeenNotifRes.status === 'fulfilled' ? lastSeenNotifRes.value : null;
+          let count = 0;
+
+          if (Array.isArray(notifs) && notifs.length > 0) {
+            if (!lastSeenNotifTime) {
+              count = notifs.filter((n) => !n.isRead).length;
+            } else {
+              const lastSeenDate = new Date(lastSeenNotifTime);
+              count = notifs.filter((n) => !n.isRead && n.createdAt && new Date(n.createdAt) > lastSeenDate).length;
+            }
+          } else {
+            count = notifRes.value?.unreadCount ?? notifRes.value?.count ?? 0;
+          }
+
+          setUnreadNotificationCount(count);
+          setHasUnreadNotifications(count > 0);
+        } else {
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }
+      })
+      .catch(() => {});
+  }, [currentTab, notificationsVisible, activeChatUser]);
 
   // Handle mobile hardware/system Back button navigation
   useEffect(() => {
@@ -83,6 +158,14 @@ export default function ElderlyHomeScreen() {
     );
   }
 
+  const handleOpenNotifications = () => {
+    const now = new Date().toISOString();
+    AsyncStorage.setItem(LAST_SEEN_NOTIFICATIONS_KEY, now).catch(() => {});
+    setUnreadNotificationCount(0);
+    setHasUnreadNotifications(false);
+    setNotificationsVisible(true);
+  };
+
   const renderActiveScreen = () => {
     switch (currentTab) {
       case 'requests':
@@ -91,6 +174,11 @@ export default function ElderlyHomeScreen() {
             onNavigateToSchedule={() => setCurrentTab('schedule')}
             onRequestNew={() => setShowCreateScreen(true)}
             onBack={() => setCurrentTab('home')}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
       case 'schedule':
@@ -98,6 +186,15 @@ export default function ElderlyHomeScreen() {
           <MyScheduleScreen
             onBack={() => setCurrentTab('home')}
             onRequestNew={() => setShowCreateScreen(true)}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
+            onStartChat={(volunteerUser) => {
+              setActiveChatUser(volunteerUser);
+              setCurrentTab('messages');
+            }}
           />
         );
       case 'messages':
@@ -113,6 +210,12 @@ export default function ElderlyHomeScreen() {
           <MessagesListScreen
             onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
             onBack={() => setCurrentTab('home')}
+            showAppHeader={true}
+            onNavigateTab={setCurrentTab}
+            onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
       case 'profile':
@@ -129,6 +232,9 @@ export default function ElderlyHomeScreen() {
             onNavigateTab={setCurrentTab}
             onRequestHelp={() => setShowCreateScreen(true)}
             onOpenProfile={() => setCurrentTab('profile')}
+            onOpenNotifications={handleOpenNotifications}
+            hasUnreadNotifications={hasUnreadNotifications}
+            unreadNotificationCount={unreadNotificationCount}
           />
         );
     }
@@ -144,7 +250,23 @@ export default function ElderlyHomeScreen() {
         role="elderly"
         activeTab={currentTab}
         onTabPress={setCurrentTab}
+        requestBadgeCount={requestCount}
         msgBadgeCount={msgBadgeCount}
+      />
+
+      <NotificationsModal
+        visible={notificationsVisible}
+        onClose={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }}
+        onNotificationAction={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+          setCurrentTab('requests');
+        }}
       />
     </View>
   );

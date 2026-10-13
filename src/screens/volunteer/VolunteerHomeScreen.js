@@ -14,12 +14,17 @@ import CaregiverChatScreen from '../caregiver/CaregiverChatScreen';
 import * as volunteerService from '../../services/volunteerService';
 import * as notificationService from '../../services/notificationService';
 import * as messageService from '../../services/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUnreadMessageCount } from '../../hooks/useUnreadMessageCount';
+
+const LAST_SEEN_VOLUNTEER_REQUESTS_KEY = '@last_seen_volunteer_requests_time';
+const LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY = '@last_seen_volunteer_notifications_time';
 
 export default function VolunteerHomeScreen() {
   const [currentTab, setCurrentTab] = useState('home'); // 'home' | 'request' | 'schedule' | 'messages' | 'history' | 'profile'
   const [requestCount, setRequestCount] = useState(0);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
   const [activeChatUser, setActiveChatUser] = useState(null);
 
@@ -33,26 +38,80 @@ export default function VolunteerHomeScreen() {
     }
   }, [activeChatUser, currentTab]);
 
+  // Immediately clear badge count to 0 whenever volunteer visits the request page
+  useEffect(() => {
+    if (currentTab === 'request') {
+      const now = new Date().toISOString();
+      AsyncStorage.setItem(LAST_SEEN_VOLUNTEER_REQUESTS_KEY, now).catch(() => {});
+      setRequestCount(0);
+    }
+  }, [currentTab]);
+
+  const handleOpenNotifications = () => {
+    const now = new Date().toISOString();
+    AsyncStorage.setItem(LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY, now).catch(() => {});
+    setUnreadNotificationCount(0);
+    setHasUnreadNotifications(false);
+    setNotificationsVisible(true);
+  };
+
   // Dynamically update available & direct request badge count + notification & message status
   useEffect(() => {
-    Promise.allSettled([
-      volunteerService.getAvailableRequests(),
-      volunteerService.getDirectRequests(),
-      notificationService.getUnreadCount ? notificationService.getUnreadCount() : Promise.resolve({ count: 0 }),
-    ])
-      .then(([availRes, directRes, notifRes]) => {
-        let totalReqs = 0;
-        if (availRes.status === 'fulfilled' && availRes.value?.success) {
-          totalReqs += (availRes.value.count || availRes.value.data?.length || 0);
-        }
-        if (directRes.status === 'fulfilled' && directRes.value?.success) {
-          totalReqs += (directRes.value.count || directRes.value.data?.length || 0);
-        }
-        setRequestCount(totalReqs);
+    const isRequestTab = currentTab === 'request';
+    if (isRequestTab) {
+      setRequestCount(0);
+    }
 
-        if (notifRes.status === 'fulfilled' && notifRes.value?.count > 0) {
-          setHasUnreadNotifications(true);
+    Promise.allSettled([
+      isRequestTab ? Promise.resolve({ success: true, data: [] }) : volunteerService.getAvailableRequests(),
+      isRequestTab ? Promise.resolve({ success: true, data: [] }) : volunteerService.getDirectRequests(),
+      notificationService.getNotifications ? notificationService.getNotifications() : notificationService.getUnreadCount(),
+      AsyncStorage.getItem(LAST_SEEN_VOLUNTEER_REQUESTS_KEY),
+      AsyncStorage.getItem(LAST_SEEN_VOLUNTEER_NOTIFICATIONS_KEY),
+    ])
+      .then(([availRes, directRes, notifRes, lastSeenRes, lastSeenNotifRes]) => {
+        if (!isRequestTab) {
+          let allReqs = [];
+          if (availRes.status === 'fulfilled' && availRes.value?.success) {
+            allReqs = allReqs.concat(availRes.value.data || []);
+          }
+          if (directRes.status === 'fulfilled' && directRes.value?.success) {
+            allReqs = allReqs.concat(directRes.value.data || []);
+          }
+
+          const lastSeenTime = lastSeenRes.status === 'fulfilled' ? lastSeenRes.value : null;
+          if (!lastSeenTime) {
+            setRequestCount(allReqs.length);
+          } else {
+            const lastSeenDate = new Date(lastSeenTime);
+            const unseenReqs = allReqs.filter((r) => {
+              if (!r.createdAt) return false;
+              return new Date(r.createdAt) > lastSeenDate;
+            });
+            setRequestCount(unseenReqs.length);
+          }
+        }
+
+        if (notifRes.status === 'fulfilled') {
+          const notifs = notifRes.value?.data || [];
+          const lastSeenNotifTime = lastSeenNotifRes.status === 'fulfilled' ? lastSeenNotifRes.value : null;
+          let count = 0;
+
+          if (Array.isArray(notifs) && notifs.length > 0) {
+            if (!lastSeenNotifTime) {
+              count = notifs.filter((n) => !n.isRead).length;
+            } else {
+              const lastSeenDate = new Date(lastSeenNotifTime);
+              count = notifs.filter((n) => !n.isRead && n.createdAt && new Date(n.createdAt) > lastSeenDate).length;
+            }
+          } else {
+            count = notifRes.value?.unreadCount ?? notifRes.value?.count ?? 0;
+          }
+
+          setUnreadNotificationCount(count);
+          setHasUnreadNotifications(count > 0);
         } else {
+          setUnreadNotificationCount(0);
           setHasUnreadNotifications(false);
         }
       })
@@ -77,36 +136,6 @@ export default function VolunteerHomeScreen() {
     return () => subscription.remove();
   }, [activeChatUser, currentTab]);
 
-  const renderActiveScreen = () => {
-    switch (currentTab) {
-      case 'request':
-        return <VolunteerRequestsScreen onNavigateTab={setCurrentTab} />;
-      case 'schedule':
-        return <VolunteerScheduleScreen onNavigateTab={setCurrentTab} />;
-      case 'messages':
-        if (activeChatUser) {
-          return (
-            <CaregiverChatScreen
-              otherUser={activeChatUser}
-              onBack={() => setActiveChatUser(null)}
-            />
-          );
-        }
-        return (
-          <MessagesListScreen
-            onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
-            onBack={() => setCurrentTab('home')}
-          />
-        );
-      case 'history':
-        return <VolunteerHistoryScreen onBack={() => setCurrentTab('home')} />;
-      case 'profile':
-        return <VolunteerProfileScreen />;
-      case 'home':
-      default:
-        return <VolunteerDashboardHome onNavigateTab={setCurrentTab} />;
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -114,12 +143,73 @@ export default function VolunteerHomeScreen() {
         <AppHeader
           onProfilePress={() => setCurrentTab('profile')}
           onNavigateTab={setCurrentTab}
-          onNotificationPress={() => setNotificationsVisible(true)}
+          onNotificationPress={handleOpenNotifications}
           hasUnreadNotifications={hasUnreadNotifications}
+          unreadNotificationsCount={unreadNotificationCount}
         />
       )}
       <View style={styles.screenArea}>
-        {renderActiveScreen()}
+        <View style={[styles.tabContent, currentTab !== 'home' && styles.hiddenTab]}>
+          <VolunteerDashboardHome
+            isActive={currentTab === 'home'}
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'request' && styles.hiddenTab]}>
+          <VolunteerRequestsScreen
+            isActive={currentTab === 'request'}
+            onNavigateTab={setCurrentTab}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'schedule' && styles.hiddenTab]}>
+          <VolunteerScheduleScreen
+            isActive={currentTab === 'schedule'}
+            onNavigateTab={setCurrentTab}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        <View style={[styles.tabContent, currentTab !== 'history' && styles.hiddenTab]}>
+          <VolunteerHistoryScreen
+            isActive={currentTab === 'history'}
+            onBack={() => setCurrentTab('home')}
+            onStartChat={(elderUser) => {
+              setActiveChatUser(elderUser);
+              setCurrentTab('messages');
+            }}
+          />
+        </View>
+
+        {currentTab === 'messages' && (
+          <View style={styles.tabContent}>
+            {activeChatUser ? (
+              <CaregiverChatScreen
+                otherUser={activeChatUser}
+                onBack={() => setActiveChatUser(null)}
+              />
+            ) : (
+              <MessagesListScreen
+                onSelectConversation={(otherUser) => setActiveChatUser(otherUser)}
+                onBack={() => setCurrentTab('home')}
+              />
+            )}
+          </View>
+        )}
+
+        {currentTab === 'profile' && (
+          <View style={styles.tabContent}>
+            <VolunteerProfileScreen />
+          </View>
+        )}
       </View>
       <AppBottomNav
         role="volunteer"
@@ -130,9 +220,15 @@ export default function VolunteerHomeScreen() {
       />
       <NotificationsModal
         visible={notificationsVisible}
-        onClose={() => setNotificationsVisible(false)}
+        onClose={() => {
+          setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
+        }}
         onNotificationAction={() => {
           setNotificationsVisible(false);
+          setUnreadNotificationCount(0);
+          setHasUnreadNotifications(false);
           setCurrentTab('request');
         }}
       />
@@ -148,5 +244,11 @@ const styles = StyleSheet.create({
   screenArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  hiddenTab: {
+    display: 'none',
   },
 });

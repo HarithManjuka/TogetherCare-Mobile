@@ -2,8 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Alert, Platform } from 'react-native';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 import * as activityService from '../services/activityService';
 import * as companionshipService from '../services/companionshipService';
+import { getLocalDateString } from '../utils/scheduleTimeHelper';
 
 const FALLBACK_ACTIVITIES = [
   { name: 'Grocery', icon: 'cart-outline', iconFamily: 'MaterialCommunityIcons' },
@@ -16,7 +18,20 @@ const FALLBACK_ACTIVITIES = [
   { name: 'Reading', icon: 'book-open-page-variant-outline', iconFamily: 'MaterialCommunityIcons' },
 ];
 
+const formatProfileAddress = (addr) => {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  const parts = [
+    addr.streetAddress,
+    addr.city,
+    addr.district,
+    addr.province,
+  ].filter(Boolean);
+  return parts.join(', ');
+};
+
 export function useCreateCompanionship({ onClose, onSuccess, editingRequest = null }) {
+  const { user } = useAuth();
   const [activities, setActivities] = useState(FALLBACK_ACTIVITIES);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState(
@@ -27,14 +42,12 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
   const [dateOption, setDateOption] = useState(editingRequest ? 'custom' : 'today');
   const [selectedDate, setSelectedDate] = useState(() => {
     if (editingRequest?.scheduledDate) {
-      try {
-        return new Date(editingRequest.scheduledDate).toISOString().split('T')[0];
-      } catch (e) {
-        return new Date().toISOString().split('T')[0];
+      if (typeof editingRequest.scheduledDate === 'string' && /^\d{4}-\d{2}-\d{2}/.test(editingRequest.scheduledDate)) {
+        return editingRequest.scheduledDate.split('T')[0];
       }
+      return getLocalDateString(editingRequest.scheduledDate);
     }
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return getLocalDateString(new Date());
   });
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
@@ -47,6 +60,16 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
   const [communicationMethod, setCommunicationMethod] = useState(
     editingRequest?.communicationMethod || 'chat'
   );
+
+  // Location / Address: Default from profile, editable without changing profile
+  const [location, setLocation] = useState(
+    editingRequest?.location !== undefined
+      ? editingRequest.location
+      : formatProfileAddress(user?.address)
+  );
+
+  // Optional Note
+  const [notes, setNotes] = useState(editingRequest?.notes || '');
 
   const [submitting, setSubmitting] = useState(false);
 
@@ -91,10 +114,10 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
     setDateOption(option);
     const d = new Date();
     if (option === 'today') {
-      setSelectedDate(d.toISOString().split('T')[0]);
+      setSelectedDate(getLocalDateString(d));
     } else if (option === 'tomorrow') {
       d.setDate(d.getDate() + 1);
-      setSelectedDate(d.toISOString().split('T')[0]);
+      setSelectedDate(getLocalDateString(d));
     } else if (option === 'custom') {
       setIsCalendarOpen(true);
     }
@@ -142,7 +165,7 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
   // Submit Companionship Request
   const handleSubmit = async () => {
     const activeActivity = selectedActivity || 'Grocery';
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
     const activeDate = selectedDate || todayStr;
 
     // Disallow past dates
@@ -177,7 +200,8 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
         endTime: activeToTime.replace(/\s+/g, ' '),
         timeSlot: `${activeFromTime} - ${activeToTime}`,
         communicationMethod: communicationMethod || 'chat',
-        notes: `Companionship for ${activeActivity}, communicate via ${communicationMethod || 'chat'}`,
+        location: (location || '').trim(),
+        notes: (notes || '').trim(),
       };
 
       console.log('Submitting companionship payload:', payload);
@@ -201,22 +225,17 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
         );
       } else {
         notifyUser(
-          'Request Failed',
-          res?.message || 'Unable to process companionship request.',
-          () => {
-            if (onClose) onClose();
-          }
+          'Scheduling Conflict',
+          res?.message || 'Unable to process companionship request.'
         );
       }
     } catch (err) {
       console.error('Error submitting companionship request:', err);
-      notifyUser(
-        'Request Failed',
-        err.message || 'Failed to submit companionship request.',
-        () => {
-          if (onClose) onClose();
-        }
-      );
+      const errMsg =
+        err.response?.data?.message ||
+        err.message ||
+        'Failed to submit companionship request.';
+      notifyUser('Scheduling Conflict', errMsg);
     } finally {
       setSubmitting(false);
     }
@@ -239,6 +258,10 @@ export function useCreateCompanionship({ onClose, onSuccess, editingRequest = nu
     setToTime,
     communicationMethod,
     setCommunicationMethod,
+    location,
+    setLocation,
+    notes,
+    setNotes,
     submitting,
     handleSelectDateOption,
     handleCustomDateConfirm,

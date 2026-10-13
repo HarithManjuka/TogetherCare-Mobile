@@ -3,6 +3,7 @@ import React, { useMemo } from 'react';
 import {
   View,
   Text,
+  TextInput,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
@@ -16,6 +17,7 @@ import { useTheme } from '../../context/ThemeContext';
 import FutureDatePickerModal from '../../components/common/FutureDatePickerModal';
 import TimePickerModal from '../../components/common/TimePickerModal';
 import { getCreateCompanionshipScreenStyles } from '../../styles/CreateCompanionshipScreen.styles';
+import { getLocalDateString } from '../../utils/scheduleTimeHelper';
 
 export default function CreateCompanionshipScreen({
   onBack,
@@ -43,6 +45,10 @@ export default function CreateCompanionshipScreen({
     setToTime,
     communicationMethod,
     setCommunicationMethod,
+    location,
+    setLocation,
+    notes,
+    setNotes,
     submitting,
     handleSelectDateOption,
     handleCustomDateConfirm,
@@ -76,7 +82,7 @@ export default function CreateCompanionshipScreen({
 
   // Check if a time slot option has already passed for today
   const isTimeSlotInPast = (timeStr) => {
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
     if (selectedDate !== todayStr) return false;
 
     const match = timeStr.replace(/\s+/g, '').match(/(\d{1,2}):(\d{2})(AM|PM)/i);
@@ -121,7 +127,7 @@ export default function CreateCompanionshipScreen({
         </TouchableOpacity>
 
         <View style={styles.topTitleWrap}>
-          <Text style={styles.topBarTitle}>{isEditing ? 'Edit Request' : 'STEP 1: Choose Activity'}</Text>
+          <Text style={styles.topBarTitle}>{isEditing ? 'Edit Request' : 'Request Companionship'}</Text>
         </View>
 
         <TouchableOpacity
@@ -140,6 +146,7 @@ export default function CreateCompanionshipScreen({
       >
         {/* STEP 1: Choose Activity */}
         <View style={styles.stepSection}>
+          <Text style={styles.stepTitle}>STEP 1: Choose Activity</Text>
           {loadingActivities ? (
             <View style={{ paddingVertical: 20, alignItems: 'center' }}>
               <ActivityIndicator size="small" color={COLORS.secondary} />
@@ -178,6 +185,9 @@ export default function CreateCompanionshipScreen({
             </View>
           )}
         </View>
+
+        {/* Divider Line */}
+        <View style={styles.dividerLine} />
 
         {/* STEP 2: Select Date & Time */}
         <View style={styles.stepSection}>
@@ -352,7 +362,7 @@ export default function CreateCompanionshipScreen({
 
         {/* STEP 3: Select Communication Method */}
         <View style={styles.stepSection}>
-          <Text style={styles.stepTitle}>STEP 3: Select Communication Method</Text>
+          <Text style={styles.stepTitle}>STEP 3: Communication Method</Text>
 
           <View style={styles.commMethodsRow}>
             {/* 1. Phone Call */}
@@ -422,6 +432,59 @@ export default function CreateCompanionshipScreen({
                 color={communicationMethod === 'in_person' ? '#1A365D' : '#64748B'}
               />
             </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Divider Line */}
+        <View style={styles.dividerLine} />
+
+        {/* STEP 4: Visit Location / Address */}
+        <View style={styles.stepSection}>
+          <View style={styles.inputLabelRow}>
+            <Text style={styles.stepTitle}>STEP 4: Visit Location / Address</Text>
+          </View>
+          <Text style={styles.inputHint}>
+            Pre-filled from your profile address. You can modify it for this request without changing your profile.
+          </Text>
+
+          <View style={styles.textInputContainer}>
+            <Ionicons name="location-outline" size={20} color={COLORS.primary} style={styles.inputIcon} />
+            <TextInput
+              style={styles.textInput}
+              placeholder="Enter meeting address or location..."
+              placeholderTextColor="#94A3B8"
+              value={location}
+              onChangeText={setLocation}
+              autoCapitalize="sentences"
+            />
+          </View>
+        </View>
+
+        {/* Divider Line */}
+        <View style={styles.dividerLine} />
+
+        {/* STEP 5: Add a Note (Optional) */}
+        <View style={styles.stepSection}>
+          <View style={styles.inputLabelRow}>
+            <Text style={styles.stepTitle}>STEP 5: Add a Note</Text>
+            <Text style={styles.inputOptionalBadge}>Optional</Text>
+          </View>
+          <Text style={styles.inputHint}>
+            Add any special instructions, preferences, or helpful details for the volunteer.
+          </Text>
+
+          <View style={[styles.textInputContainer, { alignItems: 'flex-start' }]}>
+            <Ionicons name="create-outline" size={20} color={COLORS.primary} style={[styles.inputIcon, { marginTop: 10 }]} />
+            <TextInput
+              style={[styles.textInput, styles.multilineTextInput]}
+              placeholder="e.g. Please ring the doorbell, bringing a book to read, or grocery list items..."
+              placeholderTextColor="#94A3B8"
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+              autoCapitalize="sentences"
+            />
           </View>
         </View>
       </ScrollView>

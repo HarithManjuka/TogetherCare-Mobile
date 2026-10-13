@@ -11,7 +11,7 @@ export const ROLE_TABS = {
   admin: [
     { key: 'dashboard', label: 'Dashboard', icon: 'grid', iconOutline: 'grid-outline' },
     { key: 'users', label: 'Users', icon: 'people', iconOutline: 'people-outline' },
-    { key: 'alerts', label: 'Alerts', icon: 'shield-checkmark', iconOutline: 'shield-checkmark-outline' },
+    { key: 'requests', label: 'Request', icon: 'clipboard', iconOutline: 'clipboard-outline' },
     { key: 'settings', label: 'Settings', icon: 'settings', iconOutline: 'settings-outline' },
   ],
   elderly: [
@@ -79,7 +79,10 @@ export default function AppBottomNav({
   const rawTabs = tabs && tabs.length > 0 ? tabs : (role && ROLE_TABS[role]) ? ROLE_TABS[role] : [];
 
   const finalTabs = rawTabs.map((tab) => {
-    if ((tab.key === 'requests' || tab.key === 'request') && requestBadgeCount !== undefined) {
+    if (
+      (tab.key === 'requests' || tab.key === 'request' || tab.key === 'alerts') &&
+      requestBadgeCount !== undefined
+    ) {
       return { ...tab, badge: requestBadgeCount };
     }
     if (
@@ -98,7 +101,10 @@ export default function AppBottomNav({
       <View style={styles.navBar}>
         {finalTabs.map((tab) => {
           const tabKey = tab.key || tab.id;
-          const isActive = activeTab === tabKey;
+          const isActive =
+            activeTab === tabKey ||
+            (tabKey === 'requests' && (activeTab === 'alerts' || activeTab === 'request')) ||
+            (tabKey === 'alerts' && activeTab === 'requests');
           const iconName = isActive
             ? tab.icon || tab.iconActive
             : tab.iconOutline || tab.iconInactive || tab.icon;

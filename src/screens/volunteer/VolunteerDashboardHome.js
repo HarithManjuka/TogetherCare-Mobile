@@ -13,23 +13,31 @@ import {
   Platform,
   RefreshControl,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS } from '../../constants/theme';
 import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
-import NotificationsModal from '../../components/common/NotificationsModal';
+import AvatarActionModal from '../../components/common/AvatarActionModal';
 import * as volunteerService from '../../services/volunteerService';
 import * as messageService from '../../services/messageService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { showAppAlert } from '../../utils/alert';
 
-export default function VolunteerDashboardHome({ onNavigateTab }) {
-  const { user } = useAuth();
+const CACHE_OFFERS_KEY = '@volunteer_cache_offers';
+const CACHE_STATS_KEY = '@volunteer_cache_stats';
+const CACHE_REQUESTS_KEY = '@volunteer_cache_requests';
+
+export default function VolunteerDashboardHome({ isActive = true, onNavigateTab, onStartChat }) {
+  const { user, uploadProfilePicture, deleteProfilePicture, refreshProfile } = useAuth();
 
   // State management
   const [isOnline, setIsOnline] = useState(true);
-  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [editingOffer, setEditingOffer] = useState(null);
@@ -42,13 +50,48 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   const [stats, setStats] = useState({
     hoursThisMonth: 0,
     peopleHelped: 0,
-    averageRating: 5.0,
+    averageRating: 0,
     totalCompletedVisits: 0,
   });
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Restore cached dashboard data immediately on mount to prevent any data reset or blank flashing
+  useEffect(() => {
+    const restoreCache = async () => {
+      try {
+        const [savedOffers, savedStats, savedRequests] = await Promise.all([
+          AsyncStorage.getItem(CACHE_OFFERS_KEY),
+          AsyncStorage.getItem(CACHE_STATS_KEY),
+          AsyncStorage.getItem(CACHE_REQUESTS_KEY),
+        ]);
+        if (savedOffers) {
+          const parsed = JSON.parse(savedOffers);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setMyOffers(parsed);
+            setLoading(false);
+          }
+        }
+        if (savedStats) {
+          const parsed = JSON.parse(savedStats);
+          if (parsed && typeof parsed === 'object') {
+            setStats(parsed);
+          }
+        }
+        if (savedRequests) {
+          const parsed = JSON.parse(savedRequests);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRequestsList(parsed);
+          }
+        }
+      } catch (e) {
+        // Ignore cache restore errors
+      }
+    };
+    restoreCache();
+  }, []);
 
   // Form states for Availability
   const [availHours, setAvailHours] = useState('Weekdays & Weekends (9 AM - 6 PM)');
@@ -67,6 +110,98 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
     ? `${user.address.city}, ${user.address.district || 'Colombo'}`
     : 'Colombo 03';
 
+  // Profile Picture Status & Handlers
+  const hasProfilePic = Boolean(user?.profilePicture || user?.avatar);
+  const initials = `${user?.firstName?.[0] || 'V'}${user?.lastName?.[0] || ''}`.toUpperCase();
+
+  const handlePickFromGallery = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Permission to access gallery is required to change profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar gallery pick/upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera permission is required to take a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setUploadingAvatar(true);
+        const imageAsset = result.assets[0];
+        if (uploadProfilePicture) {
+          await uploadProfilePicture(imageAsset);
+        }
+        if (refreshProfile) {
+          await refreshProfile();
+        }
+        Alert.alert('Success', 'Profile picture updated successfully!');
+      }
+    } catch (err) {
+      console.error('Avatar camera upload error:', err);
+      Alert.alert('Upload Failed', err.message || err.response?.data?.message || 'Could not upload image');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    try {
+      setUploadingAvatar(true);
+      if (deleteProfilePicture) {
+        await deleteProfilePicture();
+      }
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+      Alert.alert('Success', 'Profile picture removed successfully');
+    } catch (err) {
+      console.error('Remove avatar error:', err);
+      Alert.alert('Error', err.message || 'Could not remove profile picture');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   // Fetch real data from backend
   const loadDashboardData = useCallback(async () => {
     try {
@@ -79,13 +214,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
       ]);
 
       if (offersRes.status === 'fulfilled' && offersRes.value?.success) {
-        setMyOffers(offersRes.value.data || []);
+        const freshOffers = offersRes.value.data || [];
+        setMyOffers(freshOffers);
+        AsyncStorage.setItem(CACHE_OFFERS_KEY, JSON.stringify(freshOffers)).catch(() => {});
       }
       if (reqsRes.status === 'fulfilled' && reqsRes.value?.success) {
-        setRequestsList(reqsRes.value.data || []);
+        const freshReqs = reqsRes.value.data || [];
+        setRequestsList(freshReqs);
+        AsyncStorage.setItem(CACHE_REQUESTS_KEY, JSON.stringify(freshReqs)).catch(() => {});
       }
       if (statsRes.status === 'fulfilled' && statsRes.value?.success) {
-        setStats(statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 5.0 });
+        const freshStats = statsRes.value.data || { hoursThisMonth: 0, peopleHelped: 0, averageRating: 0 };
+        setStats(freshStats);
+        AsyncStorage.setItem(CACHE_STATS_KEY, JSON.stringify(freshStats)).catch(() => {});
       }
       if (directRes.status === 'fulfilled' && directRes.value?.success) {
         setDirectRequests(directRes.value.data || []);
@@ -106,8 +247,10 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
   }, []);
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    if (isActive) {
+      loadDashboardData();
+    }
+  }, [isActive, loadDashboardData]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -268,27 +411,39 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {/* Header Section */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            {/* Avatar matching wireframe flame badge */}
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatarInner}>
-                <Text style={styles.avatarEmoji}>🔥</Text>
+            {/* Changeable Profile Picture */}
+            <TouchableOpacity
+              style={styles.avatarTouchable}
+              onPress={() => setAvatarModalVisible(true)}
+              activeOpacity={0.8}
+              disabled={uploadingAvatar}
+              accessibilityLabel="Change profile picture"
+              accessibilityRole="button"
+            >
+              <View style={styles.avatarContainer}>
+                {uploadingAvatar ? (
+                  <ActivityIndicator size="small" color="#1E3A8A" />
+                ) : hasProfilePic ? (
+                  <Image
+                    source={{ uri: user.profilePicture || user.avatar }}
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={styles.avatarInner}>
+                    <Text style={styles.avatarEmoji}>🔥</Text>
+                  </View>
+                )}
+                <View style={styles.cameraBadge}>
+                  <Ionicons name={hasProfilePic ? 'pencil' : 'camera'} size={10} color="#FFFFFF" />
+                </View>
               </View>
-            </View>
+            </TouchableOpacity>
 
             <View style={styles.greetingContainer}>
               <View style={styles.greetingRow}>
                 <Text style={styles.greetingText}>
                   {getGreeting()}, {volunteerName} 👋
                 </Text>
-                <TouchableOpacity
-                  onPress={() => setNotificationsVisible(true)}
-                  style={styles.bellButton}
-                  activeOpacity={0.7}
-                  accessibilityLabel="Notifications"
-                >
-                  <Text style={styles.bellEmoji}>🔔</Text>
-                  <View style={styles.notifDot} />
-                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -320,27 +475,39 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         {/* 3 Metric Cards Row (Matches Wireframe with Live Backend Data) */}
         <View style={styles.metricsRow}>
           {/* Card 1: Hours this month (Lavender) */}
-          <View style={[styles.metricCard, styles.metricCardPrimary]}>
+          <TouchableOpacity
+            style={[styles.metricCard, styles.metricCardPrimary]}
+            activeOpacity={0.8}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <Text style={[styles.metricValue, styles.metricValuePrimary]}>
               {stats.hoursThisMonth} hrs
             </Text>
-            <Text style={[styles.metricLabel, styles.metricLabelPrimary]}>this month</Text>
-          </View>
+            <Text style={[styles.metricLabel, styles.metricLabelPrimary]}>this month ➔</Text>
+          </TouchableOpacity>
 
           {/* Card 2: people helped */}
-          <View style={styles.metricCard}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.8}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <Text style={styles.metricValue}>{stats.peopleHelped}</Text>
-            <Text style={styles.metricLabel}>people</Text>
-          </View>
+            <Text style={styles.metricLabel}>people ➔</Text>
+          </TouchableOpacity>
 
           {/* Card 3: your rating */}
-          <View style={styles.metricCard}>
+          <TouchableOpacity
+            style={styles.metricCard}
+            activeOpacity={0.75}
+            onPress={() => onNavigateTab && onNavigateTab('history')}
+          >
             <View style={styles.ratingValueRow}>
-              <Text style={styles.metricValue}>{stats.averageRating}</Text>
+              <Text style={styles.metricValue}>{stats.averageRating > 0 ? stats.averageRating : 'New'}</Text>
               <Text style={styles.starIcon}>★</Text>
             </View>
             <Text style={styles.metricLabel}>your rating</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Messages & Coordination Quick Access Card */}
@@ -692,6 +859,19 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
               <Text style={styles.quickActionLabel}>Availability</Text>
               <Text style={styles.quickActionSub}>Set Hours</Text>
             </TouchableOpacity>
+
+            {/* Quick Action 3: Volunteer History */}
+            <TouchableOpacity
+              style={styles.quickActionCard}
+              onPress={() => onNavigateTab && onNavigateTab('history')}
+              activeOpacity={0.8}
+            >
+              <View style={styles.quickActionIconBox}>
+                <Text style={styles.quickActionEmoji}>📜</Text>
+              </View>
+              <Text style={styles.quickActionLabel}>History</Text>
+              <Text style={styles.quickActionSub}>Past Visits</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -837,14 +1017,14 @@ export default function VolunteerDashboardHome({ onNavigateTab }) {
         </View>
       </Modal>
 
-      {/* --- REAL NOTIFICATIONS MODAL --- */}
-      <NotificationsModal
-        visible={notificationsVisible}
-        onClose={() => setNotificationsVisible(false)}
-        onNotificationAction={() => {
-          setNotificationsVisible(false);
-          loadDashboardData();
-        }}
+      {/* --- AVATAR ACTION MODAL (CAMERA / GALLERY / REMOVE) --- */}
+      <AvatarActionModal
+        visible={avatarModalVisible}
+        onClose={() => setAvatarModalVisible(false)}
+        onTakePhoto={handleTakePhoto}
+        onPickPhoto={handlePickFromGallery}
+        onRemovePhoto={handleRemoveAvatar}
+        hasExistingPhoto={hasProfilePic}
       />
     </View>
   );
@@ -867,6 +1047,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarTouchable: {
+    marginRight: 14,
+  },
   avatarContainer: {
     width: 48,
     height: 48,
@@ -874,7 +1057,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEE2E2',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 14,
+    position: 'relative',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
   },
   avatarInner: {
     width: 40,
@@ -887,35 +1075,36 @@ const styles = StyleSheet.create({
   avatarEmoji: {
     fontSize: 22,
   },
+  cameraBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    backgroundColor: '#1E3A8A',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+    elevation: 2,
+  },
   greetingContainer: {
     flex: 1,
   },
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   greetingText: {
     fontSize: 19,
     fontWeight: '800',
     color: '#0F172A',
     flex: 1,
-  },
-  bellButton: {
-    padding: 6,
-    position: 'relative',
-  },
-  bellEmoji: {
-    fontSize: 20,
-  },
-  notifDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#EF4444',
   },
   locationRow: {
     flexDirection: 'row',

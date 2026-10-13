@@ -105,6 +105,22 @@ export default function AddDependentScreen({ onBack, onSuccess }) {
       return;
     }
 
+    const trimmedPhone = phone.trim();
+    const sriLankaPhoneRegex = /^(?:0|94|\+94)?(7[0-9]{8})$/;
+    if (!sriLankaPhoneRegex.test(trimmedPhone)) {
+      showCustomAlert(
+        'Invalid Phone Number',
+        'Please enter a valid Sri Lankan mobile number (e.g., 07XXXXXXXX or +947XXXXXXXX).'
+      );
+      return;
+    }
+
+    const dobDate = new Date(dateOfBirth);
+    if (isNaN(dobDate.getTime()) || dobDate >= new Date()) {
+      showCustomAlert('Invalid Date of Birth', 'Please select a valid past date of birth.');
+      return;
+    }
+
     setLoading(false);
     try {
       setLoading(true);

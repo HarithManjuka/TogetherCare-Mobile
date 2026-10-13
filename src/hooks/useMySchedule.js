@@ -4,12 +4,21 @@ import { Alert, Platform } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { FontAwesome5, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 import * as companionshipService from '../services/companionshipService';
+import {
+  getVisitTimeWindow,
+  getVisitLiveStatus,
+  validateStartVisit,
+} from '../utils/scheduleTimeHelper';
 
 export const SCHEDULE_QUERY_KEY = ['mySchedule'];
 
 export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const currentUserId = user?._id || user?.id;
+
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   const [editingRequest, setEditingRequest] = useState(null);
@@ -45,43 +54,49 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     },
   });
 
-  // Helper to categorize schedules
+  // Mutation to update status (accepted -> ongoing -> completed)
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => companionshipService.updateStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
+    },
+  });
+
+  // Helper to categorize schedules according to PickMe/Uber live status
   const categorized = useMemo(() => {
     const requested = [];
     const upcoming = [];
     const ongoing = [];
     const completed = [];
 
-    const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
-
     const schedulesList = Array.isArray(schedule) ? schedule : [];
 
     schedulesList.forEach((item) => {
-      const status = (item.status || 'pending').toLowerCase();
-      const schedDate = item.scheduledDate
-        ? new Date(item.scheduledDate).toISOString().split('T')[0]
-        : '';
+      if (!item) return;
 
-      if (status === 'pending') {
+      // Filter: only show requests belonging to the logged-in elder
+      const itemElderId = item.elderly?._id || item.elderly || item.elderlyId?._id || item.elderlyId;
+      if (currentUserId && itemElderId && itemElderId.toString() !== currentUserId.toString()) {
+        return;
+      }
+
+      const rawStatus = (item.status || '').toLowerCase();
+      const liveStatus = getVisitLiveStatus(item);
+
+      // In Requested tab: strictly active pending/searching requests submitted by this elder
+      if (liveStatus === 'pending' && rawStatus !== 'expired' && rawStatus !== 'cancelled') {
         requested.push(item);
-      } else if (status === 'completed' || status === 'cancelled') {
+      } else if (liveStatus === 'completed' || liveStatus === 'cancelled' || liveStatus === 'expired' || rawStatus === 'expired') {
         completed.push(item);
-      } else if (status === 'ongoing' || status === 'in_progress') {
+      } else if (liveStatus === 'ongoing' || liveStatus === 'in_progress' || liveStatus === 'arrived') {
         ongoing.push(item);
-      } else if (status === 'accepted' || status === 'scheduled') {
-        if (schedDate === todayStr) {
-          upcoming.push(item);
-        } else {
-          upcoming.push(item);
-        }
-      } else {
-        requested.push(item);
+      } else if (liveStatus === 'upcoming' || liveStatus === 'accepted' || liveStatus === 'scheduled' || liveStatus === 'confirmed') {
+        upcoming.push(item);
       }
     });
 
     return { requested, upcoming, ongoing, completed };
-  }, [schedule]);
+  }, [schedule, currentUserId]);
 
   // Current list based on active tab
   const currentList = useMemo(() => {
@@ -232,6 +247,108 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     }
   };
 
+  // Start / Move to Ongoing Handler
+  const handleStartVisit = (scheduleItem) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
+    const validation = validateStartVisit(scheduleItem);
+
+    if (!validation.allowed) {
+      return;
+    }
+
+    const performStart = async () => {
+      try {
+        await updateStatusMutation.mutateAsync({ id: requestId, status: 'ongoing' });
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+          window.alert('Visit Started 🚀\n\nThis visit is now ongoing.');
+        } else {
+          Alert.alert('Visit Started 🚀', 'This visit is now ongoing.');
+        }
+        setSelectedSchedule(null);
+        setActiveTab('ongoing');
+      } catch (err) {
+        Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to update visit status.');
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Start this companionship visit now?')) {
+        performStart();
+      }
+    } else {
+      Alert.alert(
+        'Start Visit',
+        'Are you ready to start this companionship visit with the volunteer?',
+        [
+          { text: 'Not Yet', style: 'cancel' },
+          { text: 'Yes, Start Visit', onPress: performStart },
+        ]
+      );
+    }
+  };
+
+  // Complete Visit Handler
+  const handleCompleteVisit = (scheduleItem, onCompleted) => {
+    const requestId = typeof scheduleItem === 'string' ? scheduleItem : scheduleItem?._id;
+    const performComplete = async () => {
+      try {
+        await updateStatusMutation.mutateAsync({ id: requestId, status: 'completed' });
+        setSelectedSchedule(null);
+        setActiveTab('completed');
+        if (onCompleted) {
+          onCompleted(scheduleItem);
+        } else {
+          if (Platform.OS === 'web' && typeof window !== 'undefined' && window.alert) {
+            window.alert('Visit Completed! 🎉\n\nThank you for confirming your completed companionship visit.');
+          } else {
+            Alert.alert('Visit Completed! 🎉', 'Thank you for confirming your completed companionship visit.');
+          }
+        }
+      } catch (err) {
+        Alert.alert('Error', err.message || 'Failed to complete visit.');
+      }
+    };
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.confirm) {
+      if (window.confirm('Mark this companionship visit as completed?')) {
+        performComplete();
+      }
+    } else {
+      Alert.alert(
+        'Complete Visit',
+        'Are you sure you want to mark this companionship visit as completed?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Yes, Mark Completed', onPress: performComplete },
+        ]
+      );
+    }
+  };
+
+  const updateLocalScheduleRating = (updatedItem) => {
+    if (!updatedItem) return;
+    const itemId = updatedItem._id || updatedItem.id;
+    queryClient.setQueryData(SCHEDULE_QUERY_KEY, (old) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((item) => {
+        const id = item._id || item.id;
+        if (id && id.toString() === itemId.toString()) {
+          return { ...item, ...updatedItem };
+        }
+        return item;
+      });
+    });
+    setSelectedSchedule((prev) => {
+      if (!prev) return null;
+      const prevId = prev._id || prev.id;
+      if (prevId && prevId.toString() === itemId.toString()) {
+        return { ...prev, ...updatedItem };
+      }
+      return prev;
+    });
+    queryClient.invalidateQueries({ queryKey: SCHEDULE_QUERY_KEY });
+  };
+
   return {
     schedule,
     schedules: schedule,
@@ -244,6 +361,8 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     onRefresh: refetch,
     cancelRequest: cancelMutation.mutateAsync,
     isCancelling: cancelMutation.isPending,
+    updateVisitStatus: updateStatusMutation.mutateAsync,
+    isUpdatingStatus: updateStatusMutation.isPending,
     activeTab,
     setActiveTab,
     currentList,
@@ -255,8 +374,11 @@ export const useMySchedule = ({ initialTab = 'upcoming' } = {}) => {
     formatScheduleDate,
     renderActivityIcon,
     renderCommIcon,
+    handleStartVisit,
+    handleCompleteVisit,
     handleCancelRequest,
     handleDeleteRequest,
+    updateLocalScheduleRating,
     counts: {
       requested: categorized.requested.length,
       upcoming: categorized.upcoming.length,

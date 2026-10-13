@@ -19,6 +19,7 @@ import { COLORS } from '../../constants/theme';
 import * as adminUserService from '../../services/adminUserService';
 import CalendarDatePickerModal from '../../components/common/CalendarDatePickerModal';
 import ProvinceDistrictSelectorModal from '../../components/common/ProvinceDistrictSelectorModal';
+import AdminEvidenceReviewModal from '../../components/admin/AdminEvidenceReviewModal';
 
 const GENDER_OPTIONS = [
   { value: 'male', label: 'Male' },
@@ -50,6 +51,7 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
   const [banDuration, setBanDuration] = useState('1_day'); // '1_day' | '7_days' | '1_month'
   const [banReason, setBanReason] = useState('');
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
 
   const loadUser = async () => {
     try {
@@ -336,6 +338,24 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
 
   const profilePicUri = user.profilePicture || user.avatar;
 
+  // Determine effective ID verification status (protects against conflating email verification with ID verification)
+  const getEffectiveIdBadgeStatus = () => {
+    if (user?.role === 'volunteer') {
+      const vvStatus = (user?.volunteerVerification?.status || '').toUpperCase();
+      if (user?.isVolunteerVerified === true || vvStatus === 'APPROVED') {
+        return 'verified';
+      }
+      if (vvStatus === 'PENDING') {
+        return 'pending';
+      }
+      if (vvStatus === 'REJECTED') {
+        return 'rejected';
+      }
+      return 'unverified';
+    }
+    return user?.verificationBadgeStatus || 'unverified';
+  };
+
   return (
     <View style={styles.container}>
       <KeyboardAvoidingView
@@ -442,7 +462,7 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
           </View>
           <View style={styles.badgeInfoRow}>
             <Text style={styles.infoLabel}>ID Verification Badge:</Text>
-            {renderStatusBadge('idBadge', user.verificationBadgeStatus)}
+            {renderStatusBadge('idBadge', getEffectiveIdBadgeStatus())}
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Registered On:</Text>
@@ -618,11 +638,11 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
             <Text style={styles.sectionHeader}>Volunteer Credentials & Verification</Text>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>ID Type:</Text>
-              <Text style={styles.infoValue}>{user.volunteerIdType || 'N/A'}</Text>
+              <Text style={styles.infoValue}>{user.volunteerVerification?.credentialType || user.volunteerIdType || 'N/A'}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>ID Number:</Text>
-              <Text style={styles.infoValue}>{user.volunteerIdNumber || 'N/A'}</Text>
+              <Text style={styles.infoValue}>{user.volunteerVerification?.credentialNumber || user.volunteerIdNumber || 'N/A'}</Text>
             </View>
             {user.educationalInstitution ? (
               <View style={styles.infoRow}>
@@ -632,30 +652,18 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
             ) : null}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Current Badge:</Text>
-              <Text style={styles.infoValue}>{(user.verificationBadgeStatus || 'unverified').toUpperCase()}</Text>
+              <Text style={styles.infoValue}>{getEffectiveIdBadgeStatus().toUpperCase()}</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-              {user.verificationBadgeStatus !== 'verified' ? (
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#16A34A', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
-                  onPress={() => handleUpdateVerificationStatus('verified')}
-                  disabled={isActionLoading}
-                >
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Approve Badge</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity
-                  style={{ flex: 1, backgroundColor: '#DC2626', paddingVertical: 10, borderRadius: 8, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
-                  onPress={() => handleUpdateVerificationStatus('rejected')}
-                  disabled={isActionLoading}
-                >
-                  <Ionicons name="close-circle" size={16} color="#FFFFFF" style={{ marginRight: 6 }} />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Revoke Badge</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            {user?.volunteerVerification?.evidenceFiles?.length > 0 && (
+              <TouchableOpacity
+                style={styles.reviewEvidenceBtn}
+                onPress={() => setReviewModalVisible(true)}
+              >
+                <Ionicons name="document-attach-outline" size={18} color="#FFFFFF" style={{ marginRight: 6 }} />
+                <Text style={styles.reviewEvidenceText}>Review Evidence</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -895,12 +903,36 @@ export default function AdminUserDetailsScreen({ userId, onBack, onUserUpdated }
           </View>
         </View>
       </Modal>
+
+      <AdminEvidenceReviewModal
+        visible={reviewModalVisible}
+        onClose={() => setReviewModalVisible(false)}
+        volunteerUser={user}
+        onReviewCompleted={(updatedUser) => {
+          if (updatedUser) setUser(updatedUser);
+          if (onUserUpdated) onUserUpdated(updatedUser);
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC' },
+  reviewEvidenceBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0284C7',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 14,
+  },
+  reviewEvidenceText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
   centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   headerRow: {
     height: 56,

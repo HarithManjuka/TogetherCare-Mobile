@@ -25,6 +25,7 @@ import AvatarActionModal from '../../components/common/AvatarActionModal';
 import EditProfileModal from '../../components/common/EditProfileModal';
 import VerifyEmailModal from '../../components/common/VerifyEmailModal';
 import AppHeader from '../../components/common/AppHeader';
+import VolunteerVerificationModal from '../../components/volunteer/VolunteerVerificationModal';
 
 export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }) {
   const { user, logout, uploadProfilePicture, deleteProfilePicture, refreshProfile, updateProfile } = useAuth();
@@ -40,6 +41,7 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showVerifyEmailModal, setShowVerifyEmailModal] = useState(false);
+  const [verificationModalVisible, setVerificationModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Caregiver certifications state (Sprint 1)
@@ -179,6 +181,16 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
   const isVolunteer = user?.role === 'volunteer';
   const isEmailVerified = Boolean(user?.isEmailVerified);
   const volunteerBadgeStatus = user?.verificationBadgeStatus || 'unverified';
+  const volunteerVerificationStatus = (
+    user?.volunteerVerification?.status ||
+    (volunteerBadgeStatus === 'verified'
+      ? 'APPROVED'
+      : volunteerBadgeStatus === 'pending'
+        ? 'PENDING'
+        : volunteerBadgeStatus === 'rejected'
+          ? 'REJECTED'
+          : 'UNVERIFIED')
+  ).toUpperCase();
 
   const initials = `${user?.firstName?.charAt(0) || ''}${user?.lastName?.charAt(0) || ''}`.toUpperCase() || 'TC';
 
@@ -314,28 +326,35 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
 
         {/* Volunteer Identity Verification (Only for Volunteers) */}
         {isVolunteer && (
-          <View style={[styles.verificationRow, { marginTop: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 14 }]}>
+          <TouchableOpacity
+            activeOpacity={volunteerVerificationStatus === 'APPROVED' ? 1 : 0.7}
+            onPress={() => {
+              setVerificationModalVisible(true);
+            }}
+            style={[styles.verificationRow, { marginTop: 14, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 14 }]}
+          >
             <View style={styles.verificationIconWrap}>
               <Ionicons
                 name="shield-checkmark"
                 size={20}
                 color={
-                  volunteerBadgeStatus === 'verified'
+                  volunteerVerificationStatus === 'APPROVED'
                     ? '#16A34A'
-                    : volunteerBadgeStatus === 'pending'
+                    : volunteerVerificationStatus === 'PENDING'
                       ? '#D97706'
-                      : '#6B7280'
+                      : volunteerVerificationStatus === 'REJECTED'
+                        ? '#DC2626'
+                        : '#6B7280'
                 }
               />
             </View>
             <View style={styles.verificationDetails}>
               <Text style={styles.verificationLabel}>Volunteer ID Verification</Text>
               <Text style={styles.verificationSub}>
-                {volunteerBadgeStatus === 'verified'
-                  ? 'Government / Student ID verified'
-                  : volunteerBadgeStatus === 'pending'
-                    ? 'Documents currently under Admin review'
-                    : 'NIC / Passport / Student ID not verified'}
+                {volunteerVerificationStatus === 'APPROVED' && 'Identity verified & approved'}
+                {volunteerVerificationStatus === 'PENDING' && 'Pending review by admin · Tap to view'}
+                {volunteerVerificationStatus === 'REJECTED' && 'Rejected · Tap to view reason & re-upload'}
+                {volunteerVerificationStatus === 'UNVERIFIED' && 'Tap to submit ID evidence'}
               </Text>
             </View>
             <View
@@ -343,11 +362,13 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                 styles.statusBadge,
                 {
                   backgroundColor:
-                    volunteerBadgeStatus === 'verified'
+                    volunteerVerificationStatus === 'APPROVED'
                       ? '#DCFCE7'
-                      : volunteerBadgeStatus === 'pending'
+                      : volunteerVerificationStatus === 'PENDING'
                         ? '#FEF3C7'
-                        : '#F3F4F6',
+                        : volunteerVerificationStatus === 'REJECTED'
+                          ? '#FEE2E2'
+                          : '#F3F4F6',
                 },
               ]}
             >
@@ -356,18 +377,20 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
                   styles.statusBadgeText,
                   {
                     color:
-                      volunteerBadgeStatus === 'verified'
+                      volunteerVerificationStatus === 'APPROVED'
                         ? '#16A34A'
-                        : volunteerBadgeStatus === 'pending'
+                        : volunteerVerificationStatus === 'PENDING'
                           ? '#D97706'
-                          : '#4B5563',
+                          : volunteerVerificationStatus === 'REJECTED'
+                            ? '#DC2626'
+                            : '#4B5563',
                   },
                 ]}
               >
-                {volunteerBadgeStatus.toUpperCase()}
+                {volunteerVerificationStatus}
               </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -679,6 +702,15 @@ export default function ProfileScreen({ onNavigateVerifyEmail, onBack, onClose }
         onVerifiedSuccess={async () => {
           await refreshProfile();
           setShowVerifyEmailModal(false);
+        }}
+      />
+
+      <VolunteerVerificationModal
+        visible={verificationModalVisible}
+        onClose={() => setVerificationModalVisible(false)}
+        user={user}
+        onVerificationSuccess={async () => {
+          if (refreshProfile) await refreshProfile();
         }}
       />
 

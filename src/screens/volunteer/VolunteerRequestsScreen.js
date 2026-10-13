@@ -1,5 +1,5 @@
 // src/screens/volunteer/VolunteerRequestsScreen.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,28 +12,123 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as volunteerService from '../../services/volunteerService';
 import ElderRequestDetailModal from '../../components/volunteer/ElderRequestDetailModal';
+import OfferHelpModal from '../../components/volunteer/OfferHelpModal';
 import { showAppAlert } from '../../utils/alert';
 
-export default function VolunteerRequestsScreen({ onNavigateTab }) {
+const CACHE_REQUESTS_SCREEN_KEY = '@volunteer_cache_available_requests';
+const CACHE_DIRECT_REQUESTS_KEY = '@volunteer_cache_direct_requests';
+
+export default function VolunteerRequestsScreen({ isActive = true, onNavigateTab }) {
   const [requests, setRequests] = useState([]);
   const [directRequests, setDirectRequests] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedDistrict, setSelectedDistrict] = useState('all');
+  const [volunteerDistrict, setVolunteerDistrict] = useState('Colombo');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [submittingId, setSubmittingId] = useState(null);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  const [offerSubmitting, setOfferSubmitting] = useState(false);
+
+  // Restore cached requests immediately on mount
+  useEffect(() => {
+    const restoreCached = async () => {
+      try {
+        const [savedReqs, savedDirect] = await Promise.all([
+          AsyncStorage.getItem(CACHE_REQUESTS_SCREEN_KEY),
+          AsyncStorage.getItem(CACHE_DIRECT_REQUESTS_KEY),
+        ]);
+        if (savedReqs) {
+          const parsed = JSON.parse(savedReqs);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRequests(parsed);
+            setLoading(false);
+          }
+        }
+        if (savedDirect) {
+          const parsed = JSON.parse(savedDirect);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setDirectRequests(parsed);
+          }
+        }
+      } catch (e) {
+        // Ignore cache restore errors
+      }
+    };
+    restoreCached();
+  }, []);
 
   const categories = [
     { id: 'all', label: 'All Requests' },
+    { id: 'Companionship', label: '🤝 Companionship' },
     { id: 'Grocery', label: '🛒 Grocery' },
     { id: 'Medicine', label: '💊 Pharmacy' },
-    { id: 'Companionship', label: '🤝 Companionship' },
+    { id: 'Walk', label: '🚶 Walk' },
+    { id: 'Reading', label: '📖 Reading' },
+    { id: 'Chat', label: '💬 Chat' },
   ];
+
+  const districtList = [
+    { id: 'nearby', label: volunteerDistrict ? `📍 Nearby (${volunteerDistrict})` : '📍 Nearby Area' },
+    { id: 'all', label: '🌐 All Districts' },
+    { id: 'Colombo', label: 'Colombo' },
+    { id: 'Kalutara', label: 'Kalutara' },
+    { id: 'Kandy', label: 'Kandy' },
+    { id: 'Gampaha', label: 'Gampaha' },
+    { id: 'Galle', label: 'Galle' },
+  ];
+
+  const displayedRequests = useMemo(() => {
+    let list = requests;
+
+    // Filter by district / location
+    if (selectedDistrict === 'nearby') {
+      list = list.filter(
+        (r) =>
+          r.isSameDistrict ||
+          (r.district && volunteerDistrict && r.district.toLowerCase() === volunteerDistrict.toLowerCase())
+      );
+    } else if (selectedDistrict !== 'all') {
+      list = list.filter(
+        (r) => r.district && r.district.toLowerCase() === selectedDistrict.toLowerCase()
+      );
+    }
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      const catLower = selectedCategory.toLowerCase();
+      list = list.filter((r) => {
+        const type = (r.type || r.serviceType || '').toLowerCase();
+        const cat = (r.category || '').toLowerCase();
+        const items = Array.isArray(r.items) ? r.items.join(' ').toLowerCase() : '';
+        return type.includes(catLower) || cat.includes(catLower) || items.includes(catLower);
+      });
+    }
+
+    // Filter by search query
+    if (!searchQuery.trim()) return list;
+    const q = searchQuery.trim().toLowerCase();
+    return list.filter((r) => {
+      return (
+        (r.elderName && r.elderName.toLowerCase().includes(q)) ||
+        (r.address && r.address.toLowerCase().includes(q)) ||
+        (r.district && r.district.toLowerCase().includes(q)) ||
+        (r.type && r.type.toLowerCase().includes(q)) ||
+        (r.serviceType && r.serviceType.toLowerCase().includes(q)) ||
+        (r.notes && r.notes.toLowerCase().includes(q)) ||
+        (Array.isArray(r.items) && r.items.some((it) => it.toLowerCase().includes(q)))
+      );
+    });
+  }, [requests, searchQuery, selectedDistrict, selectedCategory, volunteerDistrict]);
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -43,10 +138,17 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
       ]);
 
       if (availRes.status === 'fulfilled' && availRes.value?.success) {
-        setRequests(availRes.value.data || []);
+        const freshList = availRes.value.data || [];
+        setRequests(freshList);
+        AsyncStorage.setItem(CACHE_REQUESTS_SCREEN_KEY, JSON.stringify(freshList)).catch(() => {});
+        if (availRes.value?.volunteerDistrict) {
+          setVolunteerDistrict(availRes.value.volunteerDistrict);
+        }
       }
       if (directRes.status === 'fulfilled' && directRes.value?.success) {
-        setDirectRequests(directRes.value.data || []);
+        const freshDirect = directRes.value.data || [];
+        setDirectRequests(freshDirect);
+        AsyncStorage.setItem(CACHE_DIRECT_REQUESTS_KEY, JSON.stringify(freshDirect)).catch(() => {});
       }
     } catch (error) {
       console.error('Fetch requests error:', error);
@@ -57,26 +159,30 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
   }, [selectedCategory]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchRequests();
-  }, [fetchRequests]);
+    if (isActive) {
+      fetchRequests();
+    }
+  }, [isActive, fetchRequests]);
 
   const onRefresh = () => {
     setRefreshing(true);
     fetchRequests();
   };
 
-  const handleAccept = async (req) => {
+  const handleAccept = async (req, customArrivalTime = null) => {
     const reqId = req._id || req.id;
     try {
       setSubmittingId(reqId);
       // Optimistically remove from list immediately
       setRequests((prev) => prev.filter((r) => (r._id || r.id) !== reqId));
-      const res = await volunteerService.acceptRequest(reqId);
+      const res = await volunteerService.acceptRequest(
+        reqId,
+        customArrivalTime ? { arrivalTime: customArrivalTime } : {}
+      );
       if (res?.success) {
         showAppAlert(
           '🎉 Request Accepted!',
-          `You have accepted the visit for ${req.elderName}.\nIt has been added to your Volunteer Schedule.`,
+          `You have accepted the visit for ${req.elderName}${customArrivalTime ? ` at ${customArrivalTime}` : ''}.\nIt has been added to your Volunteer Schedule.`,
           [
             { text: 'Stay Here', onPress: () => fetchRequests() },
             {
@@ -94,6 +200,24 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
       showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to accept task');
     } finally {
       setSubmittingId(null);
+    }
+  };
+
+  const handleSaveOffer = async (offerData) => {
+    try {
+      setOfferSubmitting(true);
+      const res = await volunteerService.createOffer(offerData);
+      if (res?.success) {
+        showAppAlert(
+          '🎉 Offer Posted Successfully!',
+          'Your availability offer has been posted with your custom time. When an elder requests your help, it will appear in your direct requests.'
+        );
+        setOfferModalVisible(false);
+      }
+    } catch (err) {
+      showAppAlert('Error', err.response?.data?.message || err.message || 'Failed to post offer');
+    } finally {
+      setOfferSubmitting(false);
     }
   };
 
@@ -151,8 +275,82 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Available Help Requests</Text>
-        <Text style={styles.headerSub}>Browse nearby requests from elderly residents needing assistance</Text>
+        <View style={styles.headerTitleRow}>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.headerTitle}>Available Help Requests</Text>
+              {displayedRequests.length > 0 && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{displayedRequests.length}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.headerSub}>Browse nearby requests from elderly residents</Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.postOfferHeaderBtn}
+            onPress={() => setOfferModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="time" size={14} color="#FFFFFF" style={{ marginRight: 5 }} />
+            <Text style={styles.postOfferHeaderBtnText}>+ Offer Help</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Live Search Bar */}
+        <View style={styles.searchBarContainer}>
+          <Ionicons name="search" size={17} color="#64748B" style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by elder name, task, or area..."
+            placeholderTextColor="#94A3B8"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="close-circle" size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* District / Area Filter Chips */}
+      <View style={styles.districtFilterRow}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterScroll}>
+          {districtList.map((d) => {
+            const isActiveDistrict = selectedDistrict === d.id;
+            return (
+              <TouchableOpacity
+                key={d.id}
+                style={[
+                  styles.districtFilterChip,
+                  isActiveDistrict && styles.districtFilterChipActive,
+                ]}
+                onPress={() => setSelectedDistrict(d.id)}
+              >
+                {d.id === 'nearby' && (
+                  <Ionicons
+                    name="location"
+                    size={12}
+                    color={isActiveDistrict ? '#FFFFFF' : '#1D4ED8'}
+                    style={{ marginRight: 4 }}
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.districtFilterChipText,
+                    isActiveDistrict && styles.districtFilterChipTextActive,
+                  ]}
+                >
+                  {d.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Category Filter Chips */}
@@ -255,12 +453,21 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
             <Text style={styles.emptySub}>
               There are currently no open requests matching this category. Please check back soon or switch categories!
             </Text>
-            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => setSelectedCategory('all')}>
-              <Text style={styles.resetFilterBtnText}>Show All Categories</Text>
+            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => { setSelectedCategory('all'); setSelectedDistrict('all'); setSearchQuery(''); }}>
+              <Text style={styles.resetFilterBtnText}>Show All Requests</Text>
+            </TouchableOpacity>
+          </View>
+        ) : displayedRequests.length === 0 && directRequests.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Ionicons name="search-outline" size={42} color="#94A3B8" />
+            <Text style={styles.emptyTitle}>No Matching Requests</Text>
+            <Text style={styles.emptySub}>No open requests found for this area or category.</Text>
+            <TouchableOpacity style={styles.resetFilterBtn} onPress={() => { setSelectedCategory('all'); setSelectedDistrict('all'); setSearchQuery(''); }}>
+              <Text style={styles.resetFilterBtnText}>Reset All Filters</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          requests.map((req) => {
+          displayedRequests.map((req) => {
             const reqKey = req._id || req.id;
             const isUrgent = req.badgeType === 'urgent' || req.badge === 'Urgent';
             const isProcessing = submittingId === reqKey;
@@ -273,10 +480,21 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
                 onPress={() => setSelectedRequest(req)}
               >
                 <View style={styles.cardHeader}>
-                  <View style={[styles.badgeTag, isUrgent ? styles.urgentTag : styles.todayTag]}>
-                    <Text style={[styles.badgeText, isUrgent ? styles.urgentBadgeText : styles.todayBadgeText]}>
-                      {req.badge || 'Open'}
-                    </Text>
+                  <View style={styles.cardHeaderBadges}>
+                    <View style={[styles.badgeTag, isUrgent ? styles.urgentTag : styles.todayTag]}>
+                      <Text style={[styles.badgeText, isUrgent ? styles.urgentBadgeText : styles.todayBadgeText]}>
+                        {req.badge || 'Open'}
+                      </Text>
+                    </View>
+                    <View style={[
+                      styles.sameDistrictBadge,
+                      (req.isSameDistrict || (req.district && volunteerDistrict && req.district.toLowerCase() === volunteerDistrict.toLowerCase())) && styles.sameDistrictBadgeHighlight
+                    ]}>
+                      <Ionicons name="location" size={11} color="#047857" style={{ marginRight: 2 }} />
+                      <Text style={styles.sameDistrictBadgeText}>
+                        {req.district || volunteerDistrict} Area
+                      </Text>
+                    </View>
                   </View>
                   <Text style={styles.distanceText}>📍 {req.distance || '1.2 km'} away</Text>
                 </View>
@@ -297,6 +515,13 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
                 <Text style={styles.dateTimeText}>
                   🕒 {req.date} at {req.time}
                 </Text>
+
+                {req.notes ? (
+                  <View style={styles.notesBox}>
+                    <Text style={styles.notesLabel}>📝 Note from Elder:</Text>
+                    <Text style={styles.notesText}>{req.notes}</Text>
+                  </View>
+                ) : null}
 
                 {req.items && req.items.length > 0 ? (
                   <View style={styles.itemsBox}>
@@ -323,15 +548,15 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
                   <TouchableOpacity
                     style={[styles.offerBtn, isProcessing && { opacity: 0.7 }]}
                     activeOpacity={0.8}
-                    onPress={() => handleAccept(req)}
+                    onPress={() => setSelectedRequest(req)}
                     disabled={isProcessing}
                   >
                     {isProcessing ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
                       <>
-                        <Ionicons name="hand-left-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
-                        <Text style={styles.offerBtnText}>Accept & Offer Help</Text>
+                        <Ionicons name="time-outline" size={16} color="#FFFFFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.offerBtnText}>Accept / Set Time</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -347,11 +572,19 @@ export default function VolunteerRequestsScreen({ onNavigateTab }) {
         visible={!!selectedRequest}
         request={selectedRequest}
         onClose={() => setSelectedRequest(null)}
-        onAccept={(req) => {
+        onAccept={(req, customArrivalTime) => {
           setSelectedRequest(null);
-          handleAccept(req);
+          handleAccept(req, customArrivalTime);
         }}
         isAccepting={submittingId === (selectedRequest?._id || selectedRequest?.id)}
+      />
+
+      {/* Offer Help Modal with Manual Time Picker */}
+      <OfferHelpModal
+        visible={offerModalVisible}
+        onClose={() => setOfferModalVisible(false)}
+        onSave={handleSaveOffer}
+        isSubmitting={offerSubmitting}
       />
     </SafeAreaView>
   );
@@ -370,19 +603,80 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 8,
+  },
+  postOfferHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+    elevation: 2,
+    shadowColor: '#1E40AF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  postOfferHeaderBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12.5,
+    fontWeight: '700',
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '800',
     color: '#0F172A',
   },
+  countBadge: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  countBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#3730A3',
+  },
   headerSub: {
     fontSize: 13,
     color: '#64748B',
     marginTop: 2,
+    marginBottom: 10,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    height: 38,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: '#1E293B',
+    paddingVertical: 0,
+  },
+  districtFilterRow: {
+    backgroundColor: '#FFFFFF',
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   filterRow: {
     backgroundColor: '#FFFFFF',
-    paddingVertical: 10,
+    paddingTop: 4,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
   },
@@ -410,6 +704,29 @@ const styles = StyleSheet.create({
   filterChipTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
+  },
+  districtFilterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: '#EFF6FF',
+    borderWidth: 1.5,
+    borderColor: '#93C5FD',
+  },
+  districtFilterChipActive: {
+    backgroundColor: '#1D4ED8',
+    borderColor: '#1D4ED8',
+  },
+  districtFilterChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1D4ED8',
+  },
+  districtFilterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '800',
   },
   container: {
     flex: 1,
@@ -480,6 +797,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  cardHeaderBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+    flex: 1,
+  },
+  sameDistrictBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  sameDistrictBadgeText: {
+    color: '#047857',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  sameDistrictBadgeHighlight: {
+    backgroundColor: '#D1FAE5',
+    borderColor: '#34D399',
+  },
   badgeTag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -543,6 +886,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#334155',
     marginBottom: 10,
+  },
+  notesBox: {
+    backgroundColor: '#FEF9C3',
+    borderColor: '#FEF08A',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 10,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#854D0E',
+    marginBottom: 3,
+  },
+  notesText: {
+    fontSize: 12,
+    color: '#713F12',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
   itemsBox: {
     backgroundColor: '#F8FAFC',

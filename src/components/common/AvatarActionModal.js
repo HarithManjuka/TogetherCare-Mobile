@@ -18,11 +18,18 @@ export default function AvatarActionModal({
   visible,
   onClose,
   onPickPhoto,
+  onTakePhoto,
   onRemovePhoto,
   onSelectPick,
   onSelectRemove,
+  hasExistingPhoto = true,
 }) {
   if (!visible) return null;
+
+  const handleTakePhoto = () => {
+    onClose();
+    if (typeof onTakePhoto === 'function') onTakePhoto();
+  };
 
   const handlePick = () => {
     onClose();
@@ -53,25 +60,39 @@ export default function AvatarActionModal({
               <Text style={styles.title}>Update Profile Picture</Text>
               <Text style={styles.subtitle}>Select an option to manage your photo</Text>
 
-              {/* Option 1: Choose New Photo */}
+              {/* Option 1: Take Photo with Camera */}
+              {onTakePhoto ? (
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  activeOpacity={0.75}
+                  onPress={handleTakePhoto}
+                >
+                  <Ionicons name="camera-outline" size={20} color="#1E40AF" style={{ marginRight: 10 }} />
+                  <Text style={styles.actionButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {/* Option 2: Choose Photo from Library */}
               <TouchableOpacity
                 style={styles.actionButton}
                 activeOpacity={0.75}
                 onPress={handlePick}
               >
-                <Ionicons name="image-outline" size={20} color="#1E40AF" style={{ marginRight: 10 }} />
-                <Text style={styles.actionButtonText}>Choose New Photo</Text>
+                <Ionicons name="images-outline" size={20} color="#1E40AF" style={{ marginRight: 10 }} />
+                <Text style={styles.actionButtonText}>{onTakePhoto ? 'Choose From Gallery' : 'Choose New Photo'}</Text>
               </TouchableOpacity>
 
-              {/* Option 2: Remove Photo */}
-              <TouchableOpacity
-                style={styles.removeButton}
-                activeOpacity={0.75}
-                onPress={handleRemove}
-              >
-                <Ionicons name="trash-outline" size={20} color="#DC2626" style={{ marginRight: 10 }} />
-                <Text style={styles.removeButtonText}>Remove Current Photo</Text>
-              </TouchableOpacity>
+              {/* Option 3: Remove Photo */}
+              {hasExistingPhoto ? (
+                <TouchableOpacity
+                  style={styles.removeButton}
+                  activeOpacity={0.75}
+                  onPress={handleRemove}
+                >
+                  <Ionicons name="trash-outline" size={20} color="#DC2626" style={{ marginRight: 10 }} />
+                  <Text style={styles.removeButtonText}>Remove Current Photo</Text>
+                </TouchableOpacity>
+              ) : null}
 
               {/* Option 3: Cancel */}
               <TouchableOpacity

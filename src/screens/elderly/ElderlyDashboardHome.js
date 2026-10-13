@@ -26,6 +26,9 @@ export default function ElderlyDashboardHome({
   onNavigateTab,
   onRequestHelp,
   onOpenProfile,
+  onOpenNotifications,
+  hasUnreadNotifications = false,
+  unreadNotificationCount = 0,
 }) {
   const {
     user,
@@ -120,10 +123,10 @@ export default function ElderlyDashboardHome({
 
   const handleQuickAction = (featureName) => {
     if (featureName === 'Request Help' || featureName === 'Companionship') {
-      if (onNavigateTab) {
-        onNavigateTab('requests');
-      } else if (onRequestHelp) {
+      if (onRequestHelp) {
         onRequestHelp();
+      } else if (onNavigateTab) {
+        onNavigateTab('requests');
       }
       return;
     }
@@ -157,8 +160,10 @@ export default function ElderlyDashboardHome({
       {/* App Header Component with Profile & Size Switcher */}
       <AppHeader
         onProfilePress={onOpenProfile || (() => onNavigateTab && onNavigateTab('profile'))}
-        onNotificationPress={() => handleActionPress('Notifications')}
+        onNotificationPress={onOpenNotifications || (() => handleActionPress('Notifications'))}
         onNavigateTab={onNavigateTab}
+        hasUnreadNotifications={hasUnreadNotifications}
+        unreadNotificationsCount={unreadNotificationCount}
       />
 
       <View style={{ flex: 1, backgroundColor: COLORS.background }}>
@@ -241,36 +246,6 @@ export default function ElderlyDashboardHome({
 
           {/* Action Cards */}
           <View style={styles.actionsWrapper}>
-            {/* Dedicated Emergency SOS Button Card */}
-            <TouchableOpacity
-              style={[styles.sosButton, activeSOS && styles.sosButtonActive]}
-              activeOpacity={0.85}
-              onPress={() => setShowSOSModal(true)}
-              accessibilityRole="button"
-              accessibilityLabel="SOS Emergency Button"
-            >
-              <View style={styles.sosButtonContent}>
-                <View style={styles.sosIconCircle}>
-                  <Ionicons
-                    name={activeSOS ? 'radio' : 'warning'}
-                    size={isLarge ? 30 : 24}
-                    color="#FFFFFF"
-                  />
-                </View>
-                <View style={styles.sosTextGroup}>
-                  <Text style={styles.sosButtonText}>
-                    {activeSOS ? '🚨 EMERGENCY SOS ACTIVE' : 'SOS Emergency Help'}
-                  </Text>
-                  <Text style={styles.sosSubtext}>
-                    {activeSOS
-                      ? 'Tap to view hotlines or resolve active alert'
-                      : '1-tap urgent hotlines (1990 / 119) & Care Circle'}
-                  </Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-
             {/* Main Hero Card: Request Help */}
             <TouchableOpacity
               style={styles.heroCard}
@@ -290,24 +265,32 @@ export default function ElderlyDashboardHome({
               <Text style={styles.heroSubtext}>Find a verified volunteer or caregiver</Text>
             </TouchableOpacity>
 
-            {/* Sub Action Grid (2 Columns) */}
+            {/* Sub Action Grid (2 Columns: SOS Emergency & My Care Circle) */}
             <View style={styles.gridRow}>
-              {/* My Schedules */}
+              {/* SOS Emergency Help */}
               <TouchableOpacity
-                style={styles.gridCard}
+                style={[styles.gridCard, styles.gridCardSOS, activeSOS && styles.gridCardSOSActive]}
                 activeOpacity={0.85}
-                onPress={() => handleQuickAction('My Schedules')}
+                onPress={() => setShowSOSModal(true)}
                 accessibilityRole="button"
-                accessibilityLabel="My Schedules"
+                accessibilityLabel="SOS Emergency Button"
               >
-                <View style={[styles.gridIconContainer, { backgroundColor: '#EEF2FF' }]}>
+                <View
+                  style={[
+                    styles.gridIconContainer,
+                    styles.gridIconSOS,
+                    activeSOS && styles.gridIconSOSActive,
+                  ]}
+                >
                   <Ionicons
-                    name="calendar-outline"
-                    size={isLarge ? 38 : 32}
-                    color={COLORS.primary}
+                    name={activeSOS ? 'radio' : 'warning'}
+                    size={isLarge ? 36 : 30}
+                    color={activeSOS ? '#FFFFFF' : '#DC2626'}
                   />
                 </View>
-                <Text style={styles.gridCardText}>My Schedule</Text>
+                <Text style={activeSOS ? styles.gridCardSOSTextActive : styles.gridCardSOSText}>
+                  {activeSOS ? '🚨 SOS Active' : 'SOS Emergency'}
+                </Text>
               </TouchableOpacity>
 
               {/* My Care Circle */}
@@ -443,7 +426,7 @@ export default function ElderlyDashboardHome({
               </Text>
               <TouchableOpacity
                 style={styles.emptyActionBtn}
-                onPress={() => handleQuickAction('Request Help')}
+                onPress={() => onNavigateTab ? onNavigateTab('requests') : handleQuickAction('Request Help')}
               >
                 <Text style={styles.emptyActionBtnText}>Browse Volunteer Offers</Text>
               </TouchableOpacity>
@@ -494,21 +477,42 @@ export default function ElderlyDashboardHome({
         <Modal
           visible={!!selectedVisit}
           transparent
-          animationType="slide"
+          animationType="fade"
           onRequestClose={() => setSelectedVisit(null)}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setSelectedVisit(null)}
+          >
+            <TouchableOpacity
+              style={styles.modalContent}
+              activeOpacity={1}
+              onPress={(e) => e.stopPropagation && e.stopPropagation()}
+            >
               {selectedVisit && (
                 <>
                   <View style={styles.modalHeader}>
-                    <Text style={styles.modalTitle}>Visit Details</Text>
-                    <TouchableOpacity onPress={() => setSelectedVisit(null)}>
-                      <Ionicons name="close" size={24} color={COLORS.textSecondary} />
+                    <View style={styles.modalHeaderTitleGroup}>
+                      <View style={styles.modalIconWrap}>
+                        <Ionicons name="calendar" size={Math.round(22 * scale)} color="#1E3A8A" />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.modalTitle}>Visit Details</Text>
+                        <Text style={styles.modalSubtitle}>Scheduled Care Visit</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.modalCloseIconBtn}
+                      onPress={() => setSelectedVisit(null)}
+                      accessibilityLabel="Close"
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={20} color={COLORS.textSecondary} />
                     </TouchableOpacity>
                   </View>
 
-                  <View style={styles.modalBody}>
+                  <ScrollView showsVerticalScrollIndicator={false} style={styles.modalBody}>
                     <View style={styles.modalRow}>
                       <Text style={styles.modalLabel}>Activity</Text>
                       <Text style={styles.modalValue}>{selectedVisit.activityType}</Text>
@@ -523,9 +527,11 @@ export default function ElderlyDashboardHome({
 
                     <View style={styles.modalRow}>
                       <Text style={styles.modalLabel}>Status</Text>
-                      <Text style={[styles.modalValue, { color: COLORS.primary, textTransform: 'capitalize' }]}>
-                        {selectedVisit.status || 'Accepted'}
-                      </Text>
+                      <View style={styles.statusBadge}>
+                        <Text style={styles.statusBadgeText}>
+                          {selectedVisit.status || 'Accepted'}
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={styles.modalRow}>
@@ -534,18 +540,42 @@ export default function ElderlyDashboardHome({
                         {selectedVisit.companion || 'Awaiting volunteer'}
                       </Text>
                     </View>
-                  </View>
+
+                    {selectedVisit.volunteer?.phone ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Volunteer Contact</Text>
+                        <Text style={styles.modalValue}>{selectedVisit.volunteer.phone}</Text>
+                      </View>
+                    ) : null}
+
+                    {selectedVisit.location ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Location</Text>
+                        <Text style={styles.modalValue}>{selectedVisit.location}</Text>
+                      </View>
+                    ) : null}
+
+                    {selectedVisit.notes || selectedVisit.specialInstructions ? (
+                      <View style={styles.modalRow}>
+                        <Text style={styles.modalLabel}>Notes / Instructions</Text>
+                        <Text style={styles.modalValue}>
+                          {selectedVisit.notes || selectedVisit.specialInstructions}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </ScrollView>
 
                   <TouchableOpacity
                     style={styles.modalCloseButton}
                     onPress={() => setSelectedVisit(null)}
+                    activeOpacity={0.85}
                   >
                     <Text style={styles.modalCloseButtonText}>Close</Text>
                   </TouchableOpacity>
                 </>
               )}
-            </View>
-          </View>
+            </TouchableOpacity>
+          </TouchableOpacity>
         </Modal>
 
         {/* Emergency SOS Modal Sheet */}

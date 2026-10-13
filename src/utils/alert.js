@@ -50,7 +50,13 @@ export const showAppAlert = (title, message = '', buttons = []) => {
   }
 
   // Native mobile platforms (Android & iOS)
-  Alert.alert(title, message, buttons);
+  const resolvedButtons =
+    buttons && buttons.length > 0
+      ? buttons
+      : [{ text: 'Close', style: 'cancel' }];
+  Alert.alert(title, message, resolvedButtons, { cancelable: true });
 };
 
+export const showAlert = showAppAlert;
 export default showAppAlert;
+

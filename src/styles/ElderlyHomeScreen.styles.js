@@ -171,6 +171,32 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
       color: COLORS.textPrimary,
       textAlign: 'center',
     },
+    gridCardSOS: {
+      borderColor: '#FECACA',
+      backgroundColor: '#FEF2F2',
+    },
+    gridCardSOSActive: {
+      backgroundColor: '#DC2626',
+      borderColor: '#B91C1C',
+    },
+    gridIconSOS: {
+      backgroundColor: '#FEE2E2',
+    },
+    gridIconSOSActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    },
+    gridCardSOSText: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '800',
+      color: '#DC2626',
+      textAlign: 'center',
+    },
+    gridCardSOSTextActive: {
+      fontSize: Math.round(16 * scale),
+      fontWeight: '900',
+      color: '#FFFFFF',
+      textAlign: 'center',
+    },
     sectionHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -625,6 +651,149 @@ export const getElderlyHomeScreenStyles = (scale = 1.0) =>
       color: COLORS.textSecondary,
       marginTop: 2,
       lineHeight: Math.round(17 * scale),
+    },
+
+    // Visit Details Modal Sheet Styles (High Visibility & TogetherCare Signature Light Style)
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.65)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      width: '100%',
+      maxWidth: 420,
+      maxHeight: '85%',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 24,
+      padding: Math.round(22 * scale),
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      ...Platform.select({
+        ios: {
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.25,
+          shadowRadius: 16,
+        },
+        android: {
+          elevation: 10,
+        },
+      }),
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: Math.round(16 * scale),
+      borderBottomWidth: 1,
+      borderBottomColor: '#F1F5F9',
+      paddingBottom: Math.round(14 * scale),
+    },
+    modalHeaderTitleGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+    },
+    modalIconWrap: {
+      width: Math.round(44 * scale),
+      height: Math.round(44 * scale),
+      borderRadius: Math.round(22 * scale),
+      backgroundColor: '#EFF6FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#DBEAFE',
+    },
+    modalTitle: {
+      fontSize: Math.round(19 * scale),
+      fontWeight: '800',
+      color: '#0F172A',
+      letterSpacing: -0.3,
+    },
+    modalSubtitle: {
+      fontSize: Math.round(12 * scale),
+      color: '#64748B',
+      marginTop: 2,
+      fontWeight: '500',
+    },
+    modalCloseIconBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: '#F8FAFC',
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+    },
+    modalBody: {
+      marginBottom: Math.round(14 * scale),
+    },
+    modalRow: {
+      backgroundColor: '#F8FAFC',
+      borderRadius: 14,
+      paddingHorizontal: 16,
+      paddingVertical: Math.round(12 * scale),
+      marginBottom: 10,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+    },
+    modalLabel: {
+      fontSize: Math.round(11 * scale),
+      fontWeight: '800',
+      color: '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 4,
+    },
+    modalValue: {
+      fontSize: Math.round(15 * scale),
+      fontWeight: '700',
+      color: '#0F172A',
+    },
+    statusBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+      backgroundColor: '#DCFCE7',
+      borderWidth: 1,
+      borderColor: '#BBF7D0',
+      marginTop: 2,
+    },
+    statusBadgeText: {
+      color: '#15803D',
+      fontWeight: '800',
+      fontSize: Math.round(13 * scale),
+      textTransform: 'capitalize',
+    },
+    modalCloseButton: {
+      backgroundColor: '#1E3A8A', // Signature TogetherCare primary navy blue
+      borderRadius: 14,
+      paddingVertical: Math.round(14 * scale),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 6,
+      ...Platform.select({
+        ios: {
+          shadowColor: '#1E3A8A',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.25,
+          shadowRadius: 8,
+        },
+        android: {
+          elevation: 4,
+        },
+      }),
+    },
+    modalCloseButtonText: {
+      color: '#FFFFFF',
+      fontSize: Math.round(16 * scale),
+      fontWeight: '800',
+      letterSpacing: 0.2,
     },
   });
 

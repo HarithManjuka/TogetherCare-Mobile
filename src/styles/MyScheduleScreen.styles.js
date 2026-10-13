@@ -1,25 +1,24 @@
 // src/styles/MyScheduleScreen.styles.js
-import { StyleSheet, Platform, StatusBar } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/theme';
 
 export const getMyScheduleScreenStyles = (scale = 1.0) =>
   StyleSheet.create({
     safeArea: {
       flex: 1,
-      backgroundColor: '#1A365D',
-      paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+      backgroundColor: '#1E3A8A', // Matches TogetherCare AppHeader seamless blue
     },
     container: {
       flex: 1,
       backgroundColor: '#F8FAFC',
     },
 
-    // WhatsApp-Style Top App Header
+    // Sub App Header Bar
     headerBar: {
-      backgroundColor: '#1A365D',
+      backgroundColor: '#1E3A8A',
       paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 4,
+      paddingTop: 8,
+      paddingBottom: 6,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
@@ -49,11 +48,11 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       borderRadius: 20,
     },
 
-    // WhatsApp-Style Tabs Bar
+    // Schedule Tabs Bar
     tabsBarWrapper: {
-      backgroundColor: '#1A365D',
+      backgroundColor: '#1E3A8A',
       borderBottomWidth: 1,
-      borderBottomColor: '#2A4365',
+      borderBottomColor: 'rgba(255, 255, 255, 0.15)',
     },
     tabsBarScrollContent: {
       flexDirection: 'row',
@@ -228,6 +227,17 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       fontWeight: '800',
       textTransform: 'uppercase',
     },
+    statusExpired: {
+      backgroundColor: '#FFEDD5',
+      borderWidth: 1,
+      borderColor: '#FED7AA',
+    },
+    statusExpiredText: {
+      color: '#C2410C',
+      fontSize: Math.round(11 * scale),
+      fontWeight: '800',
+      textTransform: 'uppercase',
+    },
 
     // Card Details Row
     cardDetailsBox: {
@@ -270,6 +280,53 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       color: '#334155',
       fontWeight: '700',
       textTransform: 'capitalize',
+    },
+
+    // Communication Action Strip
+    commActionStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 10,
+      paddingVertical: 4,
+    },
+    primaryCommBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      backgroundColor: '#0284C7',
+      elevation: 1,
+      shadowColor: '#0284C7',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.15,
+      shadowRadius: 2,
+    },
+    primaryCommBtnText: {
+      fontSize: Math.round(13 * scale),
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+    switchMethodBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: '#F1F5F9',
+      borderWidth: 1,
+      borderColor: '#CBD5E1',
+    },
+    switchMethodBtnText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '800',
+      color: '#334155',
     },
 
     // Card Actions
@@ -338,7 +395,52 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       fontWeight: '800',
       color: '#DC2626',
     },
+    startVisitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: '#EFF6FF',
+      justifyContent: 'center',
+      borderWidth: 1.2,
+      borderColor: '#3B82F6',
+    },
+    startVisitBtnDisabled: {
+      backgroundColor: '#F1F5F9',
+      borderColor: '#CBD5E1',
+      opacity: 0.65,
+    },
+    startVisitBtnText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '800',
+      color: '#1D4ED8',
+    },
+    startVisitBtnTextDisabled: {
+      color: '#94A3B8',
+    },
+    completeVisitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: '#ECFDF5',
+      justifyContent: 'center',
+      borderWidth: 1.2,
+      borderColor: '#10B981',
+    },
+    completeVisitBtnText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '800',
+      color: '#047857',
+    },
     cancelBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
       paddingVertical: 7,
       paddingHorizontal: 12,
       borderRadius: 10,
@@ -352,6 +454,40 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       fontSize: Math.round(12 * scale),
       fontWeight: '800',
       color: '#DC2626',
+    },
+    rateVisitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: '#FEF3C7',
+      justifyContent: 'center',
+      borderWidth: 1.2,
+      borderColor: '#F59E0B',
+    },
+    rateVisitBtnText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '800',
+      color: '#B45309',
+    },
+    ratedBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 7,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: '#F1F5F9',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#CBD5E1',
+    },
+    ratedBtnText: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '800',
+      color: '#475569',
     },
 
     // Empty State
@@ -457,5 +593,226 @@ export const getMyScheduleScreenStyles = (scale = 1.0) =>
       borderWidth: 1,
       borderColor: '#E2E8F0',
       marginTop: 4,
+    },
+
+    // Communication Switcher Sheet Styles
+    commModalSheet: {
+      backgroundColor: '#FFFFFF',
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: Platform.OS === 'ios' ? 36 : 24,
+    },
+    commOptionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: 14,
+      backgroundColor: '#F8FAFC',
+      borderWidth: 1.5,
+      borderColor: '#E2E8F0',
+      marginBottom: 10,
+      gap: 12,
+    },
+    commOptionItemActive: {
+      backgroundColor: '#EFF6FF',
+      borderColor: '#3B82F6',
+    },
+    commOptionIconCircle: {
+      width: Math.round(44 * scale),
+      height: Math.round(44 * scale),
+      borderRadius: Math.round(22 * scale),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    commOptionTextWrap: {
+      flex: 1,
+    },
+    commOptionTitle: {
+      fontSize: Math.round(15 * scale),
+      fontWeight: '800',
+      color: '#0F172A',
+      marginBottom: 2,
+    },
+    commOptionSubtitle: {
+      fontSize: Math.round(12 * scale),
+      color: '#64748B',
+      fontWeight: '600',
+    },
+    commActivePill: {
+      backgroundColor: '#DCFCE7',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    commActivePillText: {
+      fontSize: Math.round(10 * scale),
+      fontWeight: '800',
+      color: '#15803D',
+      textTransform: 'uppercase',
+    },
+
+    // Video Calling Modal Styles
+    videoBackdrop: {
+      flex: 1,
+      backgroundColor: '#0F172A',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: Platform.OS === 'ios' ? 60 : 40,
+      paddingHorizontal: 24,
+    },
+    videoTopHeader: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    videoHeaderBadge: {
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      paddingHorizontal: 14,
+      paddingVertical: 5,
+      borderRadius: 20,
+    },
+    videoHeaderBadgeText: {
+      color: '#E2E8F0',
+      fontSize: Math.round(12 * scale),
+      fontWeight: '700',
+    },
+    videoCenterContent: {
+      alignItems: 'center',
+      gap: 12,
+    },
+    videoAvatarOuter: {
+      width: Math.round(120 * scale),
+      height: Math.round(120 * scale),
+      borderRadius: Math.round(60 * scale),
+      backgroundColor: 'rgba(59, 130, 246, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: '#3B82F6',
+    },
+    videoCallerName: {
+      color: '#FFFFFF',
+      fontSize: Math.round(22 * scale),
+      fontWeight: '900',
+    },
+    videoCallStatus: {
+      color: '#93C5FD',
+      fontSize: Math.round(14 * scale),
+      fontWeight: '600',
+    },
+    videoControlsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 20,
+      width: '100%',
+    },
+    videoControlBtn: {
+      width: Math.round(56 * scale),
+      height: Math.round(56 * scale),
+      borderRadius: Math.round(28 * scale),
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    videoEndBtn: {
+      width: Math.round(64 * scale),
+      height: Math.round(64 * scale),
+      borderRadius: Math.round(32 * scale),
+      backgroundColor: '#EF4444',
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 6,
+    },
+    volunteerProfileCard: {
+      backgroundColor: '#EFF6FF',
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: '#BFDBFE',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 4,
+    },
+    volunteerCardLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    volunteerAvatarMini: {
+      width: Math.round(38 * scale),
+      height: Math.round(38 * scale),
+      borderRadius: Math.round(19 * scale),
+      backgroundColor: '#DBEAFE',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: '#3B82F6',
+    },
+    volunteerCardName: {
+      fontSize: Math.round(14 * scale),
+      fontWeight: '800',
+      color: '#1E3A8A',
+    },
+    volunteerCardSub: {
+      fontSize: Math.round(11.5 * scale),
+      color: '#2563EB',
+      fontWeight: '600',
+    },
+    viewProfileLinkBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: '#2563EB',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      gap: 4,
+    },
+    viewProfileLinkText: {
+      color: '#FFFFFF',
+      fontSize: Math.round(11.5 * scale),
+      fontWeight: '700',
+    },
+    ratingSummarySection: {
+      backgroundColor: '#FFFBEB',
+      borderRadius: 14,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: '#FDE68A',
+      marginTop: 8,
+      gap: 8,
+    },
+    ratingSummaryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    ratingSummaryTitle: {
+      fontSize: Math.round(13.5 * scale),
+      fontWeight: '800',
+      color: '#92400E',
+    },
+    ratingItemRow: {
+      gap: 3,
+    },
+    ratingItemLabel: {
+      fontSize: Math.round(12 * scale),
+      fontWeight: '700',
+      color: '#78350F',
+    },
+    ratingStarsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    ratingFeedbackText: {
+      fontSize: Math.round(12.5 * scale),
+      color: '#451A03',
+      fontStyle: 'italic',
+      marginTop: 2,
     },
   });
