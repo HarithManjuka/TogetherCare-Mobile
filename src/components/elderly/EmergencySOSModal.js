@@ -17,6 +17,15 @@ import {
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { COLORS } from '../../constants/theme';
 import * as emergencyService from '../../services/emergencyService';
+import ConfirmDialogModal from '../common/ConfirmDialogModal';
+import showAppAlert from '../../utils/alert';
+
+const formatAddress = (addr) => {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  const parts = [addr.streetAddress, addr.city, addr.district, addr.province].filter(Boolean);
+  return parts.join(', ');
+};
 
 const EMERGENCY_HOTLINES = [
   {
@@ -65,6 +74,7 @@ export default function EmergencySOSModal({
   const [loading, setLoading] = useState(false);
   const [currentAlert, setCurrentAlert] = useState(activeAlert || null);
   const [careCircle, setCareCircle] = useState([]);
+  const [resolveConfirmVisible, setResolveConfirmVisible] = useState(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const timerRef = useRef(null);
@@ -154,7 +164,7 @@ export default function EmergencySOSModal({
 
       const res = await emergencyService.triggerSOS({
         emergencyType: selectedType,
-        location: user?.address || 'Current Location',
+        location: formatAddress(user?.address) || 'Current Location',
       });
 
       const alertData = res?.data || {
@@ -173,7 +183,7 @@ export default function EmergencySOSModal({
       console.error('Trigger SOS Error in Modal:', err);
       // Fallback: Proceed to active UI anyway so senior can call hotlines
       setStage('active');
-      Alert.alert(
+      showAppAlert(
         'Emergency Alert Notice',
         'Emergency broadcast mode is active. Please call the emergency hotlines directly below for immediate assistance.'
       );
@@ -184,55 +194,47 @@ export default function EmergencySOSModal({
 
   // Resolve / Cancel SOS
   const handleResolveSOS = () => {
-    Alert.alert(
-      'Resolve Emergency SOS?',
-      'Are you safe and would you like to cancel the active emergency alert?',
-      [
-        { text: 'Keep Active', style: 'cancel' },
-        {
-          text: 'I Am Safe - Resolve SOS',
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              if (currentAlert?._id && currentAlert._id !== 'temp-alert') {
-                await emergencyService.resolveSOS(currentAlert._id, {
-                  status: 'resolved',
-                  resolutionNotes: 'Senior resolved alert via app',
-                });
-              } else {
-                await emergencyService.resolveSOS(null, {
-                  status: 'resolved',
-                });
-              }
-              setCurrentAlert(null);
-              setStage('countdown');
-              if (onAlertStatusChange) {
-                onAlertStatusChange(null);
-              }
-              onClose();
-              Alert.alert('SOS Resolved', 'Emergency alert has been cleared. Stay safe!');
-            } catch (err) {
-              console.error('Resolve SOS Error:', err);
-              setCurrentAlert(null);
-              setStage('countdown');
-              if (onAlertStatusChange) {
-                onAlertStatusChange(null);
-              }
-              onClose();
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    setResolveConfirmVisible(true);
+  };
+
+  const handleConfirmResolve = async () => {
+    setLoading(true);
+    try {
+      if (currentAlert?._id && currentAlert._id !== 'temp-alert') {
+        await emergencyService.resolveSOS(currentAlert._id, {
+          status: 'resolved',
+          resolutionNotes: 'Senior resolved alert via app',
+        });
+      } else {
+        await emergencyService.resolveSOS(null, {
+          status: 'resolved',
+        });
+      }
+      setResolveConfirmVisible(false);
+      setCurrentAlert(null);
+      setStage('countdown');
+      if (onAlertStatusChange) {
+        onAlertStatusChange(null);
+      }
+      onClose();
+    } catch (err) {
+      console.error('Resolve SOS Error:', err);
+      setResolveConfirmVisible(false);
+      setCurrentAlert(null);
+      setStage('countdown');
+      if (onAlertStatusChange) {
+        onAlertStatusChange(null);
+      }
+      onClose();
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Phone Call Hotline
   const handleCall = (phoneNumber) => {
     if (!phoneNumber) {
-      Alert.alert('Phone Number Unavailable', 'No valid phone number is registered.');
+      showAppAlert('Phone Number Unavailable', 'No valid phone number is registered.');
       return;
     }
     const cleanNumber = phoneNumber.replace(/[^0-9+]/g, '');
@@ -242,7 +244,7 @@ export default function EmergencySOSModal({
         if (supported) {
           Linking.openURL(url);
         } else {
-          Alert.alert('Calling Not Supported', `Please dial ${cleanNumber} on your device.`);
+          showAppAlert('Calling Not Supported', `Please dial ${cleanNumber} on your device.`);
         }
       })
       .catch(() => {
@@ -254,7 +256,8 @@ export default function EmergencySOSModal({
   const handleSendSMS = (targetPhone) => {
     const contactPhone = targetPhone || user?.emergencyContact?.phone;
     const seniorName = `${user?.firstName || 'Senior'} ${user?.lastName || ''}`.trim();
-    const address = user?.address ? `My address: ${user.address}.` : '';
+    const formattedAddr = formatAddress(user?.address);
+    const address = formattedAddr ? `My address: ${formattedAddr}.` : '';
     const body = `🚨 EMERGENCY SOS ALERT! I (${seniorName}) need urgent help! ${address} Please check on me or call emergency services immediately.`;
 
     const smsUrl = Platform.select({
@@ -264,7 +267,7 @@ export default function EmergencySOSModal({
     });
 
     Linking.openURL(smsUrl).catch(() => {
-      Alert.alert('SMS Dispatch', `Please send the following message to your contact:\n\n"${body}"`);
+      showAppAlert('SMS Dispatch', `Please send the following message to your contact:\n\n"${body}"`);
     });
   };
 
@@ -522,12 +525,12 @@ export default function EmergencySOSModal({
               </View>
 
               {/* User Address / Location Details */}
-              {user?.address ? (
+              {formatAddress(user?.address) ? (
                 <View style={styles.locationCard}>
                   <Ionicons name="location" size={20} color={COLORS.primary} />
                   <View style={{ flex: 1, marginLeft: 8 }}>
                     <Text style={styles.locationLabel}>Registered Address (Read to Responder):</Text>
-                    <Text style={styles.locationText}>{user.address}</Text>
+                    <Text style={styles.locationText}>{formatAddress(user?.address)}</Text>
                   </View>
                 </View>
               ) : null}
@@ -552,6 +555,19 @@ export default function EmergencySOSModal({
           )}
         </View>
       </View>
+
+      {/* In-App Resolve SOS Confirmation Modal */}
+      <ConfirmDialogModal
+        visible={resolveConfirmVisible}
+        onClose={() => setResolveConfirmVisible(false)}
+        onConfirm={handleConfirmResolve}
+        title="Resolve Emergency SOS?"
+        message="Are you safe and would you like to cancel the active emergency alert?"
+        confirmText="I Am Safe - Resolve SOS"
+        cancelText="Keep Active"
+        type="success"
+        loading={loading}
+      />
     </Modal>
   );
 }

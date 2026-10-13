@@ -19,6 +19,8 @@ import * as emergencyService from '../../services/emergencyService';
 import * as notificationService from '../../services/notificationService';
 import * as caregiverService from '../../services/caregiverService';
 import NotificationsModal from '../../components/common/NotificationsModal';
+import ConfirmDialogModal from '../../components/common/ConfirmDialogModal';
+import showAppAlert from '../../utils/alert';
 
 export default function CaregiverDashboardHome({
   onAddDependent,
@@ -39,6 +41,12 @@ export default function CaregiverDashboardHome({
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // In-App Resolve SOS Confirmation State
+  const [resolveConfirmVisible, setResolveConfirmVisible] = useState(false);
+  const [resolvingAlertId, setResolvingAlertId] = useState(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [resolveSuccessVisible, setResolveSuccessVisible] = useState(false);
 
   // Formal Caregiver stats
   const [availableAssignmentsCount, setAvailableAssignmentsCount] = useState(0);
@@ -107,33 +115,34 @@ export default function CaregiverDashboardHome({
   const handleCallSeniorOrContact = (phone) => {
     if (phone) {
       Linking.openURL(`tel:${phone}`).catch(() => {
-        Alert.alert('Calling', `Dialing ${phone}...`);
+        showAppAlert('Calling', `Dialing ${phone}...`);
       });
     }
   };
 
-  const handleResolveSOS = async (alertId) => {
-    Alert.alert(
-      'Resolve Emergency Alert',
-      'Are you sure you want to mark this emergency alert as resolved? Confirm only if the senior is safe.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm Resolved',
-          style: 'default',
-          onPress: async () => {
-            try {
-              await emergencyService.resolveSOS(alertId, 'Resolved by caregiver/family member');
-              setActiveSOS(null);
-              Alert.alert('Alert Resolved', 'The senior has been marked safe.');
-            } catch (err) {
-              console.error('Resolve SOS Error:', err);
-              Alert.alert('Error', 'Could not resolve SOS alert.');
-            }
-          },
-        },
-      ]
-    );
+  const handleResolveSOS = (alertId) => {
+    setResolvingAlertId(alertId);
+    setResolveConfirmVisible(true);
+  };
+
+  const handleConfirmResolve = async () => {
+    if (!resolvingAlertId) return;
+    setIsResolving(true);
+    try {
+      await emergencyService.resolveSOS(resolvingAlertId, {
+        status: 'resolved',
+        resolutionNotes: 'Resolved by caregiver/family member',
+      });
+      setActiveSOS(null);
+      setResolveConfirmVisible(false);
+      setResolveSuccessVisible(true);
+    } catch (err) {
+      console.error('Resolve SOS Error:', err);
+      setResolveConfirmVisible(false);
+      showAppAlert('Error', 'Could not resolve SOS alert.');
+    } finally {
+      setIsResolving(false);
+    }
   };
 
   const getStatusBadgeColor = (status) => {
@@ -239,7 +248,11 @@ export default function CaregiverDashboardHome({
               Senior: <Text style={{ fontWeight: 'bold' }}>{activeSOS.user?.firstName} {activeSOS.user?.lastName}</Text> triggered an emergency alert.
             </Text>
             <Text style={styles.sosBannerLocation}>
-              📍 {activeSOS.location || activeSOS.user?.address?.streetAddress || 'Location reported'}
+              📍 {typeof activeSOS.location === 'string'
+                ? activeSOS.location
+                : (activeSOS.location?.streetAddress
+                    ? `${activeSOS.location.streetAddress}, ${activeSOS.location.city || ''}`
+                    : (activeSOS.user?.address?.streetAddress || 'Location reported'))}
             </Text>
             <View style={styles.sosActionRow}>
               <TouchableOpacity
@@ -573,6 +586,31 @@ export default function CaregiverDashboardHome({
             fetchData();
           }
         }}
+      />
+
+      {/* In-App Resolve SOS Confirmation Modal */}
+      <ConfirmDialogModal
+        visible={resolveConfirmVisible}
+        onClose={() => setResolveConfirmVisible(false)}
+        onConfirm={handleConfirmResolve}
+        title="Resolve Emergency Alert"
+        message="Are you sure you want to mark this emergency alert as resolved? Confirm only if the senior is safe."
+        confirmText="Confirm Resolved"
+        cancelText="Cancel"
+        type="warning"
+        loading={isResolving}
+      />
+
+      {/* In-App Resolve SOS Success Modal */}
+      <ConfirmDialogModal
+        visible={resolveSuccessVisible}
+        onClose={() => setResolveSuccessVisible(false)}
+        onConfirm={() => setResolveSuccessVisible(false)}
+        title="Alert Resolved"
+        message="The senior has been marked safe."
+        confirmText="OK"
+        type="success"
+        singleButton
       />
     </View>
   );
