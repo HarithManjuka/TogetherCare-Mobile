@@ -14,6 +14,8 @@ import {
 import Icon from 'react-native-vector-icons/Ionicons';
 import { COLORS } from '../../constants/theme';
 import * as dependentService from '../../services/dependentService';
+import ConfirmDialogModal from '../../components/common/ConfirmDialogModal';
+import showAppAlert from '../../utils/alert';
 
 export default function DependentManagementScreen({
   onBack,
@@ -26,6 +28,11 @@ export default function DependentManagementScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  // In-app Unlink Confirmation States
+  const [unlinkModalVisible, setUnlinkModalVisible] = useState(false);
+  const [selectedSeniorToUnlink, setSelectedSeniorToUnlink] = useState(null);
+  const [unlinkSuccessVisible, setUnlinkSuccessVisible] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -57,34 +64,30 @@ export default function DependentManagementScreen({
   };
 
   const handleUnlink = (senior) => {
-    Alert.alert(
-      'Unlink Senior Dependent',
-      `Are you sure you want to unlink ${senior.firstName} ${senior.lastName}? You will no longer receive their alerts or manage visits.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unlink',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setActionLoading(true);
-              const res = await dependentService.unlinkDependent(senior._id);
-              if (res?.success) {
-                Alert.alert('Success', `${senior.firstName} has been unlinked.`);
-                fetchDependents();
-              } else {
-                Alert.alert('Error', res?.message || 'Failed to unlink senior');
-              }
-            } catch (err) {
-              console.error('Unlink Error:', err);
-              Alert.alert('Error', 'Server error while unlinking senior');
-            } finally {
-              setActionLoading(false);
-            }
-          },
-        },
-      ]
-    );
+    setSelectedSeniorToUnlink(senior);
+    setUnlinkModalVisible(true);
+  };
+
+  const handleConfirmUnlink = async () => {
+    if (!selectedSeniorToUnlink?._id) return;
+    try {
+      setActionLoading(true);
+      const res = await dependentService.unlinkDependent(selectedSeniorToUnlink._id);
+      if (res?.success) {
+        setUnlinkModalVisible(false);
+        setUnlinkSuccessVisible(true);
+        fetchData();
+      } else {
+        setUnlinkModalVisible(false);
+        showAppAlert('Error', res?.message || 'Failed to unlink senior');
+      }
+    } catch (err) {
+      console.error('Unlink Error:', err);
+      setUnlinkModalVisible(false);
+      showAppAlert('Error', 'Server error while unlinking senior');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   return (
@@ -256,6 +259,31 @@ export default function DependentManagementScreen({
           ))
         )}
       </ScrollView>
+
+      {/* In-App Unlink Confirmation Modal */}
+      <ConfirmDialogModal
+        visible={unlinkModalVisible}
+        onClose={() => setUnlinkModalVisible(false)}
+        onConfirm={handleConfirmUnlink}
+        title="Unlink Senior Dependent"
+        message={`Are you sure you want to unlink ${selectedSeniorToUnlink?.firstName || ''} ${selectedSeniorToUnlink?.lastName || ''}? You will no longer receive their alerts or manage visits.`}
+        confirmText="Unlink"
+        cancelText="Cancel"
+        type="danger"
+        loading={actionLoading}
+      />
+
+      {/* In-App Unlink Success Modal */}
+      <ConfirmDialogModal
+        visible={unlinkSuccessVisible}
+        onClose={() => setUnlinkSuccessVisible(false)}
+        onConfirm={() => setUnlinkSuccessVisible(false)}
+        title="Dependent Unlinked"
+        message={`${selectedSeniorToUnlink?.firstName || 'Senior'} has been unlinked successfully.`}
+        confirmText="OK"
+        type="success"
+        singleButton
+      />
     </SafeAreaView>
   );
 }
