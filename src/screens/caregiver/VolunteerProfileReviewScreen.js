@@ -123,8 +123,8 @@ export default function VolunteerProfileReviewScreen({
         <View style={styles.profileCard}>
           <View style={styles.avatar}>
             <Text style={styles.avatarText}>
-              {profile?.firstName[0]}
-              {profile?.lastName[0]}
+              {profile?.firstName ? profile.firstName[0] : 'V'}
+              {profile?.lastName ? profile.lastName[0] : ''}
             </Text>
           </View>
           <Text style={styles.volunteerName}>

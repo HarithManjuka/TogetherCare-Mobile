@@ -15,6 +15,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import client from '../../api/client';
 import { COLORS, SIZES } from '../../constants/theme';
 import CalendarDatePickerModal from '../../components/common/CalendarDatePickerModal';
+import SingleTimePickerModal from '../../components/common/SingleTimePickerModal';
 
 export default function RequestHelpScreen({ onBack, onSubmitSuccess }) {
   const [dependents, setDependents] = useState([]);
@@ -23,6 +24,7 @@ export default function RequestHelpScreen({ onBack, onSubmitSuccess }) {
   const [date, setDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [time, setTime] = useState('10:00 AM');
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [location, setLocation] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -225,7 +227,14 @@ export default function RequestHelpScreen({ onBack, onSubmitSuccess }) {
             onChangeText={setTime}
             placeholder="e.g. 10:00 AM"
           />
-          <Icon name="time-outline" size={20} color={COLORS.textSecondary} style={styles.timeIcon} />
+          <TouchableOpacity
+            style={styles.timeIconBtn}
+            onPress={() => setShowTimePicker(true)}
+            activeOpacity={0.7}
+            accessibilityLabel="Select time"
+          >
+            <Icon name="time-outline" size={22} color={COLORS.secondary} />
+          </TouchableOpacity>
         </View>
 
         {/* Location input */}
@@ -261,6 +270,15 @@ export default function RequestHelpScreen({ onBack, onSubmitSuccess }) {
         onConfirm={handleDateSelect}
         title="Select Date for Visit"
         minDate={new Date()} // Visit cannot be in the past
+      />
+
+      <SingleTimePickerModal
+        visible={showTimePicker}
+        initialTime={time}
+        selectedDate={date}
+        onConfirm={(pickedTime) => setTime(pickedTime)}
+        onClose={() => setShowTimePicker(false)}
+        title="Select Preferred Time"
       />
     </SafeAreaView>
   );
@@ -354,7 +372,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   timeInput: { flex: 1, padding: 12, fontSize: 16, color: COLORS.textPrimary },
-  timeIcon: { marginRight: 12 },
+  timeIconBtn: { padding: 10, paddingRight: 12, justifyContent: 'center', alignItems: 'center' },
   locationInput: {
     borderWidth: 1,
     borderColor: '#E2E8F0',
